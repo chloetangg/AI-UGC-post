@@ -9,6 +9,8 @@ import { useT } from "@/components/providers/language-provider";
 import { interpolate, type Dictionary } from "@/lib/i18n";
 import type { FinalSlide } from "@/lib/cover/post-layout";
 import {
+  buildRednoteText,
+  canShareFiles,
   collectRednoteDownloads,
   copyRednoteText,
   formatRednotePasteText,
@@ -16,6 +18,7 @@ import {
   openRednotePublish,
   saveRednoteImage,
   saveRednoteImages,
+  shareToRednote,
   type PublishStatus,
   type RednotePublishPackage,
   type SaveImagesResult,
@@ -31,7 +34,9 @@ export function PublishAssistant({
 }) {
   const t = useT();
   const mobile = useSyncExternalStore(emptySubscribe, isMobileDevice, () => false);
+  const fileShare = useSyncExternalStore(emptySubscribe, canShareFiles, () => false);
   const pasteText = useMemo(() => formatRednotePasteText(pkg), [pkg]);
+  const shareText = useMemo(() => buildRednoteText(pkg), [pkg]);
   const downloads = useMemo(() => collectRednoteDownloads(pkg), [pkg]);
   const hashtagsLine = pkg.hashtags.join(" ");
 
@@ -42,11 +47,14 @@ export function PublishAssistant({
   const [showMore, setShowMore] = useState(false);
   const [openFailed, setOpenFailed] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [filesPartial, setFilesPartial] = useState(false);
   const [saveHint, setSaveHint] = useState<"share" | "long-press" | "cancelled" | "">("");
   const [showAlbumGuide, setShowAlbumGuide] = useState(false);
 
-  const heading = status === "idle" || status === "preparing" ? t.publish.title : t.publish.titleReady;
-  const subtitle = statusMessage(status, openFailed, t);
+  const heading =
+    status === "idle" || status === "preparing" || status === "cancelled"
+      ? t.publish.title
+      : t.publish.titleReady;
 
   async function copyAll() {
     const ok = await copyRednoteText(pasteText);
@@ -57,17 +65,52 @@ export function PublishAssistant({
     return ok;
   }
 
+  async function copyShareText() {
+    const ok = await copyRednoteText(shareText);
+    setCopied(ok);
+    setCopyFailed(!ok);
+    if (!ok) setShowPaste(true);
+    return ok;
+  }
+
   async function publishToRednote() {
     if (busy) return;
     setBusy(true);
     setOpenFailed(false);
+    setFilesPartial(false);
     setStatus("preparing");
-    await copyAll();
+
+    const result = await shareToRednote(pkg);
+    setCopied(result.copied);
+    setCopyFailed(!result.copied);
+    setFilesPartial(result.filesPartial);
+    if (!result.copied) setShowPaste(true);
+
+    if (result.outcome === "shared") {
+      setStatus("shared");
+    } else if (result.outcome === "cancelled") {
+      setStatus("cancelled");
+    } else if (result.outcome === "fallback-opened") {
+      setStatus("completed");
+      setShowPaste(true);
+      if (!fileShare) setShowAlbumGuide(true);
+    } else {
+      setOpenFailed(true);
+      setStatus(result.filesPartial ? "files-partial" : "fallback");
+      setShowPaste(true);
+      if (!fileShare) setShowAlbumGuide(true);
+    }
+    setBusy(false);
+  }
+
+  async function openRednoteOnly() {
+    if (busy) return;
+    setBusy(true);
+    await copyShareText();
     setStatus("opening-rednote");
     const result = await openRednotePublish();
     if (result === "opened") {
       setStatus("completed");
-      setShowPaste(true);
     } else {
       setOpenFailed(true);
       setStatus("fallback");
@@ -112,7 +155,7 @@ export function PublishAssistant({
           {heading}
         </h1>
         <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-muted-foreground">
-          {status === "idle" ? t.publish.subtitle : subtitle}
+          {status === "idle" ? t.publish.subtitle : statusMessage(status, openFailed, t)}
         </p>
       </div>
 
@@ -132,7 +175,7 @@ export function PublishAssistant({
               <button
                 type="button"
                 className="text-xs font-semibold text-primary"
-                onClick={() => saveOne(pkg.coverImageUrl, "baan-ying-cover.png")}
+                onClick={() => saveOne(pkg.coverImageUrl, downloads[0]?.fileName || "rednote-cover.png")}
               >
                 {t.publish.copyCover}
               </button>
@@ -147,16 +190,12 @@ export function PublishAssistant({
 
       <section className="rounded-3xl border border-border bg-card p-4 shadow-sm">
         <ul className="space-y-2.5">
-          <CheckRow done={Boolean(pkg.title)} label={t.publish.checkTitle} />
-          <CheckRow done={Boolean(pkg.caption)} label={t.publish.checkCaption} />
+          <CheckRow done={Boolean(pkg.coverImageUrl)} label={t.publish.checkCover} />
           <CheckRow
-            done={pkg.hashtags.length > 0}
-            label={interpolate(t.publish.checkHashtags, { count: pkg.hashtags.length })}
+            done={downloads.length > 0}
+            label={interpolate(t.publish.checkImageCount, { count: downloads.length })}
           />
-          <CheckRow
-            done={Boolean(pkg.coverImageUrl) || pkg.photos.length > 0}
-            label={t.publish.checkPhotos}
-          />
+          <CheckRow done={copied} label={copied ? t.publish.checkCopied : t.publish.checkCopyPending} />
         </ul>
       </section>
 
@@ -168,12 +207,20 @@ export function PublishAssistant({
             </li>
             <li className="text-foreground">{t.publish.stepPhotos}</li>
             <li className="text-foreground">
-              {status === "opening-rednote" || status === "completed"
-                ? t.publish.stepOpening
-                : t.publish.stepOpen}
+              {fileShare && (status === "shared" || status === "sharing" || status === "files-partial")
+                ? t.publish.stepShare
+                : status === "opening-rednote" || status === "completed"
+                  ? t.publish.stepOpening
+                  : t.publish.stepOpen}
             </li>
           </ul>
         </section>
+      ) : null}
+
+      {filesPartial && status !== "cancelled" && status !== "files-partial" ? (
+        <p className="whitespace-pre-wrap text-sm leading-relaxed text-destructive">
+          {t.publish.statusFilesPartial}
+        </p>
       ) : null}
 
       {copyFailed || showPaste ? (
@@ -181,27 +228,36 @@ export function PublishAssistant({
           {copyFailed ? (
             <p className="mb-3 text-sm text-destructive">{t.publish.statusCopyFailed}</p>
           ) : null}
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+              {t.publish.captionLabel}
+            </h2>
+            <CopyButton label={t.publish.copyAll} value={pasteText} />
+          </div>
           <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-foreground select-text">
             {pasteText}
           </p>
         </section>
       ) : null}
 
-      {status === "fallback" ? (
+      {status === "shared" || status === "fallback" || status === "files-partial" ? (
         <p className="text-sm leading-relaxed text-muted-foreground whitespace-pre-wrap">
           {t.publish.statusAppMissing}
         </p>
       ) : null}
 
       <div className="space-y-2">
-        {mobile ? (
-          <Button className="w-full" variant="outline" onClick={copyAll}>
-            {t.publish.copyAll}
-          </Button>
-        ) : null}
+        <Button className="w-full" variant="outline" onClick={copyAll}>
+          {t.publish.copyAll}
+        </Button>
         <Button className="w-full" variant="outline" onClick={saveAll}>
           {t.publish.saveAll}
         </Button>
+        {!mobile || !fileShare || status !== "idle" ? (
+          <Button className="w-full" variant="outline" disabled={busy} onClick={openRednoteOnly}>
+            {t.publish.openXiaohongshu}
+          </Button>
+        ) : null}
         {mobile ? (
           <p className="text-sm leading-relaxed text-muted-foreground">{t.publish.saveShareHint}</p>
         ) : null}
@@ -222,7 +278,7 @@ export function PublishAssistant({
 
       <button
         type="button"
-        className="flex w-full items-center justify-center gap-1 pt-1 text-xs font-semibold text-muted-foreground"
+        className="flex w-full items-center justify-between gap-1 pt-1 text-xs font-semibold text-muted-foreground"
         onClick={() => setShowMore((open) => !open)}
       >
         {t.publish.moreActions}
@@ -300,8 +356,11 @@ function statusMessage(
   openFailed: boolean,
   t: Dictionary,
 ) {
-  if (status === "preparing") return t.publish.statusPreparing;
+  if (status === "preparing" || status === "sharing") return t.publish.statusPreparing;
   if (status === "ready" || status === "copied") return t.publish.statusReady;
+  if (status === "cancelled") return t.publish.statusCancelled;
+  if (status === "shared") return t.publish.statusShared;
+  if (status === "files-partial") return t.publish.statusFilesPartial;
   if (status === "opening-rednote") return t.publish.statusOpening;
   if (status === "completed") return t.publish.statusOpened;
   if (status === "fallback") {

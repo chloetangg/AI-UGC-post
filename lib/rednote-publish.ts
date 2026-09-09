@@ -8,6 +8,10 @@ export type PublishStatus =
   | "preparing"
   | "ready"
   | "copied"
+  | "sharing"
+  | "shared"
+  | "cancelled"
+  | "files-partial"
   | "opening-rednote"
   | "fallback"
   | "completed";
@@ -50,6 +54,14 @@ export type RednoteDownloadItem = {
 
 export type OpenRednoteResult = "opened" | "failed";
 
+export type ShareToRednoteOutcome = "shared" | "cancelled" | "fallback-opened" | "fallback-failed";
+
+export type ShareToRednoteResult = {
+  outcome: ShareToRednoteOutcome;
+  filesPartial: boolean;
+  copied: boolean;
+};
+
 function joinBlocks(parts: Array<string | null | undefined>) {
   return parts
     .map((part) => (part ?? "").trim())
@@ -62,10 +74,39 @@ function photoFileName(name: string | undefined, index: number) {
   return raw.replace(/[^\w.\u4e00-\u9fff-]+/g, "-");
 }
 
+function extensionFromName(name: string) {
+  const match = name.match(/\.(png|jpe?g|webp)$/i);
+  if (!match) return "";
+  const ext = match[1].toLowerCase();
+  return ext === "jpeg" ? "jpg" : ext;
+}
+
+function extensionFromMime(mime: string) {
+  if (mime === "image/png") return "png";
+  if (mime === "image/webp") return "webp";
+  if (mime === "image/jpeg") return "jpg";
+  return "";
+}
+
+export function publishFileName(item: Pick<RednoteDownloadItem, "kind" | "fileName">, arrayIndex: number) {
+  const ext = extensionFromName(item.fileName) || (item.kind === "cover" ? "png" : "jpg");
+  if (item.kind === "cover") return `rednote-cover.${ext}`;
+  return `rednote-photo-${String(arrayIndex + 1).padStart(2, "0")}.${ext}`;
+}
+
 /** Caption + hashtags only. Title stays out of this string. */
 export function formatRednoteFullText(caption: string, hashtags: string[]) {
   const tags = hashtags.filter(Boolean).join(" ");
   return joinBlocks([caption, tags]);
+}
+
+/** Caption (with Location & Time) + hashtags. Title stays in `finalTitle`. */
+export function buildRednoteText(pkg: Pick<RednotePublishPackage, "caption" | "hashtags">) {
+  return formatRednoteFullText(pkg.caption, pkg.hashtags);
+}
+
+export function finalTitle(pkg: Pick<RednotePublishPackage, "title">) {
+  return pkg.title;
 }
 
 /** Paste-ready block: title, caption (with Location & Time), hashtags. */
@@ -107,23 +148,38 @@ export function prepareRednotePublishPackage(source: RednotePublishSource): Redn
 
 export function collectRednoteDownloads(pkg: RednotePublishPackage): RednoteDownloadItem[] {
   const items: RednoteDownloadItem[] = [];
+  const seen = new Set<string>();
+
+  const pushItem = (item: Omit<RednoteDownloadItem, "fileName" | "labelIndex"> & { fileName?: string }) => {
+    const url = item.url.trim();
+    if (!url || seen.has(url)) return;
+    seen.add(url);
+    const labeled: RednoteDownloadItem = {
+      key: item.key,
+      url,
+      kind: item.kind,
+      labelIndex: items.length + 1,
+      fileName: item.fileName || (item.kind === "cover" ? "rednote-cover.png" : `photo-${items.length + 1}.jpg`),
+    };
+    labeled.fileName = publishFileName(labeled, items.length);
+    items.push(labeled);
+  };
+
   if (pkg.coverImageUrl) {
-    items.push({
+    pushItem({
       key: "cover",
       url: pkg.coverImageUrl,
-      fileName: "baan-ying-cover.png",
       kind: "cover",
-      labelIndex: 1,
+      fileName: "rednote-cover.png",
     });
   }
   for (const photo of pkg.photos) {
     if (pkg.coverImageUrl && photo.isCover) continue;
-    items.push({
+    pushItem({
       key: `photo-${photo.index}`,
       url: photo.url,
-      fileName: photo.fileName || `baan-ying-photo-${photo.index + 1}.jpg`,
       kind: "photo",
-      labelIndex: items.length + 1,
+      fileName: photo.fileName,
     });
   }
   return items;
@@ -175,6 +231,10 @@ function imageMime(fileName: string, blobType: string) {
 }
 
 function imageFileName(fileName: string, mime: string) {
+  const ext = extensionFromMime(mime);
+  if (ext && /\.(png|jpe?g|webp)$/i.test(fileName)) {
+    return fileName.replace(/\.(png|jpe?g|webp)$/i, `.${ext}`);
+  }
   if (/\.(png|jpe?g|webp)$/i.test(fileName)) return fileName;
   if (mime === "image/png") return `${fileName}.png`;
   if (mime === "image/webp") return `${fileName}.webp`;
@@ -183,7 +243,17 @@ function imageFileName(fileName: string, mime: string) {
 
 async function urlToBlob(url: string) {
   const response = await fetch(url);
+  if (!response.ok && !url.startsWith("data:") && !url.startsWith("blob:")) {
+    throw new Error("Could not read image");
+  }
   return response.blob();
+}
+
+export async function urlToFile(url: string, fileName: string, mimeType?: string): Promise<File> {
+  const blob = await urlToBlob(url);
+  const mime = mimeType || imageMime(fileName, blob.type);
+  const named = imageFileName(fileName, mime);
+  return new File([blob], named, { type: mime });
 }
 
 async function urlToObjectUrl(url: string) {
@@ -192,30 +262,92 @@ async function urlToObjectUrl(url: string) {
 }
 
 async function itemToImageFile(item: RednoteDownloadItem) {
-  const blob = await urlToBlob(item.url);
-  const mime = imageMime(item.fileName, blob.type);
-  const named = imageFileName(item.fileName, mime);
-  return new File([blob], named, { type: mime });
+  return urlToFile(item.url, item.fileName);
+}
+
+function probeShareFile() {
+  return new File([new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])], "rednote-cover.png", {
+    type: "image/png",
+  });
+}
+
+function canShareData(data: ShareData) {
+  if (typeof navigator === "undefined") return false;
+  if (typeof navigator.canShare !== "function") return false;
+  try {
+    return navigator.canShare(data);
+  } catch {
+    return false;
+  }
+}
+
+export function canShareFiles() {
+  if (typeof navigator === "undefined") return false;
+  if (typeof navigator.share !== "function") return false;
+  if (typeof navigator.canShare !== "function") return false;
+  if (typeof window !== "undefined" && !window.isSecureContext) return false;
+  return canShareData({ files: [probeShareFile()] });
 }
 
 export function canShareImagesToPhotos() {
-  if (typeof navigator === "undefined") return false;
-  if (!window.isSecureContext) return false;
-  return typeof navigator.share === "function";
+  return canShareFiles();
+}
+
+export async function buildPublishFiles(pkg: RednotePublishPackage): Promise<File[]> {
+  const items = collectRednoteDownloads(pkg);
+  const files: File[] = [];
+  for (const [index, item] of items.entries()) {
+    files.push(await urlToFile(item.url, publishFileName(item, index)));
+  }
+  return files;
+}
+
+async function buildPublishFilesLenient(pkg: RednotePublishPackage) {
+  const items = collectRednoteDownloads(pkg);
+  const files: File[] = [];
+  let failed = 0;
+  for (const [index, item] of items.entries()) {
+    try {
+      files.push(await urlToFile(item.url, publishFileName(item, index)));
+    } catch {
+      failed += 1;
+    }
+  }
+  return { files, items, failed };
+}
+
+function isShareAbort(error: unknown) {
+  return error instanceof DOMException && error.name === "AbortError";
+}
+
+async function sharePublishFiles(files: File[], title: string, text: string): Promise<"shared" | "cancelled" | "failed"> {
+  if (files.length === 0 || typeof navigator.share !== "function") return "failed";
+  const full: ShareData = { files, title, text };
+  const filesOnly: ShareData = { files };
+  const payload = canShareData(full) ? full : canShareData(filesOnly) ? filesOnly : null;
+  if (!payload) return "failed";
+  try {
+    await navigator.share(payload);
+    return "shared";
+  } catch (error) {
+    if (isShareAbort(error)) return "cancelled";
+    if (payload !== filesOnly && canShareData(filesOnly)) {
+      try {
+        await navigator.share(filesOnly);
+        return "shared";
+      } catch (retry) {
+        if (isShareAbort(retry)) return "cancelled";
+      }
+    }
+    return "failed";
+  }
 }
 
 async function shareImageFiles(files: File[]) {
   if (files.length === 0 || typeof navigator.share !== "function") return "failed" as const;
-  try {
-    if (typeof navigator.canShare === "function" && !navigator.canShare({ files })) {
-      return "failed" as const;
-    }
-    await navigator.share({ files, title: files.length > 1 ? "Baan Ying photos" : files[0]?.name });
-    return "shared" as const;
-  } catch (error) {
-    if (error instanceof DOMException && error.name === "AbortError") return "cancelled" as const;
-    return "failed" as const;
-  }
+  const shared = await sharePublishFiles(files, files.length > 1 ? "Baan Ying photos" : files[0]?.name || "", "");
+  if (shared === "shared" || shared === "cancelled") return shared;
+  return "failed" as const;
 }
 
 /** Prefer the system share sheet so the customer can save into Photos. */
@@ -312,7 +444,7 @@ export async function downloadRednoteImages(pkg: RednotePublishPackage) {
 
 /**
  * Open the official Rednote publish screen.
- * Content is not passed through the URL — injection stays a separate future hook.
+ * Content is not passed through the URL — no undocumented params.
  */
 export function openRednotePublish(): Promise<OpenRednoteResult> {
   if (typeof window === "undefined") return Promise.resolve("failed");
@@ -348,4 +480,41 @@ export function openRednotePublish(): Promise<OpenRednoteResult> {
       finish("failed");
     }, 1600);
   });
+}
+
+export async function fallbackRednotePublish(pkg: RednotePublishPackage): Promise<ShareToRednoteOutcome> {
+  await copyRednoteText(buildRednoteText(pkg));
+  await saveRednoteImages(pkg);
+  const opened = await openRednotePublish();
+  return opened === "opened" ? "fallback-opened" : "fallback-failed";
+}
+
+/**
+ * Primary: Web Share the cover + photos.
+ * Fallback: copy text, save images, open xhsdiscover://post.
+ */
+export async function shareToRednote(pkg: RednotePublishPackage): Promise<ShareToRednoteResult> {
+  const { files, items, failed } = await buildPublishFilesLenient(pkg);
+  const filesPartial = failed > 0 || (items.length > 0 && files.length === 0);
+  const copied = await copyRednoteText(buildRednoteText(pkg));
+  const title = finalTitle(pkg);
+  const text = buildRednoteText(pkg);
+
+  if (canShareFiles() && files.length > 0) {
+    if (canShareData({ files })) {
+      const shared = await sharePublishFiles(files, title, text);
+      if (shared === "shared" || shared === "cancelled") {
+        return { outcome: shared, filesPartial, copied };
+      }
+    }
+    const opened = await openRednotePublish();
+    return {
+      outcome: opened === "opened" ? "fallback-opened" : "fallback-failed",
+      filesPartial,
+      copied,
+    };
+  }
+
+  const outcome = await fallbackRednotePublish(pkg);
+  return { outcome, filesPartial, copied };
 }
