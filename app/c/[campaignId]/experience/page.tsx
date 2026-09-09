@@ -117,7 +117,7 @@ export default function ExperiencePage() {
         title={t.campaign.title}
         subtitle={t.campaign.subtitle}
       />
-      <div className="space-y-7 pb-4">
+      <div className="space-y-7 pb-28">
         <section className="space-y-3">
           <div>
             <h2 className="text-base font-semibold">{t.experience.q2Title}</h2>
@@ -233,6 +233,9 @@ export default function ExperiencePage() {
           <p className="text-sm text-muted-foreground">
             {interpolate(t.experience.q7Hint, { count: noteCount })}
           </p>
+          {touched && !noteReady ? (
+            <p className="text-sm text-destructive">{t.experience.q7Error}</p>
+          ) : null}
         </section>
         {touched && !requiredChoicesReady ? (
           <p className="text-sm text-destructive">
@@ -241,9 +244,6 @@ export default function ExperiencePage() {
         ) : null}
         {touched && !expenseReady ? (
           <p className="text-sm text-destructive">{t.experience.qExpenseError}</p>
-        ) : null}
-        {touched && !noteReady ? (
-          <p className="text-sm text-destructive">{t.experience.q7Error}</p>
         ) : null}
       </div>
       <StickyAction onClick={continueNext}>{t.common.continue}</StickyAction>

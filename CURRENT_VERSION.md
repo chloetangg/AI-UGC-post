@@ -1,8 +1,8 @@
 # AI 小红书 / Rednote UGC 生成器｜当前版本说明
 
-**版本：** Consumer Demo v0.10  
-**日期：** 2026-09-06  
-**状态：** 消费者端前端 + OpenAI 真实生成（标题 / 正文 / 话题标签 / 封面标题 / 封面选图）+ 内部 Content Strategy Layer（KSP → Storyline → Content Angle → Search Keyword）+ Cover Composer 自动合成 4:5 封面；POST 页可选 Template 1–10
+**版本：** Consumer Demo v0.11  
+**日期：** 2026-09-09  
+**状态：** 消费者端前端 + OpenAI 真实生成（标题 / 正文 / 话题标签 / 封面 mainTitle + subTitle / 封面选图）+ 内部 Content Strategy Layer + Cover Composer + MongoDB 保存 YOU 资料与 FEEL 餐费 + GitHub / Vercel 部署
 
 这不是完整产品 spec。本文记录**现在已经上线到 Demo 里的行为**。
 
@@ -14,13 +14,16 @@
 
 英文界面称平台为 **Rednote**；中文界面称 **小红书**。生成的帖子一律是简体中文。
 
+代码仓库：[https://github.com/chloetangg/AI-UGC-post](https://github.com/chloetangg/AI-UGC-post)  
+部署：Vercel（Hobby）。
+
 消费者进入后：
 
-1. YOU：填写年龄、来自哪里，并同意隐私政策
-2. FEEL：选择用餐体验
+1. YOU：年龄、性别、来自哪个国家
+2. FEEL：游客/本地、是否第一次、本餐开销、喜欢的点、推荐菜、推荐理由、用餐补充说明
 3. PHOTOS：上传 1–5 张照片
-4. Generating：一次 OpenAI 请求写出标题 + 正文 + 5 个标签 + 1 个封面标题 + 封面照片选择；系统追加 Location & Time，再调用 Cover Composer 自动生成封面
-5. POST：看封面、换封面模板（Template 1–10）、选正文标题、改正文、改动态标签；封面标题由系统叠字，用户不必另选 Cover Title
+4. Generating：一次 OpenAI 请求写出标题 + 正文 + 5 个标签 + 封面 mainTitle / subTitle + 封面照片选择；系统追加 Location & Time，再调用 Cover Composer 自动生成封面
+5. POST：看封面、换封面模板（Template 1–10）、选正文标题、改正文、改动态标签
 6. SHARE：分块复制文案，可保存已生成的封面，自己去小红书发布
 
 生成目标口吻：
@@ -29,23 +32,35 @@
 
 不是品牌广告、不是正式餐厅评测、也不是把问卷关键词拼成文章。
 
-**没有：** 注册、登录、品牌 Dashboard、MongoDB、Cloudinary、小红书自动发布、AI 生图。
+**没有：** 注册、登录、品牌 Dashboard、Cloudinary、小红书自动发布、AI 生图。  
+**已有：** MongoDB Atlas 保存 YOU 页客户资料 + FEEL 页餐费（同一条 `submissions` 记录）。
 
 ---
 
 ## 2. 如何运行
 
 ```bash
-cd "AI UGC Content"
+cd "/Users/wenhueyyy/Downloads/AI UGC Content"
 npm install
 npm run dev
 ```
 
-打开：**http://localhost:3000**
+打开：**http://localhost:3000**（若被占用则看终端实际端口，常见 3001）。
 
 `/` 会跳到 `/c/baan-ying/customer`。
 
-需要 `.env.local` 里的 `OPENAI_API_KEY`。可选：`OPENAI_MODEL`（默认 `gpt-4o`）。
+`.env.local`（不提交 Git）：
+
+```text
+OPENAI_API_KEY=
+OPENAI_MODEL=gpt-4o
+MONGODB_URI=
+MONGODB_DB_NAME=baan-ying
+```
+
+生成帖子必须有 `OPENAI_API_KEY`。MongoDB 只用于保存 YOU / 餐费；缺了不会挡住翻页，但数据不会入库。
+
+Vercel 需配置同样的环境变量（Production / Preview / Development），改完后 Redeploy。生成走 OpenAI，不走 MongoDB。
 
 如果浏览器报 `ERR_CONNECTION_REFUSED`，说明 `npm run dev` 没在跑。
 
@@ -59,13 +74,13 @@ npm run dev
 | 语言 | TypeScript |
 | 样式 | Tailwind CSS v4 |
 | UI | shadcn/ui + 自定义下拉 `MenuSelect` |
-| 流程状态 | React 内存（同一次填写可前后翻页） |
-| 客户资料 | **不写入** `sessionStorage`；刷新 / 重新打开 = 空表单 |
+| 流程状态 | React 内存（同一次填写可前后翻页）；Continue 不等待 MongoDB |
+| 客户资料 | YOU 的年龄 / 性别 / 国家，以及 FEEL 餐费，写入 MongoDB `baan-ying.submissions`；刷新后表单仍清空 |
 | UI 语言 | `localStorage` key：`xhs-ugc-ui-language` |
-| AI | OpenAI Chat Completions，**一次请求**写出标题 + 正文 + 标签 + 封面标题 + 封面选图；每次生成会在服务端控制台和浏览器 console 打印 token / 费用（含 `Calls:`） |
-| 照片 | 浏览器 `File API` + `URL.createObjectURL()`，用户上传的全部 1–5 张都会发给模型做封面选择 |
-| 封面 | 现有 Cover Composer：`POST /api/compose-cover`，服务端真实中文字体渲染 1080×1350 PNG；**不是** OpenAI 请求 |
-| 计价 | `lib/openai-pricing.ts`（按百万 token 的官方牌价，可改） |
+| AI | OpenAI Chat Completions，**一次请求**写出标题 + 正文 + 标签 + 封面 mainTitle / subTitle + 封面选图 |
+| 照片 | 浏览器 `File API`；发给 `/api/generate` 前会在客户端压缩，避免 Vercel 4.5MB 限制 |
+| 封面 | Cover Composer：`POST /api/compose-cover`；字体从 `public/fonts` 读取（Vercel 需 file tracing） |
+| 数据库 | MongoDB Atlas；接口 `POST /api/submissions` |
 
 主色：Baan Ying 森林绿。手机宽布局，`max-w-[430px]`。页面标题：`Rednote UGC Generator`。
 
@@ -76,9 +91,9 @@ npm run dev
 ```text
 打开网站（空表单）
         ↓
-YOU（年龄 / 来自哪里 + 同意隐私政策）
+YOU（年龄 / 性别 / 来自哪个国家）
         ↓
-FEEL（7 道用餐问题）
+FEEL（游客或本地 / 是否第一次 / 本餐开销 / 喜欢的点 / 菜 / 理由 / 补充说明）
         ↓
 PHOTOS（上传 1–5 张）
         ↓
@@ -91,7 +106,7 @@ SHARE（分别复制标题、正文、标签；可保存封面）
 
 进度条中英文都是：**YOU → FEEL → PHOTOS → POST → SHARE**
 
-流程守卫：没填完 YOU、FEEL（含第 7 题至少 10 个计数单位）、Photos，不能进后面的步骤。
+流程守卫：没填完 YOU、FEEL（含餐费、第 7 题至少 10 个计数单位）、Photos，不能进后面的步骤。
 
 刷新或重新打开页面，表单清空，从 YOU 重新开始。同一次访问里按返回，已填内容还在。
 
@@ -103,8 +118,8 @@ SHARE（分别复制标题、正文、标签；可保存封面）
 | --- | --- |
 | `/` | 跳转到 `/c/baan-ying/customer` |
 | `/c/[campaignId]` | 跳转到 `customer` |
-| `/c/[campaignId]/customer` | YOU：年龄、来自哪里、可选性别、同意隐私政策 |
-| `/c/[campaignId]/experience` | FEEL：7 道体验问题 |
+| `/c/[campaignId]/customer` | YOU：年龄、性别、来自哪个国家 |
+| `/c/[campaignId]/experience` | FEEL：游客/本地、是否第一次、餐费、喜欢的点、菜、理由、补充说明 |
 | `/c/[campaignId]/preferences` | 重定向到 experience |
 | `/c/[campaignId]/upload` | PHOTOS：上传 1–5 张照片 |
 | `/c/[campaignId]/generating` | 生成中 |
@@ -116,7 +131,8 @@ SHARE（分别复制标题、正文、标签；可保存封面）
 
 消费者主生成接口：`POST /api/generate`  
 封面合成接口：`POST /api/compose-cover`（非 OpenAI）  
-另有 `POST /api/generate-content`（JSON 入参的备用生成接口，同样会系统追加 Location & Time）。
+顾客资料接口：`POST /api/submissions`（YOU + 餐费 upsert）  
+另有 `POST /api/generate-content`（JSON 入参的备用生成接口）。
 
 ---
 
@@ -147,28 +163,37 @@ SHARE（分别复制标题、正文、标签；可保存封面）
 
 **不再收集** Name / Nickname、Email、Phone Number。表单上已删除这三项；继续不依赖它们。
 
-必填：
+**当前表单没有同意勾选。** `ConsentCheckbox` 组件和 i18n 同意句仍在代码里，但 YOU 页不渲染。隐私政策页仍可从路由进入。
 
-- Age Range：`18-24` / `25-34` / `35-44` / `45+`
-- Origins（来自哪里；会作为 diner origin 传给生成）
-- Consent（必须勾选才能继续）
+必填三项：
 
-选填：
+| 字段 | 规则 |
+| --- | --- |
+| Age Range | `18-24` / `25-34` / `35-44` / `45+` |
+| Gender | `female` / `male` / `non-binary` / `prefer-not-to-say`（**必填**） |
+| Origins | **只选国家**，不是城市。占位和搜索框：EN `Where are you from?` / 中文 `你来自哪里？` |
 
-- Gender：`female` / `male` / `non-binary` / `prefer-not-to-say`
+Origins 下拉置顶：Thailand、Singapore、Malaysia、China、Hong Kong、Taiwan。值写入英文国名（如 `Thailand`），并带上 `countryIso2` / `countryCode`。会作为 diner origin 传给生成。
 
-没有自定义问答题。资料只存在当前访问内存，不上传数据库、刷新即清空。生成文案**不会使用真实姓名**（页面也不再收集姓名）。
+没有自定义问答题。生成文案**不会使用真实姓名**（页面也不再收集姓名）。
 
 Age Range 和 Gender 使用自定义下拉：圆角按钮、右侧箭头、点开后是选项列表，不再用系统 `select`。
 
-内部 `CustomerInfo` 仍保留空的 `name` / `email` / `phone*` 字段，不展示、不校验，方便把 YOU 快照还原成旧版。旧版完整代码在 `snapshots/you-page-2026-09-06/`。
+点 Continue 时 `void saveYouPage()`：**不等待** MongoDB 返回就翻到 FEEL。刷新后表单仍清空；同一 `submissionId` 在本次访问内可 upsert。
 
-### 7.1 同意勾选
+内部 `CustomerInfo` 仍保留空的 `name` / `email` / `phone*` / `consent` 字段，不展示、不校验。旧版完整代码在 `snapshots/you-page-2026-09-06/`。
 
-勾选文案与隐私政策页正文不同。勾选框是第一人称同意句，其中 **Privacy Policy / 《隐私政策》** 可点进政策页：
+MongoDB `baan-ying.submissions` 保存：
 
-- EN：I have read and agree to the Privacy Policy. My information will be used to analyze this campaign's performance and generate my Rednote post.
-- 中文：我已阅读并同意《隐私政策》。我的信息将用于分析本次活动效果，并生成我的小红书文案。
+```text
+customer.ageRange
+customer.gender
+customer.location
+customer.countryIso2
+customer.countryCode
+```
+
+不保存照片、不保存用餐补充说明。
 
 ---
 
@@ -197,28 +222,29 @@ Age Range 和 Gender 使用自定义下拉：圆角按钮、右侧箭头、点�
 - EN：You will also upload photos from your visit.
 - 中文：你也将上传用餐照片。
 
-收集范围**不含**姓名、邮箱、电话。包含年龄区间、来自哪里、可选性别，以及用餐体验补充说明（FEEL 第 7 题）：
-
-- EN：This campaign page collects your age range, your place of origin, and optional details such as gender and dining preferences (e.g. branch visited, number of visits, dishes recommended, and a short note about your dining experience).
-- 中文：本活动页面会收集你的年龄区间、所在地区，以及性别（选填）、用餐偏好（如到访门店、到访次数、推荐菜品、用餐体验补充说明）等信息。
+收集范围**不含**姓名、邮箱、电话。隐私页英文/中文仍写「性别选填、到访门店」等旧表述；**实际表单已变**：性别必填、不选分店、增加本餐开销（THB）。政策文案尚未完全跟上表单。
 
 联系邮箱：**admin@trendplay.com.sg**（可点 `mailto`）。
 
-政策正文写明：回答会在活动结束后保存最多 12 个月，用于效果分析。**当前 Demo 实现仍不写入数据库**；刷新即清空。政策文案是面向正式上线的说明，不是当前存储实现。
+政策正文写明：回答会在活动结束后保存最多 12 个月。**当前实现：** MongoDB 只存 YOU（年龄 / 性别 / 国家）和 FEEL 餐费；照片、用餐补充说明、问卷多选项**不入库**。刷新后浏览器表单仍清空。
 
 ---
 
-## 9. FEEL（7 道问题）
+## 9. FEEL（体验问卷）
+
+**没有分店选择题。** 用餐地点一律由系统定为 `Baan Ying (centralwOrld, 3rd Floor)`（`DEFAULT_BAAN_YING_BRANCH` / `resolveDiningBranch()`）。Location & Time 始终用 centralwOrld 官方地点和营业时间。`centralwOrld` 可作为封面两个关键词之一。
 
 | # | 问题 | 必填 | 选项 |
 | --- | --- | --- | --- |
-| 1 | Which Baan Ying branch did you dine at? | 单选必填 | centralwOrld 3 楼 / Siam Center 2 楼 / Terminal 21 5 楼 / One Bangkok 3 楼 / Baan Ying（无商场） |
-| 2 | Are you a tourist or a local? | 单选必填 | Tourist / Local |
-| 3 | How many times have you visited Baan Ying? | 单选必填 | `1st time`（中文：第一次） / `1-5 times` / `More than 5 times` |
+| 1 | Are you a tourist or a local? | 单选必填 | Tourist / Local |
+| 2 | Is this your first time at Baan Ying? | 单选必填 | 内部值 `1st time` / `Not first time`。UI：EN Yes / No；中文 是 / 不是 |
+| 3 | How much is the total expenses for this meal? | 必填 | THB 金额；写入 Mongo `mealExpenseThb` |
 | 4 | What did you enjoy most? | 多选可选 | The food / flavors / presentation / variety / atmosphere / service / overall experience |
 | 5 | What dish would you recommend the most? | 多选可选 | Yellow Curry Crab Meat / Tom Yum Goong / Thai Sweet & Sour Steamed Fish / Stir-Fried Shrimp with Garlic / Mango Sticky Rice / Others（可填其他） |
 | 6 | Why do you recommend it? | 多选可选 | Delicious / Flavorful / Authentic / Fresh / Tender / Crispy / Fragrant / Rich / Creamy / Satisfying / Well-balanced（**没有 Others**） |
-| 7 | Tell us more about your dining experience | 必填 | 多行文本框 |
+| 7 | Tell us more about your dining experience | 必填 | 多行文本框；**不写入 Mongo** |
+
+点 Continue 时 `void saveFeelExpense()`：不等待 Mongo 就翻到 PHOTOS。
 
 第 7 题标题下**不再**显示「中文按字计算…」这类说明。输入框下方仍显示 `{count} / 10`。至少 **10 个计数单位** 才能继续：
 
@@ -232,7 +258,7 @@ Age Range 和 Gender 使用自定义下拉：圆角按钮、右侧箭头、点�
 
 选项内部值保持英文（给 AI 用）。中文 UI 只翻译显示文案。
 
-`1st time` 按第一次到访写，不要写成回头客。`1-5 times` 仍可写成初次发现感。`More than 5 times` 才按回头客写。
+`1st time`（Yes / 是）按第一次到访写，不要写成回头客。`Not first time`（No / 不是）表示来过，不要写成第一次发现；除非用餐说明里写明常来，否则不要发明「每次来 / 又来了」。
 
 这些答案要转化成**个人经历**，不要逐条复述。系统大约取 2–4 个强内容点来写故事。第 7 题是主要的亲口细节来源。
 
@@ -244,7 +270,7 @@ Age Range 和 Gender 使用自定义下拉：圆角按钮、右侧箭头、点�
 - JPG / JPEG / PNG / WEBP
 - 本地预览，可删除
 - 不上传 Cloudinary / MongoDB
-- 发给模型全部 1–5 张，单张不超过 4MB
+- 发给 `/api/generate` 前，浏览器用 `lib/compress-photo.ts` 压缩（最长边 1024、JPEG 0.72），避免 Vercel 约 4.5MB body 限制
 - AI 封面选择基于用户实际上传的全部照片，不是只看前 4 张
 - 刷新后预览丢失
 
@@ -289,13 +315,13 @@ CONTENT_LANGUAGE = "zh-CN"
 POST /api/generate
         ↓
 正好 1 次 openai.chat.completions.create
-（structured JSON：titles[3] + caption + hashtags[5] + coverTitle + selectedPhotoIndex + photoSelectionReason）
+（structured JSON：titles[3] + caption + hashtags[5] + mainTitle + subTitle + selectedPhotoIndex + photoSelectionReason）
         ↓
-本地补全标题关键词 / 格式、故事 emoji、从正文剥 hashtag
+本地补全标题关键词 / 格式、故事 emoji、封面叠字、从正文剥 hashtag
         ↓
 系统按锁定模板追加 Location & Time
         ↓
-返回 { titles, caption, hashtags, coverTitle, selectedPhotoIndex, photoSelectionReason, locationFormat, cost }
+返回 { titles, caption, hashtags, coverTitle, coverSubtitle, selectedPhotoIndex, photoSelectionReason, locationFormat, cost }
         ↓
 浏览器把选中的照片转成 data URL
         ↓
@@ -343,10 +369,10 @@ Input Tokens: ...
 | 层 | 内容 |
 | --- | --- |
 | 1. 品牌知识 | Baan Ying 故事、个性、可用事实；只当背景 |
-| 2. 顾客体验 | 分店、游客/本地、到访次数、喜欢的点、推荐菜、第 7 题亲口描述、照片 |
+| 2. 顾客体验 | 系统分店（centralwOrld）、游客/本地、是否第一次、餐费、喜欢的点、推荐菜、第 7 题亲口描述、照片 |
 | 3. 写法风格 | 参考帖压缩成特征 + 自然小红书语气 |
-| 4. 生成规则 | 内部策略层（KSP / Storyline / Content Angle / Search Keyword）+ 标题、正文、emoji、hashtag JSON 字段、封面标题、封面选图、安全、多样性；Location & Time 由系统追加 |
-| 5. 输出格式 | JSON：3 个正文标题 + 1 篇正文 + 5 个 hashtags + 1 个 coverTitle + selectedPhotoIndex + 内部策略 id |
+| 4. 生成规则 | 内部策略层（KSP / Storyline / Content Angle / Search Keyword）+ 标题、正文、emoji、hashtag JSON 字段、封面 mainTitle / subTitle、封面选图、负面中性化、安全、多样性；Location & Time 由系统追加 |
+| 5. 输出格式 | JSON：3 个正文标题 + 1 篇正文 + 5 个 hashtags + mainTitle + subTitle + selectedPhotoIndex + 内部策略 id |
 | 6. 校验规则 | 中文、正文无 hashtag、不编造、必须有 emoji、正文不含 Location & Time 区块 |
 
 JSON 形状：
@@ -356,7 +382,8 @@ JSON 形状：
   "titles": ["标题1", "标题2", "标题3"],
   "caption": "故事正文。不要写 Location & Time，不要写 hashtag。",
   "hashtags": ["#baanying曼谷", "#曼谷必吃", "#动态1", "#动态2", "#动态3"],
-  "coverTitle": "封面标题",
+  "mainTitle": "封面主标题",
+  "subTitle": "封面副标题",
   "selectedPhotoIndex": 0,
   "photoSelectionReason": "食物主体清晰、构图完整，适合叠加标题。",
   "selectedKspId": "KSP-01",
@@ -430,7 +457,25 @@ KSP-03 Family Recipes & Heritage 是低频策略，不默认写 1999 / Auntie Yi
 
 不编造：配料、口味、价格、奖项、米其林、明星、营业时间、促销、排名、「曼谷第一」。
 
-生成链路会先按小红书合规规则写标题 / 正文 / 标签 / 封面标题 / 内容角度；返回前再扫描绝对化、医疗功效、迷信、引流、跨平台、硬广「必吃/封神/顶级」等表述。命中则改写成中性个人体验后再检查一次。品牌固定标签 `#baanying曼谷` `#曼谷必吃` 仍保留；正文和标题里不再把「必吃」当卖点。用户只看到终稿，看不到内部合规分析。
+生成链路会先按小红书合规规则写标题 / 正文 / 标签 / 封面 / 内容角度；返回前再扫描绝对化、医疗功效、迷信、引流、跨平台、硬广「必吃/封神/顶级」等表述。命中则改写成中性个人体验后再检查一次。
+
+**负面反馈中性化（Negative → Neutral）：** 顾客原话里的负面意思要保留，但不得原样出现在标题、正文、标签或封面。不要删掉、也不要改成假好评。映射写在 `lib/compliance/negative-feedback.ts`，例如：
+
+| 输入 | 输出 |
+| --- | --- |
+| 难吃 | 泰餐口味比较看个人喜好 |
+| 性价比低 | 价格和个人预期有所不同 |
+| 很普通 / 没什么特别 | 整体风味比较经典 |
+| 服务不好 | 用餐高峰期服务可能会比较慢 |
+| 态度不好 | 和店员沟通可能需要多一些耐心 |
+| 不会回购 | 是否再次选择可以根据个人喜好决定 |
+| 贵 / 太贵 | 价格偏高 / 价格相对较高 |
+| 踩雷 | 可以根据个人口味选择 |
+| 抽奖送东西 | 有互动活动和礼品 |
+
+封面字数不够时用更短同义：口味看个人喜好 / 整体风味比较经典 / 价格看个人预期。禁止把难吃改成超级好吃。
+
+品牌固定标签 `#baanying曼谷` `#曼谷必吃` 仍保留；正文和标题里不再把「必吃」当卖点。封面允许用池子里的「必吃」作为两个关键词之一。用户只看到终稿，看不到内部合规分析。
 
 写法应口语、自然、略带情绪；避免「作为一家…」「值得一提的是…」「整体来说…」「如果你正在寻找…」这类评测 / 广告句式。
 
@@ -468,9 +513,18 @@ KSP-03 Family Recipes & Heritage 是低频策略，不默认写 1999 / Auntie Yi
 
 Generating 页文案：先 `Generating your post...`，再 `Creating your cover...`，完成后进入 Result。用户不必再点 Generate Cover，也不必另选 Cover Title。
 
-封面叠字来自独立的 `coverTitle` / `coverSubtitle`，**不是**正文 3 个标题的缩写，也不是 SEO 搜索短标题。模型要直接写成 **5–10 个字符** 的小红书封面 Hook（标点、Emoji、英文字母都计入 10 字）。10 是上限不是配额。禁止先写长句再截断。不要求主谓宾整句，但必须语义完整。
+封面叠字来自独立的 JSON `mainTitle` + `subTitle`（解析后存在 `coverTitle` / `coverSubtitle`），**不是**正文 3 个标题的缩写，也不是 SEO 搜索短标题。禁止先写长句再截断、禁止用填充字凑字数。
 
-封面 Hook 按内部策略选风格（搜索推荐 / 情绪形容词 / 口语反应 / 轻 CTA / 菜名 / 氛围 / 品牌），不要每篇都是「曼谷泰餐推荐 / 曼谷泰菜推荐 / 曼谷美食推荐」。可偶尔用「超好吃 / 绝了 / 太香了」，但不要每篇都夸张，也不要用「必吃 / 最好吃 / 封神 / 顶级」当封面卖点。不要编造「泰国人爱吃 / 明星爱吃」。菜名可选，且必须是顾客选过或写过的。
+| 字段 | 字数（汉字等价单位） |
+| --- | --- |
+| mainTitle | **正好 4–7**。禁止 3，禁止 8+ |
+| subTitle | **正好 4–9**。禁止 1–3，禁止 10+ |
+
+**mainTitle + subTitle 合起来必须正好 2 个池子关键词**（不重复、不能 1 个也不能 3 个）：
+
+`曼谷` / `centralwOrld` / `泰餐` / `美食` / `必吃`
+
+有效组合例如：曼谷+泰餐、曼谷+美食、曼谷+必吃、centralwOrld+美食、泰餐+必吃。关键词不能当整句；副标题要带 KSP，不要重复主标题公式。`必吃` **只允许出现在封面**（以及固定话题 `#曼谷必吃`）。封面禁止：第一 / 唯一 / 顶级 / 最强 / 最好吃 / 封神。不要编造「泰国人爱吃 / 明星爱吃」。菜名可选，且必须是顾客选过或写过的。
 
 不合格时整条换成完整短标题，不截原句。封面标题与正文标题分开校验。`layoutCoverOverlay` 的叠字架构不变。
 
@@ -505,7 +559,7 @@ UI 一律显示 **Template 1 … Template 10**（中英文相同）。内部 `te
 
 POST 页可点选模板；换模板只重打 `/api/compose-cover`，**不再调用 OpenAI**。
 
-`top-stroke`（Template 1）在 **正好 4 张照片** 时做 2×2 拼贴；其余情况以及另外 9 个模板都是单图封面。输出 1080×1350。
+`top-stroke`（Template 1）在 **正好 4 张照片** 时做 2×2 拼贴；标题 / 副标题 / 背景装饰叠在四宫格几何中心。其余张数以及另外 9 个模板都是单图封面。输出 1080×1350。Vercel 上中文字体从 `public/fonts` 读取（`lib/cover/asset-path.ts` + `outputFileTracingIncludes`）。
 
 ### Template 4（`top-banner`）
 
@@ -527,7 +581,7 @@ POST 页可点选模板；换模板只重打 `/api/compose-cover`，**不再调�
 
 Cover Composer 失败时：「Cover generation failed」+ Retry Cover（只重打 `/api/compose-cover`，不再调用 OpenAI）。
 
-封面状态：`coverTitle`、`selectedPhotoIndex`、`selectedCoverTemplateId`、`generatedCoverImageUrl`。刷新仍会清空。不写 MongoDB / Cloudinary。
+封面状态：`coverTitle`、`coverSubtitle`、`selectedPhotoIndex`、`selectedCoverTemplateId`、`generatedCoverImageUrl`。刷新仍会清空。不写 MongoDB / Cloudinary。
 
 ---
 
@@ -541,7 +595,7 @@ Location & Time 必须出现在正文**最后**，后面不能再有 CTA、推�
 
 ### 13.1 官方数据
 
-顾客选的分店拼写 / 楼层如果和官方数据冲突，**以官方数据为准**。
+消费者**不选分店**。生成和 Location & Time 一律用 `Baan Ying (centralwOrld, 3rd Floor)`。下表仍保留其他分店的官方写法，供数据层使用，但当前 Demo 不会选用。
 
 | 分店 | 官方地点行 | 营业时间 |
 | --- | --- | --- |
@@ -696,21 +750,31 @@ Version 1 和 Version 6 使用单换行，行与行之间没有空行。
 
 | 文件 | 作用 |
 | --- | --- |
-| `lib/i18n.ts` | UI 文案、隐私政策、Rednote / 小红书用词 |
-| `types/customer.ts` | 客户资料类型（年龄 / 性别 / 来自哪里；name / email / phone 仍空置保留） |
+| `lib/i18n.ts` | UI 文案、隐私政策、Rednote / 小红书用词；Origins 占位 `Where are you from?` |
+| `types/customer.ts` | 客户资料类型（年龄 / 性别 / 国家；name / email / phone / consent 仍空置保留） |
 | `components/ui/menu-select.tsx` | 自定义下拉（年龄、性别共用样式） |
-| `components/customer/ConsentCheckbox.tsx` | 同意勾选，链到隐私政策 |
-| `components/customer/CustomerForm.tsx` | YOU 表单（年龄、性别、来自哪里、同意；无姓名 / 邮箱 / 电话） |
-| `snapshots/you-page-2026-09-06/` | 含姓名 / 邮箱 / 电话的旧版 YOU 快照，可整份还原 |
+| `components/customer/OriginCityField.tsx` | Origins 国家下拉（置顶 TH / SG / MY / CN / HK / TW） |
+| `components/customer/ConsentCheckbox.tsx` | 同意勾选组件（当前 YOU 页未使用） |
+| `components/customer/CustomerForm.tsx` | YOU 表单（年龄、性别、国家；无姓名 / 邮箱 / 电话 / 同意勾选） |
+| `snapshots/you-page-2026-09-06/` | 含姓名 / 邮箱 / 电话的旧版 YOU 快照 |
 | `app/c/[campaignId]/privacy/page.tsx` | 隐私政策页 |
+| `lib/mongodb.ts` | MongoDB Atlas 连接 |
+| `lib/submissions.ts` | `submissions` upsert（YOU + 餐费） |
+| `lib/save-submission-client.ts` | 浏览器调用 `POST /api/submissions`（fire-and-forget） |
+| `app/api/submissions/route.ts` | 顾客资料 API |
+| `lib/compress-photo.ts` | 生成前压缩照片 |
+| `lib/compliance/negative-feedback.ts` | 负面用语 → 中性表述 |
+| `lib/cover/asset-path.ts` | 服务端读取 `public/fonts`、`public/cover` |
+| `lib/cover/collage.ts` | Template 1 四图 2×2 与中心点 |
 | `components/providers/language-provider.tsx` | UI 语言 |
-| `components/providers/campaign-flow-provider.tsx` | 流程状态、照片、封面、角度历史、调用生成 |
+| `components/providers/campaign-flow-provider.tsx` | 流程状态、照片、封面、保存 YOU / 餐费、调用生成 |
 | `lib/compose-cover-client.ts` | 浏览器把 File 转 data URL，调用 `/api/compose-cover` |
 | `lib/cover/` | Cover Composer：模板、字体、合成 |
 | `lib/cover/templates.ts` | 10 个模板定义；`name` 为 Template 1–10 |
 | `lib/cover/post-layout.ts` | 模板选项文案、成片幻灯顺序 |
 | `lib/cover/overlay-layout.ts` | 封面标题一行 / 两行规则 |
-| `lib/cover/cover-title.ts` | 封面标题清洗、汉字上限、语义拆行、不合格整条替换 |
+| `lib/cover/cover-title.ts` | 封面 mainTitle / subTitle 清洗、字数、关键词对、不合格整条替换 |
+| `lib/cover/cover-rules.ts` | 封面池子关键词与 KSP 规则 |
 | `lib/cover/cover-hooks.ts` | 封面 Hook 风格库 + 按策略建议家族 |
 | `public/cover/thai-flag.png` | Template 4 标题前的泰国国旗 |
 | `app/api/compose-cover/route.ts` | 封面合成 API（非 OpenAI） |
@@ -724,29 +788,33 @@ Version 1 和 Version 6 使用单换行，行与行之间没有空行。
 | `lib/title-keywords.ts` | 标题曼谷搜索关键词、去重、校验与兜底 |
 | `lib/title-formats.ts` | 标题句式多样性（国旗 / 冒号 / 纯句 / emoji）校验与兜底 |
 | `lib/caption-emoji.ts` | 正文故事区 emoji 计数与兜底补全 |
-| `types/content.ts` | 体验问卷类型；第 7 题 `diningExperienceNote` 与中英计数 |
-| `lib/generate-prompt.ts` | 合并后的标题 / 正文 / 标签 / 封面标题 / 选图 prompt + JSON schema |
+| `types/content.ts` | 体验问卷类型；默认分店、到访 Yes/No、第 7 题计数 |
+| `lib/generate-prompt.ts` | 合并后的标题 / 正文 / 标签 / 封面 / 选图 prompt + JSON schema |
 | `lib/generate-hashtags/prompt.ts` | 备用接口的标签 prompt |
 | `lib/generate-hashtags/generate.ts` | 备用接口的标签生成 + 重试（主路径不用） |
 | `lib/hashtags.ts` | 标签校验、从正文剥离 `#` |
-| `lib/locations.ts` | 分店、官方地点、营业时间、6 种锁定 Location & Time 模板（服务端追加） |
+| `lib/locations.ts` | 分店官方数据、默认 centralwOrld、6 种锁定 Location & Time 模板 |
 | `lib/openai-pricing.ts` | OpenAI 模型单价（每百万 token），改价只改这里 |
 | `lib/openai-usage.ts` | 从 API `usage` 取 token，汇总费用并打日志；`Calls:` 每次都打印 |
-| `lib/parse-generated.ts` | 解析标题 + 正文 + hashtags + coverTitle + 封面选图 |
+| `lib/parse-generated.ts` | 解析标题 + 正文 + hashtags + mainTitle / subTitle + 封面选图 |
 | `app/api/generate/route.ts` | 消费者主生成：1 次 OpenAI → 本地补全 → 追加地点；最多 5 张图 |
 | `app/api/generate-content/route.ts` | 备用 JSON 生成接口 |
-| `app/c/[campaignId]/experience/page.tsx` | FEEL 问卷（含第 7 题文本框） |
+| `app/c/[campaignId]/experience/page.tsx` | FEEL 问卷（无分店题；含餐费与第 7 题） |
 | `app/c/[campaignId]/*` | 消费者页面 |
+| `vercel.json` | `maxDuration`（Hobby 实际仍可能被平台上限截断） |
+| `next.config.ts` | `outputFileTracingIncludes`（字体 / 国旗） |
 
 ---
 
 ## 17. 明确没做的事
 
 - 登录 / 注册 / 品牌 Dashboard
-- MongoDB / 持久化客户资料（政策文案已写 12 个月保存，Demo 尚未实现）
-- Cloudinary / 图片存储
+- Cloudinary / 图片存储（照片不进 Mongo）
+- 用餐补充说明、问卷多选项写入 Mongo（目前只存 YOU + 餐费）
 - 小红书 / Rednote 自动发布
 - AI 生图 / 修图 / 用模型绘制中文封面（封面是 Cover Composer 叠字，不是生图）
 - QR Code 生成服务
 - 多品牌多 Campaign 后台配置
 - Token / 费用写入 MongoDB（目前只打服务端控制台和浏览器 console 日志）
+- YOU 页同意勾选（组件还在，表单未展示）
+- 隐私政策正文与现表单完全对齐（仍写性别选填、到访门店等）

@@ -28,42 +28,37 @@ export function isFourPhotoGridCover(photoCount: number, templateId: string) {
 export const REMAINING_ORDER_PATTERNS = ["1", "2", "3", "4", "5", "6"] as const;
 export type RemainingOrderPattern = (typeof REMAINING_ORDER_PATTERNS)[number];
 
+function pickRandomTemplate(ids: CoverTemplateOptionId[]): CoverTemplateOptionId | undefined {
+  if (ids.length === 0) return undefined;
+  const cryptoObj = globalThis.crypto;
+  if (typeof cryptoObj?.getRandomValues === "function") {
+    const bytes = new Uint8Array(1);
+    cryptoObj.getRandomValues(bytes);
+    return ids[bytes[0] % ids.length];
+  }
+  return ids[Math.floor(Math.random() * ids.length)];
+}
+
+/**
+ * Website assigns the visible cover style.
+ * The model copies prompt samples (especially left-spine / Style 5), so `selected` is ignored.
+ */
 export function autoMatchTemplate(input: {
   selected?: string | null;
   suitable?: string[] | null;
   previousTemplateId?: string | null;
+  recentTemplateIds?: string[] | null;
 }): CoverTemplateOptionId {
   const all = COVER_TEMPLATE_OPTIONS.map((item) => item.id);
-  const suitable = (input.suitable ?? []).filter(isCoverTemplateId);
-  const previous = input.previousTemplateId && isCoverTemplateId(input.previousTemplateId)
-    ? input.previousTemplateId
-    : "";
-  const selectedRaw = input.selected ?? "";
-  const selected = isCoverTemplateId(selectedRaw) ? selectedRaw : null;
-  const exampleSuitable =
-    suitable.length > 0 &&
-    suitable.every((id) => id === "bottom-card" || id === "top-banner" || id === "polaroid");
-  const pool =
-    !previous && (suitable.length < 3 || exampleSuitable)
-      ? all
-      : suitable.length > 0
-        ? suitable
-        : all;
-  const alternatives = pool.filter((id) => id !== previous);
-
-  if (!previous) {
-    if (selected && alternatives.includes(selected) && selected !== "bottom-card") {
-      return selected;
-    }
-    return alternatives[Math.floor(Math.random() * alternatives.length)] ?? all[0];
-  }
-
-  if (selected && alternatives.includes(selected)) return selected;
-  if (alternatives.length > 0) {
-    return alternatives[Math.floor(Math.random() * alternatives.length)] ?? pool[0] ?? DEFAULT_COVER_TEMPLATE_ID;
-  }
-  if (selected) return selected;
-  return pool[0] ?? DEFAULT_COVER_TEMPLATE_ID;
+  const previous =
+    input.previousTemplateId && isCoverTemplateId(input.previousTemplateId)
+      ? input.previousTemplateId
+      : "";
+  const recent = (input.recentTemplateIds ?? []).filter(isCoverTemplateId);
+  const avoid = new Set<string>([previous, ...recent].filter(Boolean));
+  const unused = all.filter((id) => !avoid.has(id));
+  const pool = unused.length > 0 ? unused : all.filter((id) => id !== previous);
+  return pickRandomTemplate(pool.length > 0 ? pool : all) ?? DEFAULT_COVER_TEMPLATE_ID;
 }
 
 export function parseRemainingPhotoIndexes(

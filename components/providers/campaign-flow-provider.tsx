@@ -53,6 +53,7 @@ import {
 } from "@/lib/locations";
 import type { LocationTimeFormatId } from "@/lib/locations";
 import { formatGenerationCostLog, type GenerationCostReport } from "@/lib/openai-usage";
+import { createId } from "@/lib/id";
 import { saveSubmissionToServer } from "@/lib/save-submission-client";
 import { compressPhotosForGenerate } from "@/lib/compress-photo";
 import type { FlowStep } from "@/lib/flow";
@@ -75,6 +76,7 @@ type PersistedFlow = {
   kspHistory: string[];
   storylineHistory: string[];
   searchKeywordHistory: string[];
+  coverTemplateHistory: string[];
 };
 
 export type GeneratePhase = "post" | "cover";
@@ -136,6 +138,7 @@ function defaultPersisted(): PersistedFlow {
     kspHistory: [],
     storylineHistory: [],
     searchKeywordHistory: [],
+    coverTemplateHistory: [],
   };
 }
 
@@ -188,7 +191,7 @@ function getFlowSnapshot(campaignId: string) {
 function ensureSubmissionId(campaignId: string) {
   const current = getFlowSnapshot(campaignId);
   if (current.submissionId) return current.submissionId;
-  const submissionId = crypto.randomUUID();
+  const submissionId = createId();
   patchFlow(campaignId, { submissionId });
   return submissionId;
 }
@@ -327,7 +330,7 @@ export function CampaignFlowProvider({
           continue;
         }
         next.push({
-          id: crypto.randomUUID(),
+          id: createId(),
           name: file.name,
           previewUrl: URL.createObjectURL(file),
           file,
@@ -537,6 +540,7 @@ export function CampaignFlowProvider({
       selected: data.selectedTemplateId,
       suitable: data.suitableTemplateIds,
       previousTemplateId,
+      recentTemplateIds: current.coverTemplateHistory ?? [],
     });
     const remainingPhotoIndexes = parseRemainingPhotoIndexes(
       data.remainingPhotoIndexes,
@@ -592,6 +596,7 @@ export function CampaignFlowProvider({
     const kspHistory = [...(current.kspHistory ?? []), selectedStrategy.kspId].slice(-8);
     const storylineHistory = [...(current.storylineHistory ?? []), selectedStrategy.storylineId].slice(-8);
     const searchKeywordHistory = [...(current.searchKeywordHistory ?? []), selectedStrategy.searchKeyword].slice(-8);
+    const coverTemplateHistory = [...(current.coverTemplateHistory ?? []), selectedTemplateId].slice(-9);
     patchFlow(campaignId, {
       generated: {
         ...nextGenerated,
@@ -608,6 +613,7 @@ export function CampaignFlowProvider({
       kspHistory,
       storylineHistory,
       searchKeywordHistory,
+      coverTemplateHistory,
       selectedCoverTemplateId: selectedTemplateId,
     });
 

@@ -337,8 +337,9 @@ COVER TEMPLATE — JSON fields "selectedTemplateId" + "suitableTemplateIds".
 Must be one of the existing 10 IDs only: top-stroke, bottom-bar, bottom-card, top-banner, left-spine, polaroid, center-lower, badge-stack, split-band, dual-line.
 Match the photos: composition, subject position, negative space, portrait vs landscape, food close-up vs restaurant/environment, room for large text, Xiaohongshu cover balance.
 Do NOT invent a new template.
-Do NOT default to bottom-card. Do NOT copy template IDs from the sample JSON. Rotate across the 10 templates over generations.
+Do NOT default to bottom-card or left-spine. Do NOT copy template IDs from the sample JSON. Rotate across the 10 templates over generations.
 If a previous template is provided, do NOT reuse it unless no other suitable template exists. suitableTemplateIds should list 3–8 existing templates that genuinely fit. selectedTemplateId must be in that list and should differ from the previous template when possible.
+The website may replace selectedTemplateId after you return JSON, so never always output the same ID.
 top-stroke 4-photo grid is ONLY valid when photoCount is exactly 4 AND you select top-stroke. 1/2/3/5 photos + top-stroke is a normal single-photo cover, not a grid.
 
 REMAINING PHOTO ORDER — after choosing Cover Source, classify remaining photos (never the cover source) into: ALL FOOD, CUSTOMER-SELECTED/MENTIONED FOOD, FOOD, RESTAURANT ATMOSPHERE, CUSTOMER IN RESTAURANT, FOOD DETAILS.
@@ -355,7 +356,7 @@ EXCEPTION: photoCount === 4 AND selectedTemplateId === "top-stroke": remainingPh
 REGENERATION: If previous title/caption/strategy/hashtags are provided, keep all customer facts identical. Avoid the previous Content Angle when another valid angle exists; prefer a different Storyline and KSP when another naturally fits. Change title keywords, opening, narrative structure, dish emphasis where possible, emoji placement, and dynamic hashtags. Variation must come from storytelling approach, not invented experience. Do not copy previous mainTitle or subTitle. Location & Time is chosen by the system.
 
 OUTPUT: Return ONLY JSON matching the schema. No Markdown fences.
-{"titles":["标题1","标题2","标题3"],"caption":"正文 only. No Location & Time. No hashtags.","hashtags":["#baanying曼谷","#曼谷必吃","#动态1","#动态2","#动态3"],"mainTitle":"曼谷必吃","subTitle":"招牌泰式料理","selectedPhotoIndex":0,"selectedPhotoIndexes":[0],"photoSelectionReason":"...","selectedTemplateId":"left-spine","suitableTemplateIds":["left-spine","center-lower","badge-stack"],"remainingPhotoOrder":[1,2],"remainingOrderPattern":"5","selectedKspId":"KSP-01","selectedStorylineId":"ST-01","selectedContentAngleId":"CA-01","selectedSearchKeyword":"曼谷美食"}
+{"titles":["标题1","标题2","标题3"],"caption":"正文 only. No Location & Time. No hashtags.","hashtags":["#baanying曼谷","#曼谷必吃","#动态1","#动态2","#动态3"],"mainTitle":"曼谷必吃","subTitle":"招牌泰式料理","selectedPhotoIndex":0,"selectedPhotoIndexes":[0],"photoSelectionReason":"...","selectedTemplateId":"<one of 10>","suitableTemplateIds":["<id>","<id>","<id>"],"remainingPhotoOrder":[1,2],"remainingOrderPattern":"5","selectedKspId":"KSP-01","selectedStorylineId":"ST-01","selectedContentAngleId":"CA-01","selectedSearchKeyword":"曼谷美食"}
 
 The sample JSON is FORMAT ONLY. Do not copy its selectedTemplateId, suitableTemplateIds, or strategy ids.
 
@@ -365,7 +366,7 @@ VALIDATE before returning:
 - 5 hashtags: two fixed tags exact, then 3 relevant dynamic tags with no exaggerated claims
 - 1 independent mainTitle (HARD 4–7 units) and subTitle (HARD 4–9 units) generated in this same JSON. EXACTLY 2 keywords from 曼谷 / centralwOrld / 泰餐 / 美食 / 必吃 across the pair. centralwOrld is optional, never mandatory. KSP required. Complementary, not repetitive. No emoji. Never truncate. Not copied from titles[]. Do not reuse the previous cover formula.
 - selectedPhotoIndex in range; selectedPhotoIndexes unique and in range
-- selectedTemplateId is one of the 10 existing IDs, not copied from the sample JSON, not always bottom-card, and differs from previous when another suitable option exists
+- selectedTemplateId is one of the 10 existing IDs, not copied from the sample JSON, not always left-spine, not always bottom-card, and differs from previous when another suitable option exists
 - remainingPhotoOrder excludes the cover source except the 4-photo top-stroke case
 - selectedKspId / selectedStorylineId / selectedContentAngleId / selectedSearchKeyword are internal only and never appear in the consumer post
 - no invented facts; brand used only if it strengthens THIS story
@@ -497,7 +498,8 @@ ${formatCoverTitleRules({
 })}
 Cover overlay: write mainTitle (4–7 units) + subTitle (4–9 units) in THIS JSON. No extra API call. No emoji. Do not shorten titles[]. Do not truncate. Use EXACTLY 2 keywords from 曼谷 / centralwOrld / 泰餐 / 美食 / 必吃 across the pair. Vary the pair, structure, and KSP from the previous cover. centralwOrld is optional. GOOD: 曼谷必吃 + 招牌泰式料理 / 泰餐必吃 + 招牌冬阴功 / 曼谷美食 + 家常泰式料理 / centralwOrld美食 + 招牌泰式料理. BAD: 曼谷必吃泰餐 (3 keywords) / always 曼谷+泰餐 / always centralwOrld+美食 / same formula every generation / 3-character mainTitle / 曼谷难吃泰餐 / centralwOrld踩雷美食 / 贵到吃不起 / 抽奖送东西. Optional real dish only if it fits. No 最好吃 / 封神 / 顶级. Never copy customer negatives onto the cover; if needed use 价格偏高 / 互动抽奖活动 / 特色泰餐. 必吃 is allowed on the COVER only. No hashtag, address, hours.
 Cover photo: pick ONE selectedPhotoIndex from 0 to ${Math.max((input.photoCount || 1) - 1, 0)}. selectedPhotoIndexes[0] must equal selectedPhotoIndex.
-Automatically choose selectedTemplateId from the existing 10 templates based on the photos. Do not default to bottom-card. Do not copy sample JSON template IDs. Include 3–8 suitableTemplateIds. Avoid previousCoverTemplateId when another fit exists. Diversity seed: ${input.variantIndex}.
+Automatically choose selectedTemplateId from the existing 10 templates based on the photos. Do not default to bottom-card or left-spine. Do not copy sample JSON template IDs. Include 3–8 suitableTemplateIds. Avoid previousCoverTemplateId when another fit exists. Diversity seed: ${input.variantIndex}.
+The website assigns the final visible Style 1–10 after this JSON, so do not always return left-spine.
 After removing the cover source, order remainingPhotoOrder using one of the 6 approved patterns. Exception: exactly 4 photos + top-stroke → remainingPhotoOrder [0,1,2,3].
 
 ${formatStyleReferences(input.brandContext)}

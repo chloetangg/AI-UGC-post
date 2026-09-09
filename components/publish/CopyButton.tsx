@@ -4,22 +4,15 @@ import { useState } from "react";
 import { Check, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useT } from "@/components/providers/language-provider";
+import { copyRednoteText } from "@/lib/rednote-publish";
 
 export function CopyButton({ label, value }: { label: string; value: string }) {
   const t = useT();
   const [copied, setCopied] = useState(false);
 
   async function copy() {
-    try {
-      await navigator.clipboard.writeText(value);
-    } catch {
-      const textarea = document.createElement("textarea");
-      textarea.value = value;
-      document.body.appendChild(textarea);
-      textarea.select();
-      document.execCommand("copy");
-      textarea.remove();
-    }
+    const ok = await copyRednoteText(value);
+    if (!ok) return;
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1600);
   }
