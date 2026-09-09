@@ -1,0 +1,193 @@
+import { DEFAULT_COVER_TEMPLATE_ID } from "@/types/content";
+
+export const FOUR_PHOTO_GRID_TEMPLATE_ID = "top-stroke";
+
+export const COVER_TEMPLATE_OPTIONS = [
+  { id: "top-stroke", en: "Style 1", zh: "Style 1" },
+  { id: "bottom-bar", en: "Style 2", zh: "Style 2" },
+  { id: "bottom-card", en: "Style 3", zh: "Style 3" },
+  { id: "top-banner", en: "Style 4", zh: "Style 4" },
+  { id: "left-spine", en: "Style 5", zh: "Style 5" },
+  { id: "polaroid", en: "Style 6", zh: "Style 6" },
+  { id: "center-lower", en: "Style 7", zh: "Style 7" },
+  { id: "badge-stack", en: "Style 8", zh: "Style 8" },
+  { id: "split-band", en: "Style 9", zh: "Style 9" },
+  { id: "dual-line", en: "Style 10", zh: "Style 10" },
+] as const;
+
+export type CoverTemplateOptionId = (typeof COVER_TEMPLATE_OPTIONS)[number]["id"];
+
+export function isCoverTemplateId(value: string): value is CoverTemplateOptionId {
+  return COVER_TEMPLATE_OPTIONS.some((item) => item.id === value);
+}
+
+export function isFourPhotoGridCover(photoCount: number, templateId: string) {
+  return photoCount === 4 && templateId === FOUR_PHOTO_GRID_TEMPLATE_ID;
+}
+
+export const REMAINING_ORDER_PATTERNS = ["1", "2", "3", "4", "5", "6"] as const;
+export type RemainingOrderPattern = (typeof REMAINING_ORDER_PATTERNS)[number];
+
+export function autoMatchTemplate(input: {
+  selected?: string | null;
+  suitable?: string[] | null;
+  previousTemplateId?: string | null;
+}): CoverTemplateOptionId {
+  const all = COVER_TEMPLATE_OPTIONS.map((item) => item.id);
+  const suitable = (input.suitable ?? []).filter(isCoverTemplateId);
+  const previous = input.previousTemplateId && isCoverTemplateId(input.previousTemplateId)
+    ? input.previousTemplateId
+    : "";
+  const selectedRaw = input.selected ?? "";
+  const selected = isCoverTemplateId(selectedRaw) ? selectedRaw : null;
+  const exampleSuitable =
+    suitable.length > 0 &&
+    suitable.every((id) => id === "bottom-card" || id === "top-banner" || id === "polaroid");
+  const pool =
+    !previous && (suitable.length < 3 || exampleSuitable)
+      ? all
+      : suitable.length > 0
+        ? suitable
+        : all;
+  const alternatives = pool.filter((id) => id !== previous);
+
+  if (!previous) {
+    if (selected && alternatives.includes(selected) && selected !== "bottom-card") {
+      return selected;
+    }
+    return alternatives[Math.floor(Math.random() * alternatives.length)] ?? all[0];
+  }
+
+  if (selected && alternatives.includes(selected)) return selected;
+  if (alternatives.length > 0) {
+    return alternatives[Math.floor(Math.random() * alternatives.length)] ?? pool[0] ?? DEFAULT_COVER_TEMPLATE_ID;
+  }
+  if (selected) return selected;
+  return pool[0] ?? DEFAULT_COVER_TEMPLATE_ID;
+}
+
+export function parseRemainingPhotoIndexes(
+  value: unknown,
+  coverSourceIndex: number,
+  photoCount: number,
+  templateId: string,
+) {
+  if (isFourPhotoGridCover(photoCount, templateId)) {
+    return Array.from({ length: photoCount }, (_, index) => index);
+  }
+  const remaining = Array.from({ length: Math.max(photoCount, 0) }, (_, index) => index).filter(
+    (index) => index !== coverSourceIndex,
+  );
+  const allowed = new Set(remaining);
+  const seen = new Set<number>();
+  const ordered: number[] = [];
+  const raw = Array.isArray(value) ? value : [];
+  for (const item of raw) {
+    const index = typeof item === "number" ? item : Number.parseInt(String(item ?? ""), 10);
+    if (!allowed.has(index) || seen.has(index)) continue;
+    seen.add(index);
+    ordered.push(index);
+  }
+  for (const index of remaining) {
+    if (seen.has(index)) continue;
+    ordered.push(index);
+  }
+  return ordered;
+}
+
+export function photosInIndexOrder<T>(photos: T[], indexes: number[]) {
+  const ordered: T[] = [];
+  const seen = new Set<number>();
+  for (const index of indexes) {
+    if (!Number.isInteger(index) || seen.has(index) || !photos[index]) continue;
+    seen.add(index);
+    ordered.push(photos[index]);
+  }
+  return ordered;
+}
+
+export function remainingPostPhotoIndexes(
+  photoCount: number,
+  coverSourceIndex: number,
+  templateId: string,
+) {
+  const indexes = Array.from({ length: Math.max(photoCount, 0) }, (_, index) => index);
+  if (isFourPhotoGridCover(photoCount, templateId)) {
+    return indexes;
+  }
+  const source = Number.isInteger(coverSourceIndex) ? coverSourceIndex : 0;
+  return indexes.filter((index) => index !== source);
+}
+
+export function remainingPostPhotos<T extends { id: string }>(
+  photos: T[],
+  templateId: string,
+  coverSource: { id?: string | null; index?: number },
+) {
+  if (isFourPhotoGridCover(photos.length, templateId)) {
+    return photos;
+  }
+  const sourceId = coverSource.id || photos[coverSource.index ?? 0]?.id;
+  if (!sourceId) return photos;
+  return photos.filter((photo) => photo.id !== sourceId);
+}
+
+export type FinalSlide = {
+  id: string;
+  src: string;
+  kind: "cover" | "photo";
+};
+
+export function buildFinalSlides(
+  photos: Array<{ id: string; previewUrl: string }>,
+  cover: {
+    generatedCoverImageUrl: string | null;
+    selectedPhotoIndex: number;
+    selectedCoverTemplateId?: string;
+    coverSourcePhotoId?: string | null;
+    remainingPhotoIds?: string[] | null;
+  } | null,
+): FinalSlide[] {
+  const templateId = cover?.selectedCoverTemplateId || DEFAULT_COVER_TEMPLATE_ID;
+  const slides: FinalSlide[] = [];
+  if (cover?.generatedCoverImageUrl) {
+    slides.push({
+      id: "generated-cover",
+      src: cover.generatedCoverImageUrl,
+      kind: "cover",
+    });
+  }
+  if (!cover) {
+    return photos.map((photo) => ({
+      id: photo.id,
+      src: photo.previewUrl,
+      kind: "photo" as const,
+    }));
+  }
+  const fromIds = (cover.remainingPhotoIds ?? [])
+    .map((id) => photos.find((photo) => photo.id === id))
+    .filter((photo): photo is { id: string; previewUrl: string } => Boolean(photo))
+    .filter((photo) =>
+      isFourPhotoGridCover(photos.length, templateId)
+        ? true
+        : photo.id !== cover.coverSourcePhotoId,
+    );
+  const remaining = isFourPhotoGridCover(photos.length, templateId)
+    ? fromIds.length > 0
+      ? fromIds
+      : photos
+    : fromIds.length > 0
+      ? fromIds
+      : remainingPostPhotos(photos, templateId, {
+          id: cover.coverSourcePhotoId,
+          index: cover.selectedPhotoIndex,
+        });
+  for (const photo of remaining) {
+    slides.push({
+      id: photo.id,
+      src: photo.previewUrl,
+      kind: "photo",
+    });
+  }
+  return slides;
+}
