@@ -209,7 +209,7 @@ export async function encodeOutput(
   format: "png" | "jpeg",
 ): Promise<{ buffer: Buffer; contentType: "image/png" | "image/jpeg" }> {
   if (format === "jpeg") {
-    const buffer = await sharp(png).jpeg({ quality: 90, mozjpeg: true }).toBuffer();
+    const buffer = await sharp(png).jpeg({ quality: 82, mozjpeg: true }).toBuffer();
     return { buffer, contentType: "image/jpeg" };
   }
   return { buffer: png, contentType: "image/png" };

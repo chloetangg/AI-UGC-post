@@ -146,7 +146,9 @@ export type PhotoItem = {
   id: string;
   name: string;
   previewUrl: string;
+  thumbUrl?: string;
   file: File;
+  uploadFile?: File;
 };
 
 export const DEFAULT_COVER_TEMPLATE_ID = "top-stroke";

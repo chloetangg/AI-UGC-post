@@ -19,11 +19,13 @@ export function PhotoPreview({
   return (
     <div className="relative aspect-square overflow-hidden rounded-2xl bg-muted">
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={photo.previewUrl}
-        alt={photo.name || `Photo ${index + 1}`}
-        className="size-full object-cover"
-      />
+      {photo.thumbUrl ? (
+        <img
+          src={photo.thumbUrl}
+          alt={photo.name || `Photo ${index + 1}`}
+          className="size-full object-cover"
+        />
+      ) : null}
       <button
         type="button"
         onClick={onRemove}

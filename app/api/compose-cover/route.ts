@@ -105,26 +105,27 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "title is required" }, { status: 400 });
     }
 
-    const image = await loadImageBuffer({
-      file: body.imageFile,
-      url: body.imageUrl,
-    });
-    const extraImages: Buffer[] = [];
-    for (const file of body.extraFiles.slice(0, 4)) {
-      try {
-        extraImages.push(await loadImageBuffer({ file }));
-      } catch (error) {
-        console.warn("Skipping extra cover image", error);
-      }
-    }
-    for (const extra of body.extraUrls.slice(0, Math.max(0, 4 - extraImages.length))) {
-      if (!extra.trim()) continue;
-      try {
-        extraImages.push(await loadImageBuffer({ url: extra }));
-      } catch (error) {
-        console.warn("Skipping extra cover image", error);
-      }
-    }
+    const extraUrls = body.extraUrls.filter((url) => url.trim()).slice(0, 4);
+    const [image, extraLoaded] = await Promise.all([
+      loadImageBuffer({
+        file: body.imageFile,
+        url: body.imageUrl,
+      }),
+      Promise.all(
+        [
+          ...body.extraFiles.slice(0, 4).map((file) => loadImageBuffer({ file })),
+          ...extraUrls.map((url) => loadImageBuffer({ url })),
+        ].map((task) =>
+          task.catch((error) => {
+            console.warn("Skipping extra cover image", error);
+            return null;
+          }),
+        ),
+      ),
+    ]);
+    const extraImages = extraLoaded
+      .filter((item): item is Buffer => Boolean(item))
+      .slice(0, 4);
 
     const result = await composeCover({
       image,

@@ -20,7 +20,7 @@ import { buildGenerateRequest } from "@/lib/generate-prompt";
 import { emptyCustomerInfo, type CustomerInfo } from "@/types/customer";
 import { isMealExpenseComplete } from "@/lib/meal-expense";
 import { isKnownOriginCity } from "@/lib/world-cities";
-import { composeCoverImage } from "@/lib/compose-cover-client";
+import { composeCoverImage, preloadCoverFile } from "@/lib/compose-cover-client";
 import { layoutCoverOverlay } from "@/lib/cover/cover-title";
 import { normalizePhotoIndexes, pickFourGridSources } from "@/lib/cover/collage";
 import { fontForTemplate, generateRandomFontAssignments } from "@/lib/cover/font-match";
@@ -55,7 +55,7 @@ import type { LocationTimeFormatId } from "@/lib/locations";
 import { formatGenerationCostLog, type GenerationCostReport } from "@/lib/openai-usage";
 import { createId } from "@/lib/id";
 import { saveSubmissionToServer } from "@/lib/save-submission-client";
-import { compressPhotosForGenerate } from "@/lib/compress-photo";
+import { compressPhotoForGenerate, compressPhotosForGenerate, makePhotoThumbUrl } from "@/lib/compress-photo";
 import type { FlowStep } from "@/lib/flow";
 
 const MAX_PHOTOS = 5;
@@ -196,8 +196,21 @@ function ensureSubmissionId(campaignId: string) {
   return submissionId;
 }
 
+function revokeBlobUrl(url: string | null | undefined) {
+  if (url?.startsWith("blob:")) URL.revokeObjectURL(url);
+}
+
 function patchFlow(campaignId: string, partial: Partial<PersistedFlow>) {
   const current = getFlowSnapshot(campaignId);
+  const nextCoverUrl = partial.cover?.generatedCoverImageUrl;
+  const previousCoverUrl = current.cover?.generatedCoverImageUrl;
+  if (
+    previousCoverUrl &&
+    previousCoverUrl !== nextCoverUrl &&
+    (partial.cover || nextCoverUrl === null)
+  ) {
+    revokeBlobUrl(previousCoverUrl);
+  }
   const next = {
     ...current,
     ...partial,
@@ -271,6 +284,7 @@ export function CampaignFlowProvider({
 
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
   const photosRef = useRef<PhotoItem[]>([]);
+  const photoPrepRef = useRef(new Map<string, Promise<void>>());
   const generateInFlightRef = useRef<Promise<ResultDraft> | null>(null);
   const [coverComposing, setCoverComposing] = useState(false);
   const composeInFlightRef = useRef<Promise<void> | null>(null);
@@ -333,13 +347,36 @@ export function CampaignFlowProvider({
           rejected += 1;
           continue;
         }
+        const id = createId();
         next.push({
-          id: createId(),
+          id,
           name: file.name,
           previewUrl: URL.createObjectURL(file),
           file,
         });
         added += 1;
+        preloadCoverFile(file, `photo-${id}.jpg`);
+        const prep = Promise.all([compressPhotoForGenerate(file), makePhotoThumbUrl(file)]).then(
+          ([compressed, thumbUrl]) => {
+            const currentPhoto = photosRef.current.find((photo) => photo.id === id);
+            if (!currentPhoto) {
+              revokeBlobUrl(thumbUrl);
+              return;
+            }
+            const updated = photosRef.current.map((photo) =>
+              photo.id === id
+                ? {
+                    ...photo,
+                    uploadFile: compressed,
+                    thumbUrl: thumbUrl || photo.thumbUrl,
+                  }
+                : photo,
+            );
+            photosRef.current = updated;
+            setPhotos(updated);
+          },
+        );
+        photoPrepRef.current.set(id, prep);
       }
 
       if (added > 0) {
@@ -357,7 +394,11 @@ export function CampaignFlowProvider({
     (id: string) => {
       const current = photosRef.current;
       const target = current.find((photo) => photo.id === id);
-      if (target) URL.revokeObjectURL(target.previewUrl);
+      if (target) {
+        revokeBlobUrl(target.previewUrl);
+        revokeBlobUrl(target.thumbUrl);
+        photoPrepRef.current.delete(id);
+      }
       const next = current.filter((photo) => photo.id !== id);
       photosRef.current = next;
       setPhotos(next);
@@ -373,6 +414,7 @@ export function CampaignFlowProvider({
 
     const run = (async () => {
     onPhase?.("post");
+    await Promise.all([...photoPrepRef.current.values()]);
     const current = getFlowSnapshot(campaignId);
     const campaign = getCampaign(campaignId);
     const files = photosRef.current.map((photo) => photo.file).filter(Boolean);
@@ -463,7 +505,9 @@ export function CampaignFlowProvider({
 
     const form = new FormData();
     form.append("payload", JSON.stringify(payload));
-    const uploadPhotos = await compressPhotosForGenerate(files);
+    const uploadPhotos = await compressPhotosForGenerate(
+      photosRef.current.map((photo) => photo.uploadFile ?? photo.file).filter(Boolean),
+    );
     uploadPhotos.forEach((file) => form.append("photos", file));
 
     const response = await fetch("/api/generate", {
@@ -682,6 +726,7 @@ export function CampaignFlowProvider({
     const fontId = latest.selectedFontId;
 
     const run = (async () => {
+      await Promise.all([...photoPrepRef.current.values()]);
       const files = photosRef.current.map((photo) => photo.file).filter(Boolean);
       const photo = files[photoIndex] ?? files[0];
       if (!photo || !title) {

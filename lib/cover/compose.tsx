@@ -1654,14 +1654,20 @@ export async function composeCover(request: ComposeRequest): Promise<ComposeResu
   const template = applyTextEdgeInset(sized);
   const titleFontId = template.slots.title.font;
   const subtitleFontId = template.slots.subtitle.font;
-  const fonts = await loadRequiredFonts(
-    titleFontId === subtitleFontId ? [titleFontId] : [titleFontId, subtitleFontId],
-  );
-  try {
-    await ensureThaiFlagSrc();
-  } catch {
-    thaiFlagSrcCache = "";
-  }
+  const fontsNeeded =
+    titleFontId === subtitleFontId ? [titleFontId] : [titleFontId, subtitleFontId];
+  const [fonts, photo] = await Promise.all([
+    loadRequiredFonts(fontsNeeded),
+    useCollage
+      ? Promise.resolve({ dataUrl: "data:image/gif;base64,R0lGODlhAQABAAAAACw=" })
+      : prepareBaseImage(sources[0], {
+          crop: request.crop ?? "attention",
+          dimPhoto: request.dimPhoto ?? false,
+        }),
+    ensureThaiFlagSrc().catch(() => {
+      thaiFlagSrcCache = "";
+    }),
+  ]);
   const coverFont = fonts.get(titleFontId);
   const subtitleFont = fonts.get(subtitleFontId) ?? coverFont;
 
@@ -1677,11 +1683,6 @@ export async function composeCover(request: ComposeRequest): Promise<ComposeResu
     throw new CoverComposeError("title is required", 400);
   }
 
-  const photo = await prepareBaseImage(sources[0], {
-    crop: request.crop ?? "attention",
-    dimPhoto: request.dimPhoto ?? false,
-  });
-
   let collageTiles: Array<{
     dataUrl: string;
     x: number;
@@ -1693,32 +1694,32 @@ export async function composeCover(request: ComposeRequest): Promise<ComposeResu
 
   if (useCollage) {
     const plan = planCollageTiles(sources.length);
-    collageTiles = [];
-    for (let index = 0; index < COLLAGE_TILES.length; index += 1) {
-      const tile = COLLAGE_TILES[index];
-      const mapped = plan[index];
-      const source = sources[mapped.sourceIndex] ?? sources[0];
-      let prepared;
-      try {
-        prepared = await prepareTileImage(source, tile.width, tile.height, {
-          crop: mapped.crop,
-          zoom: mapped.zoom,
-        });
-      } catch {
-        prepared = await prepareTileImage(sources[0], tile.width, tile.height, {
-          crop: "center",
-          zoom: 1,
-        });
-      }
-      collageTiles.push({
-        dataUrl: prepared.dataUrl,
-        x: tile.x,
-        y: tile.y,
-        width: tile.width,
-        height: tile.height,
-        radius: tile.radius,
-      });
-    }
+    collageTiles = await Promise.all(
+      COLLAGE_TILES.map(async (tile, index) => {
+        const mapped = plan[index];
+        const source = sources[mapped.sourceIndex] ?? sources[0];
+        let prepared;
+        try {
+          prepared = await prepareTileImage(source, tile.width, tile.height, {
+            crop: mapped.crop,
+            zoom: mapped.zoom,
+          });
+        } catch {
+          prepared = await prepareTileImage(sources[0], tile.width, tile.height, {
+            crop: "center",
+            zoom: 1,
+          });
+        }
+        return {
+          dataUrl: prepared.dataUrl,
+          x: tile.x,
+          y: tile.y,
+          width: tile.width,
+          height: tile.height,
+          radius: tile.radius,
+        };
+      }),
+    );
   }
 
   const subtitleText = keepRenderableCoverText(

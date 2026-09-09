@@ -127,7 +127,27 @@ function createMetricsFont(buffer: Buffer, fileName: string): Font {
   }
 }
 
+const loadedFontCache = new Map<FontId, LoadedCoverFont>();
+const loadingFontCache = new Map<FontId, Promise<LoadedCoverFont>>();
+
 export async function loadCoverFont(
+  definition: FontDefinition,
+): Promise<LoadedCoverFont> {
+  const cached = loadedFontCache.get(definition.id);
+  if (cached) return cached;
+  const inflight = loadingFontCache.get(definition.id);
+  if (inflight) return inflight;
+
+  const loading = loadCoverFontFromDisk(definition);
+  loadingFontCache.set(definition.id, loading);
+  try {
+    return await loading;
+  } finally {
+    loadingFontCache.delete(definition.id);
+  }
+}
+
+async function loadCoverFontFromDisk(
   definition: FontDefinition,
 ): Promise<LoadedCoverFont> {
   const resolved = await resolveFontFile(definition);
@@ -169,7 +189,7 @@ export async function loadCoverFont(
     metricsFont = createMetricsFont(decompressed, resolved.fileName);
   }
 
-  return {
+  const loadedFont: LoadedCoverFont = {
     id: definition.id,
     name: definition.name,
     family: definition.family,
@@ -177,6 +197,8 @@ export async function loadCoverFont(
     satoriData: fileBuffer,
     metricsFont,
   };
+  loadedFontCache.set(definition.id, loadedFont);
+  return loadedFont;
 }
 
 export async function loadRequiredFonts(
@@ -186,12 +208,12 @@ export async function loadRequiredFonts(
     (font) => !fontIds || fontIds.includes(font.id),
   );
   const loaded = new Map<FontId, LoadedCoverFont>();
-
-  for (const definition of needed) {
-    const font = await loadCoverFont(definition);
-    loaded.set(definition.id, font);
-  }
-
+  await Promise.all(
+    needed.map(async (definition) => {
+      const font = await loadCoverFont(definition);
+      loaded.set(definition.id, font);
+    }),
+  );
   return loaded;
 }
 
