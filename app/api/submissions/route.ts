@@ -46,8 +46,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true, submissionId });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to save submission";
-    console.error("[submissions]", error);
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("[submissions] save failed");
+    const detail = error instanceof Error ? error.message : "";
+    if (detail) console.error("[submissions]", detail);
+    return NextResponse.json({ error: "Could not save submission" }, { status: 500 });
   }
 }

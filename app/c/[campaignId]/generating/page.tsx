@@ -12,6 +12,7 @@ export default function GeneratingPage() {
   const { campaignId } = useParams<{ campaignId: string }>();
   const { hydrated, canAccess, generatePost } = useCampaignFlow();
   const [error, setError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
   const [attempt, setAttempt] = useState(0);
   const [phase, setPhase] = useState<"post" | "cover">("post");
 
@@ -28,8 +29,11 @@ export default function GeneratingPage() {
         if (!cancelled) {
           router.replace(campaignPath(campaignId, "result"));
         }
-      } catch {
-        if (!cancelled) setError(true);
+      } catch (caught) {
+        if (!cancelled) {
+          setError(true);
+          setErrorMessage(caught instanceof Error ? caught.message : "");
+        }
       }
     })();
 
@@ -44,9 +48,11 @@ export default function GeneratingPage() {
       <GeneratingState
         key={attempt}
         error={error}
+        errorMessage={errorMessage}
         phase={phase}
         onRetry={() => {
           setError(false);
+          setErrorMessage("");
           setPhase("post");
           setAttempt((current) => current + 1);
         }}

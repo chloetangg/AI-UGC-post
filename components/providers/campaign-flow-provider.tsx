@@ -54,6 +54,7 @@ import {
 import type { LocationTimeFormatId } from "@/lib/locations";
 import { formatGenerationCostLog, type GenerationCostReport } from "@/lib/openai-usage";
 import { saveSubmissionToServer } from "@/lib/save-submission-client";
+import { compressPhotosForGenerate } from "@/lib/compress-photo";
 import type { FlowStep } from "@/lib/flow";
 
 const MAX_PHOTOS = 5;
@@ -290,8 +291,8 @@ export function CampaignFlowProvider({
         campaignId,
         customer: current.customer,
       });
-    } catch (error) {
-      console.error("[saveYouPage]", error);
+    } catch {
+      /* Saving to MongoDB should not block the customer flow. */
     }
   }, [campaignId]);
 
@@ -305,8 +306,8 @@ export function CampaignFlowProvider({
         customer: current.customer,
         mealExpenseThb: current.productFeedback.totalMealExpense,
       });
-    } catch (error) {
-      console.error("[saveFeelExpense]", error);
+    } catch {
+      /* Saving to MongoDB should not block the customer flow. */
     }
   }, [campaignId]);
 
@@ -455,7 +456,8 @@ export function CampaignFlowProvider({
 
     const form = new FormData();
     form.append("payload", JSON.stringify(payload));
-    files.slice(0, 5).forEach((file) => form.append("photos", file));
+    const uploadPhotos = await compressPhotosForGenerate(files);
+    uploadPhotos.forEach((file) => form.append("photos", file));
 
     const response = await fetch("/api/generate", {
       method: "POST",
@@ -473,9 +475,18 @@ export function CampaignFlowProvider({
         cost?: GenerationCostReport;
       };
     } catch {
+      if (response.status === 413) {
+        throw new Error("Photos are too large to upload. Try 1–2 smaller photos.");
+      }
+      if (response.status === 504 || response.status === 502) {
+        throw new Error("Generation timed out on the server. Retry with fewer photos.");
+      }
       throw new Error("Generation failed");
     }
     if (!response.ok) {
+      if (response.status === 413) {
+        throw new Error("Photos are too large to upload. Try 1–2 smaller photos.");
+      }
       throw new Error(data.error || "Generation failed");
     }
     if (!data.titles?.[0] || !data.titles?.[1] || !data.titles?.[2] || !data.caption) {

@@ -7,12 +7,14 @@ import { useT } from "@/components/providers/language-provider";
 
 type GeneratingStateProps = {
   error?: boolean;
+  errorMessage?: string;
   onRetry?: () => void;
   phase?: "post" | "cover";
 };
 
 export function GeneratingState({
   error = false,
+  errorMessage,
   onRetry,
   phase = "post",
 }: GeneratingStateProps) {
@@ -33,6 +35,9 @@ export function GeneratingState({
     return (
       <div className="flex flex-1 flex-col items-center justify-center px-4 text-center">
         <p className="font-display text-2xl text-foreground">{t.generating.error}</p>
+        {errorMessage ? (
+          <p className="mt-3 max-w-sm text-sm text-muted-foreground">{errorMessage}</p>
+        ) : null}
         {onRetry ? (
           <Button className="mt-6" onClick={onRetry}>
             {t.generating.retry}

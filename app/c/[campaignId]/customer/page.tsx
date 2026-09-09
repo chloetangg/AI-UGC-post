@@ -24,8 +24,8 @@ export default function CustomerPage() {
       <CustomerForm
         value={customer}
         onChange={setCustomer}
-        onContinue={async () => {
-          await saveYouPage();
+        onContinue={() => {
+          void saveYouPage();
           router.push(campaignPath(campaignId, "experience"));
         }}
       />

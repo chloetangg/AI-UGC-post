@@ -47,11 +47,11 @@ export default function ExperiencePage() {
   const ready = requiredChoicesReady && expenseReady && noteReady;
   const noteCount = countDiningExperienceUnits(feedback.diningExperienceNote);
 
-  async function continueNext() {
+  function continueNext() {
     setTouched(true);
     if (!ready) return;
     setProductFeedback(withDefaultBranch(feedback));
-    await saveFeelExpense();
+    void saveFeelExpense();
     router.push(campaignPath(campaignId, "upload"));
   }
 

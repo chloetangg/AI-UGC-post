@@ -25,7 +25,6 @@ export async function saveSubmissionToServer(input: {
     }),
   });
   if (!response.ok) {
-    const payload = (await response.json().catch(() => ({}))) as { error?: string };
-    throw new Error(payload.error || "Failed to save submission");
+    throw new Error("Could not save submission");
   }
 }
