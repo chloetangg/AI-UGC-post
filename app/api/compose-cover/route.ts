@@ -149,7 +149,7 @@ export async function POST(request: Request) {
           "Content-Type": result.contentType,
           "X-Template-Id": result.templateId,
           "X-Used-Font-Size": String(result.usedFontSize),
-          "X-Used-Font": result.usedFont.name,
+          "X-Used-Font": result.usedFont.id,
           "Cache-Control": "no-store",
         },
       });
