@@ -15,6 +15,7 @@ import { countCoverUnits, sanitizeCoverLine } from "./cover-title";
 import { COLORS, getTemplate } from "./templates";
 import { applyFontMatch } from "./font-match";
 import { COLLAGE_BACKGROUND, COLLAGE_TILES, collageGridBounds, planCollageTiles } from "./collage";
+import { isFourGridTemplateId } from "./post-layout";
 import {
   CANVAS_HEIGHT,
   CANVAS_WIDTH,
@@ -1121,7 +1122,7 @@ function renderStyledPack(
   const edge = canvasEdgeInset();
   const top = Math.max(
     edge.y,
-    Math.min(preferredTextTop(bounds.height), CANVAS_HEIGHT - edge.y - bounds.height),
+    Math.min(title.slot.y, CANVAS_HEIGHT - edge.y - bounds.height),
   );
   const gap = style.gap ?? bounds.gap;
   const subtitleGap = style.subtitleGap ?? bounds.subtitleGap;
@@ -1642,10 +1643,13 @@ export async function composeCover(request: ComposeRequest): Promise<ComposeResu
     throw new CoverComposeError(`Unknown templateId: ${request.templateId}`, 400);
   }
   const sources = [request.image, ...(request.images ?? [])].filter((item) => item?.length);
-  const useCollage = foundTemplate.layout === "collage" && sources.length === 4;
+  const useCollage = isFourGridTemplateId(foundTemplate.id) && sources.length === 4;
+  const base = applyFontMatch(foundTemplate, request.fontId);
   const matched = useCollage
-    ? applyFontMatch(foundTemplate, request.fontId)
-    : asSinglePhotoTemplate(applyFontMatch(foundTemplate, request.fontId));
+    ? { ...base, layout: "collage" as const }
+    : foundTemplate.layout === "collage"
+      ? asSinglePhotoTemplate(base)
+      : base;
   const sized = applyCoverTitleHierarchy(matched);
   const template = applyTextEdgeInset(sized);
   const titleFontId = template.slots.title.font;
@@ -1977,7 +1981,7 @@ export async function composeCover(request: ComposeRequest): Promise<ComposeResu
     }
   }
 
-  if (template.textStyle) {
+  if (template.textStyle && template.layout !== "collage") {
     const pack = styledPackBounds(
       template.textStyle.kind,
       titleLayout,
@@ -1995,38 +1999,64 @@ export async function composeCover(request: ComposeRequest): Promise<ComposeResu
   if (template.layout === "collage") {
     const grid = collageGridBounds();
     const edge = canvasEdgeInset();
-    const padX = 36;
-    const padY = 22;
-    const innerWidth = Math.max(
-      titleLayout.measured.width,
-      subtitleLayout?.measured.width ?? 0,
-    );
-    const blockWidth = Math.min(
-      Math.max(innerWidth + padX * 2, 420),
-      CANVAS_WIDTH - edge.x * 2,
-    );
-    const blockHeight =
-      titleLayout.measured.height +
-      (subtitleLayout ? SUBTITLE_GAP + subtitleLayout.measured.height : 0) +
-      padY * 2;
-    const blockX = Math.round(grid.centerX - blockWidth / 2);
-    const blockY = centeredOn(grid.centerY, blockHeight);
-    titleBackdrop = { x: blockX, y: blockY, width: blockWidth, height: blockHeight };
-    titleLayout.slot = {
-      ...titleLayout.slot,
-      x: blockX + padX,
-      y: blockY + padY,
-      maxWidth: blockWidth - padX * 2,
-      align: "center",
-    };
-    if (subtitleLayout) {
-      subtitleLayout.slot = {
-        ...subtitleLayout.slot,
+    if (template.textStyle) {
+      const pack = styledPackBounds(
+        template.textStyle.kind,
+        titleLayout,
+        subtitleLayout,
+        template.textStyle,
+      );
+      const blockY = centeredOn(grid.centerY, pack.height);
+      titleLayout.slot = {
+        ...titleLayout.slot,
+        x: Math.round(grid.centerX - pack.width / 2),
+        y: blockY,
+        maxWidth: pack.width,
+        align: "center",
+      };
+      if (subtitleLayout) {
+        subtitleLayout.slot = {
+          ...subtitleLayout.slot,
+          x: titleLayout.slot.x,
+          y: blockY,
+          maxWidth: pack.width,
+          align: "center",
+        };
+      }
+    } else {
+      const padX = 36;
+      const padY = 22;
+      const innerWidth = Math.max(
+        titleLayout.measured.width,
+        subtitleLayout?.measured.width ?? 0,
+      );
+      const blockWidth = Math.min(
+        Math.max(innerWidth + padX * 2, 420),
+        CANVAS_WIDTH - edge.x * 2,
+      );
+      const blockHeight =
+        titleLayout.measured.height +
+        (subtitleLayout ? SUBTITLE_GAP + subtitleLayout.measured.height : 0) +
+        padY * 2;
+      const blockX = Math.round(grid.centerX - blockWidth / 2);
+      const blockY = centeredOn(grid.centerY, blockHeight);
+      titleBackdrop = { x: blockX, y: blockY, width: blockWidth, height: blockHeight };
+      titleLayout.slot = {
+        ...titleLayout.slot,
         x: blockX + padX,
-        y: blockY + padY + titleLayout.measured.height + SUBTITLE_GAP,
+        y: blockY + padY,
         maxWidth: blockWidth - padX * 2,
         align: "center",
       };
+      if (subtitleLayout) {
+        subtitleLayout.slot = {
+          ...subtitleLayout.slot,
+          x: blockX + padX,
+          y: blockY + padY + titleLayout.measured.height + SUBTITLE_GAP,
+          maxWidth: blockWidth - padX * 2,
+          align: "center",
+        };
+      }
     }
     renderTemplate = {
       ...template,

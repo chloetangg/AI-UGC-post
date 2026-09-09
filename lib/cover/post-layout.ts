@@ -1,6 +1,15 @@
 import { DEFAULT_COVER_TEMPLATE_ID } from "@/types/content";
 
 export const FOUR_PHOTO_GRID_TEMPLATE_ID = "top-stroke";
+export const FOUR_PHOTO_GRID_TEMPLATE_IDS = ["top-stroke", "badge-stack", "dual-line"] as const;
+
+export function isFourGridTemplateId(templateId: string) {
+  return (FOUR_PHOTO_GRID_TEMPLATE_IDS as readonly string[]).includes(templateId);
+}
+
+export function isFourPhotoGridCover(photoCount: number, templateId: string) {
+  return photoCount >= 4 && isFourGridTemplateId(templateId);
+}
 
 export const COVER_TEMPLATE_OPTIONS = [
   { id: "top-stroke", en: "Style 1", zh: "Style 1" },
@@ -21,8 +30,22 @@ export function isCoverTemplateId(value: string): value is CoverTemplateOptionId
   return COVER_TEMPLATE_OPTIONS.some((item) => item.id === value);
 }
 
-export function isFourPhotoGridCover(photoCount: number, templateId: string) {
-  return photoCount === 4 && templateId === FOUR_PHOTO_GRID_TEMPLATE_ID;
+function insertMissingByOriginalIndex(ordered: number[], pool: number[]) {
+  const seen = new Set(ordered);
+  const result = [...ordered];
+  for (const index of pool) {
+    if (seen.has(index)) continue;
+    let insertAt = result.length;
+    for (let position = 0; position < result.length; position += 1) {
+      if (result[position] > index) {
+        insertAt = position;
+        break;
+      }
+    }
+    result.splice(insertAt, 0, index);
+    seen.add(index);
+  }
+  return result;
 }
 
 export const REMAINING_ORDER_PATTERNS = ["1", "2", "3", "4", "5", "6"] as const;
@@ -67,12 +90,9 @@ export function parseRemainingPhotoIndexes(
   photoCount: number,
   templateId: string,
 ) {
-  if (isFourPhotoGridCover(photoCount, templateId)) {
-    return Array.from({ length: photoCount }, (_, index) => index);
-  }
-  const remaining = Array.from({ length: Math.max(photoCount, 0) }, (_, index) => index).filter(
-    (index) => index !== coverSourceIndex,
-  );
+  const all = Array.from({ length: Math.max(photoCount, 0) }, (_, index) => index);
+  const fourGrid = isFourPhotoGridCover(photoCount, templateId);
+  const remaining = fourGrid ? all : all.filter((index) => index !== coverSourceIndex);
   const allowed = new Set(remaining);
   const seen = new Set<number>();
   const ordered: number[] = [];
@@ -82,6 +102,9 @@ export function parseRemainingPhotoIndexes(
     if (!allowed.has(index) || seen.has(index)) continue;
     seen.add(index);
     ordered.push(index);
+  }
+  if (fourGrid) {
+    return insertMissingByOriginalIndex(ordered, remaining);
   }
   for (const index of remaining) {
     if (seen.has(index)) continue;
@@ -105,22 +128,30 @@ export function remainingPostPhotoIndexes(
   photoCount: number,
   coverSourceIndex: number,
   templateId: string,
+  remainingOrder: unknown = [],
 ) {
-  const indexes = Array.from({ length: Math.max(photoCount, 0) }, (_, index) => index);
-  if (isFourPhotoGridCover(photoCount, templateId)) {
-    return indexes;
-  }
-  const source = Number.isInteger(coverSourceIndex) ? coverSourceIndex : 0;
-  return indexes.filter((index) => index !== source);
+  return parseRemainingPhotoIndexes(remainingOrder, coverSourceIndex, photoCount, templateId);
 }
 
 export function remainingPostPhotos<T extends { id: string }>(
   photos: T[],
   templateId: string,
-  coverSource: { id?: string | null; index?: number },
+  coverSource: {
+    id?: string | null;
+    index?: number;
+    remainingOrder?: unknown;
+  },
 ) {
   if (isFourPhotoGridCover(photos.length, templateId)) {
-    return photos;
+    return photosInIndexOrder(
+      photos,
+      parseRemainingPhotoIndexes(
+        coverSource.remainingOrder,
+        coverSource.index ?? 0,
+        photos.length,
+        templateId,
+      ),
+    );
   }
   const sourceId = coverSource.id || photos[coverSource.index ?? 0]?.id;
   if (!sourceId) return photos;
@@ -159,19 +190,13 @@ export function buildFinalSlides(
       kind: "photo" as const,
     }));
   }
+  const fourGrid = isFourPhotoGridCover(photos.length, templateId);
   const fromIds = (cover.remainingPhotoIds ?? [])
     .map((id) => photos.find((photo) => photo.id === id))
     .filter((photo): photo is { id: string; previewUrl: string } => Boolean(photo))
-    .filter((photo) =>
-      isFourPhotoGridCover(photos.length, templateId)
-        ? true
-        : photo.id !== cover.coverSourcePhotoId,
-    );
-  const remaining = isFourPhotoGridCover(photos.length, templateId)
-    ? fromIds.length > 0
-      ? fromIds
-      : photos
-    : fromIds.length > 0
+    .filter((photo) => (fourGrid ? true : photo.id !== cover.coverSourcePhotoId));
+  const remaining =
+    fromIds.length > 0
       ? fromIds
       : remainingPostPhotos(photos, templateId, {
           id: cover.coverSourcePhotoId,

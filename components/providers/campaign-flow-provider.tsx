@@ -22,7 +22,7 @@ import { isMealExpenseComplete } from "@/lib/meal-expense";
 import { isKnownOriginCity } from "@/lib/world-cities";
 import { composeCoverImage } from "@/lib/compose-cover-client";
 import { layoutCoverOverlay } from "@/lib/cover/cover-title";
-import { normalizePhotoIndexes } from "@/lib/cover/collage";
+import { normalizePhotoIndexes, pickFourGridSources } from "@/lib/cover/collage";
 import { fontForTemplate, generateRandomFontAssignments } from "@/lib/cover/font-match";
 import {
   autoMatchTemplate,
@@ -219,8 +219,12 @@ function draftFromGenerated(generated: GeneratedContent): ResultDraft {
 async function composeCoverFromState(cover: CoverState, files: File[]) {
   const templateId = cover.selectedCoverTemplateId || DEFAULT_COVER_TEMPLATE_ID;
   const sourceIndex = cover.selectedPhotoIndex;
-  const chosen = isFourPhotoGridCover(files.length, templateId)
-    ? files.slice(0, 4)
+  const fourGrid = isFourPhotoGridCover(files.length, templateId);
+  const chosen = fourGrid
+    ? pickFourGridSources(
+        files,
+        normalizePhotoIndexes(cover.selectedPhotoIndexes ?? [], sourceIndex, files.length),
+      )
     : [files[sourceIndex] ?? files[0]].filter((file): file is File => Boolean(file));
   if (!chosen[0] || !cover.coverTitle) {
     throw new Error("Cover generation failed");
@@ -231,7 +235,7 @@ async function composeCoverFromState(cover: CoverState, files: File[]) {
   }
   return composeCoverImage({
     image: chosen[0],
-    images: isFourPhotoGridCover(files.length, templateId) ? chosen.slice(1) : [],
+    images: fourGrid ? chosen.slice(1) : [],
     title: overlay.title,
     subtitle: overlay.subtitle,
     templateId,
@@ -552,7 +556,7 @@ export function CampaignFlowProvider({
     const selectedFontId = fontForTemplate(selectedTemplateId, templateFontIds);
     const coverSourcePhoto = photosRef.current[aiSelectedPhotoIndex] ?? photosRef.current[0] ?? null;
     const remainingPhotos = isFourPhotoGridCover(photosRef.current.length, selectedTemplateId)
-      ? photosRef.current
+      ? photosInIndexOrder(photosRef.current, remainingPhotoIndexes)
       : photosInIndexOrder(photosRef.current, remainingPhotoIndexes).filter(
           (photo) => photo.id !== coverSourcePhoto?.id,
         );
@@ -744,12 +748,12 @@ export function CampaignFlowProvider({
       if (!isCoverTemplateId(templateId)) return;
       const cover = getFlowSnapshot(campaignId).cover;
       if (!cover || cover.selectedCoverTemplateId === templateId) return;
-      const remaining = isFourPhotoGridCover(photosRef.current.length, templateId)
-        ? photosRef.current
-        : remainingPostPhotos(photosRef.current, templateId, {
-            id: cover.coverSourcePhotoId,
-            index: cover.selectedPhotoIndex,
-          });
+      const snapshot = getFlowSnapshot(campaignId);
+      const remaining = remainingPostPhotos(photosRef.current, templateId, {
+        id: cover.coverSourcePhotoId,
+        index: cover.selectedPhotoIndex,
+        remainingOrder: snapshot.generated?.remainingPhotoIndexes,
+      });
       patchFlow(campaignId, { selectedCoverTemplateId: templateId });
       await composeCurrentCover({
         selectedCoverTemplateId: templateId,

@@ -124,9 +124,10 @@ export function prepareRednotePublishPackage(source: RednotePublishSource): Redn
   const hashtags = [...ensureRequiredHashtags(source.hashtags)];
   const selectedPhotoIndex = Number.isInteger(source.selectedPhotoIndex) ? source.selectedPhotoIndex : 0;
   const coverIndexSet = new Set(
-    (source.coverPhotoIndexes?.length ? source.coverPhotoIndexes : [selectedPhotoIndex]).filter(
-      (index) => Number.isInteger(index) && index >= 0,
-    ),
+    (Array.isArray(source.coverPhotoIndexes)
+      ? source.coverPhotoIndexes
+      : [selectedPhotoIndex]
+    ).filter((index) => Number.isInteger(index) && index >= 0),
   );
   const photos: RednotePublishPhoto[] = source.photos.map((photo, index) => ({
     index,

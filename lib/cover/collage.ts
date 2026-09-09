@@ -117,3 +117,16 @@ export function normalizePhotoIndexes(
   }
   return unique.length > 0 ? unique : [0];
 }
+
+export function pickFourGridSources<T>(items: T[], indexes: number[]) {
+  const chosen: T[] = [];
+  const seen = new Set<number>();
+  const candidates = [...indexes, ...items.map((_, index) => index)];
+  for (const index of candidates) {
+    if (!Number.isInteger(index) || seen.has(index) || items[index] == null) continue;
+    seen.add(index);
+    chosen.push(items[index]);
+    if (chosen.length === 4) break;
+  }
+  return chosen;
+}

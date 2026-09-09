@@ -34,7 +34,7 @@ export default function PublishPage() {
         photos.length,
         cover?.selectedCoverTemplateId ?? generated.selectedTemplateId ?? "",
       )
-        ? photos.map((_, index) => index)
+        ? []
         : [cover?.selectedPhotoIndex ?? generated.selectedPhotoIndex ?? 0],
       photos: photos.map((photo) => ({ previewUrl: photo.previewUrl, name: photo.name })),
     });
