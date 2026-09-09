@@ -9,7 +9,6 @@ import { useT } from "@/components/providers/language-provider";
 import { interpolate, type Dictionary } from "@/lib/i18n";
 import type { FinalSlide } from "@/lib/cover/post-layout";
 import {
-  buildRednoteText,
   canShareFiles,
   collectRednoteDownloads,
   copyRednoteText,
@@ -36,12 +35,10 @@ export function PublishAssistant({
   const mobile = useSyncExternalStore(emptySubscribe, isMobileDevice, () => false);
   const fileShare = useSyncExternalStore(emptySubscribe, canShareFiles, () => false);
   const pasteText = useMemo(() => formatRednotePasteText(pkg), [pkg]);
-  const shareText = useMemo(() => buildRednoteText(pkg), [pkg]);
   const downloads = useMemo(() => collectRednoteDownloads(pkg), [pkg]);
   const hashtagsLine = pkg.hashtags.join(" ");
 
   const [status, setStatus] = useState<PublishStatus>("idle");
-  const [copied, setCopied] = useState(false);
   const [copyFailed, setCopyFailed] = useState(false);
   const [showPaste, setShowPaste] = useState(false);
   const [showMore, setShowMore] = useState(false);
@@ -58,17 +55,8 @@ export function PublishAssistant({
 
   async function copyAll() {
     const ok = await copyRednoteText(pasteText);
-    setCopied(ok);
     setCopyFailed(!ok);
     if (ok) setStatus((current) => (current === "idle" ? "copied" : current));
-    if (!ok) setShowPaste(true);
-    return ok;
-  }
-
-  async function copyShareText() {
-    const ok = await copyRednoteText(shareText);
-    setCopied(ok);
-    setCopyFailed(!ok);
     if (!ok) setShowPaste(true);
     return ok;
   }
@@ -78,13 +66,11 @@ export function PublishAssistant({
     setBusy(true);
     setOpenFailed(false);
     setFilesPartial(false);
+    setCopyFailed(false);
     setStatus("preparing");
 
     const result = await shareToRednote(pkg);
-    setCopied(result.copied);
-    setCopyFailed(!result.copied);
     setFilesPartial(result.filesPartial);
-    if (!result.copied) setShowPaste(true);
 
     if (result.outcome === "shared") {
       setStatus("shared");
@@ -92,12 +78,10 @@ export function PublishAssistant({
       setStatus("cancelled");
     } else if (result.outcome === "fallback-opened") {
       setStatus("completed");
-      setShowPaste(true);
       if (!fileShare) setShowAlbumGuide(true);
     } else {
       setOpenFailed(true);
       setStatus(result.filesPartial ? "files-partial" : "fallback");
-      setShowPaste(true);
       if (!fileShare) setShowAlbumGuide(true);
     }
     setBusy(false);
@@ -106,7 +90,6 @@ export function PublishAssistant({
   async function openRednoteOnly() {
     if (busy) return;
     setBusy(true);
-    await copyShareText();
     setStatus("opening-rednote");
     const result = await openRednotePublish();
     if (result === "opened") {
@@ -195,16 +178,12 @@ export function PublishAssistant({
             done={downloads.length > 0}
             label={interpolate(t.publish.checkImageCount, { count: downloads.length })}
           />
-          <CheckRow done={copied} label={copied ? t.publish.checkCopied : t.publish.checkCopyPending} />
         </ul>
       </section>
 
       {status !== "idle" ? (
         <section className="rounded-3xl border border-border bg-card p-4 shadow-sm">
           <ul className="space-y-2.5 text-sm">
-            <li className={copied ? "text-foreground" : "text-muted-foreground"}>
-              {copied ? t.publish.stepCopied : t.publish.stepCopyPending}
-            </li>
             <li className="text-foreground">{t.publish.stepPhotos}</li>
             <li className="text-foreground">
               {fileShare && (status === "shared" || status === "sharing" || status === "files-partial")

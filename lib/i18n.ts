@@ -224,7 +224,7 @@ const en = {
     photoNote:
       "On your phone, tap Publish to Rednote and choose Rednote in the share menu. The website cannot pick Rednote or drop photos into the editor for you.",
     rednoteLimit:
-      "This page cannot auto-fill the Rednote title or caption, or tap Publish. Paste the copied text in the app if needed.",
+      "This page only shares photos. It will not fill the Rednote title or caption. Copy text yourself if you need it.",
   },
   privacy: {
     title: "Privacy Policy",
@@ -505,7 +505,7 @@ const zh: typeof en = {
     stepShare: "③ 在系统分享里选择小红书",
     fallbackHint: "如果没有自动打开，请再点一次「发布到小红书」。",
     photoNote: "手机上点「发布到小红书」，在系统分享里选择小红书即可带上图片。网站无法替你点选小红书，也不能直接把图放进编辑器。",
-    rednoteLimit: "无法自动填入小红书标题和正文，也无法代为点发布。如需发帖，请在小红书里粘贴已复制的文案并确认。",
+    rednoteLimit: "点「发布到小红书」只会分享图片，不会填入标题和正文。需要文案时，请自己点「复制全部文案」。",
   },
   privacy: {
     title: "隐私政策",

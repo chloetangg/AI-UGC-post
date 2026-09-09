@@ -320,32 +320,21 @@ function isShareAbort(error: unknown) {
   return error instanceof DOMException && error.name === "AbortError";
 }
 
-async function sharePublishFiles(files: File[], title: string, text: string): Promise<"shared" | "cancelled" | "failed"> {
+async function sharePublishFiles(files: File[]): Promise<"shared" | "cancelled" | "failed"> {
   if (files.length === 0 || typeof navigator.share !== "function") return "failed";
-  const full: ShareData = { files, title, text };
-  const filesOnly: ShareData = { files };
-  const payload = canShareData(full) ? full : canShareData(filesOnly) ? filesOnly : null;
-  if (!payload) return "failed";
+  if (!canShareData({ files })) return "failed";
   try {
-    await navigator.share(payload);
+    await navigator.share({ files });
     return "shared";
   } catch (error) {
     if (isShareAbort(error)) return "cancelled";
-    if (payload !== filesOnly && canShareData(filesOnly)) {
-      try {
-        await navigator.share(filesOnly);
-        return "shared";
-      } catch (retry) {
-        if (isShareAbort(retry)) return "cancelled";
-      }
-    }
     return "failed";
   }
 }
 
 async function shareImageFiles(files: File[]) {
   if (files.length === 0 || typeof navigator.share !== "function") return "failed" as const;
-  const shared = await sharePublishFiles(files, files.length > 1 ? "Baan Ying photos" : files[0]?.name || "", "");
+  const shared = await sharePublishFiles(files);
   if (shared === "shared" || shared === "cancelled") return shared;
   return "failed" as const;
 }
@@ -483,38 +472,32 @@ export function openRednotePublish(): Promise<OpenRednoteResult> {
 }
 
 export async function fallbackRednotePublish(pkg: RednotePublishPackage): Promise<ShareToRednoteOutcome> {
-  await copyRednoteText(buildRednoteText(pkg));
   await saveRednoteImages(pkg);
   const opened = await openRednotePublish();
   return opened === "opened" ? "fallback-opened" : "fallback-failed";
 }
 
 /**
- * Primary: Web Share the cover + photos.
- * Fallback: copy text, save images, open xhsdiscover://post.
+ * Primary: Web Share image files only — never title or caption.
+ * Fallback: save images, then open xhsdiscover://post.
  */
 export async function shareToRednote(pkg: RednotePublishPackage): Promise<ShareToRednoteResult> {
   const { files, items, failed } = await buildPublishFilesLenient(pkg);
   const filesPartial = failed > 0 || (items.length > 0 && files.length === 0);
-  const copied = await copyRednoteText(buildRednoteText(pkg));
-  const title = finalTitle(pkg);
-  const text = buildRednoteText(pkg);
 
   if (canShareFiles() && files.length > 0) {
-    if (canShareData({ files })) {
-      const shared = await sharePublishFiles(files, title, text);
-      if (shared === "shared" || shared === "cancelled") {
-        return { outcome: shared, filesPartial, copied };
-      }
+    const shared = await sharePublishFiles(files);
+    if (shared === "shared" || shared === "cancelled") {
+      return { outcome: shared, filesPartial, copied: false };
     }
     const opened = await openRednotePublish();
     return {
       outcome: opened === "opened" ? "fallback-opened" : "fallback-failed",
       filesPartial,
-      copied,
+      copied: false,
     };
   }
 
   const outcome = await fallbackRednotePublish(pkg);
-  return { outcome, filesPartial, copied };
+  return { outcome, filesPartial, copied: false };
 }
