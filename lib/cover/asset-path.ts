@@ -1,38 +1,50 @@
 import { promises as fs } from "fs";
 import path from "path";
 
-function publicUrl(relativeFromPublic: string) {
-  const rel = relativeFromPublic.replace(/^\/+/, "");
-  const origin = process.env.VERCEL_PROJECT_PRODUCTION_URL
-    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
-    : process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : "";
-  return origin ? `${origin}/${rel}` : "";
+const FONT_FILES = new Set([
+  "jiangchengheiti.ttf",
+  "jiangchengyuanti.ttf",
+  "jingnabobohei.ttf",
+]);
+
+const COVER_FILES = new Set(["thai-flag.png"]);
+
+function publicOrigin() {
+  if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
+    return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
+  }
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`;
+  }
+  return "";
 }
 
-export function publicFileCandidates(relativeFromPublic: string) {
+function localPublicPath(relativeFromPublic: string) {
   const rel = relativeFromPublic.replace(/^\/+/, "");
-  return [
-    path.join(process.cwd(), "public", rel),
-    path.join(process.cwd(), rel),
-    path.join(process.cwd(), ".next", "standalone", "public", rel),
-  ];
+  const [folder, fileName] = rel.split("/");
+  if (folder === "fonts" && fileName && FONT_FILES.has(fileName)) {
+    return path.join(process.cwd(), "public", "fonts", fileName);
+  }
+  if (folder === "cover" && fileName && COVER_FILES.has(fileName)) {
+    return path.join(process.cwd(), "public", "cover", fileName);
+  }
+  return null;
 }
 
 export async function readPublicFile(relativeFromPublic: string): Promise<Buffer> {
-  for (const filePath of publicFileCandidates(relativeFromPublic)) {
+  const filePath = localPublicPath(relativeFromPublic);
+  if (filePath) {
     try {
       const buffer = await fs.readFile(filePath);
       if (buffer.length) return buffer;
     } catch {
-      /* try the next location */
+      /* try the public URL on Vercel */
     }
   }
 
-  const url = publicUrl(relativeFromPublic);
-  if (url) {
-    const response = await fetch(url);
+  const origin = publicOrigin();
+  if (origin) {
+    const response = await fetch(`${origin}/${relativeFromPublic.replace(/^\/+/, "")}`);
     if (response.ok) {
       const buffer = Buffer.from(await response.arrayBuffer());
       if (buffer.length) return buffer;
