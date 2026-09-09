@@ -32,3 +32,11 @@ export const PROGRESS_STEPS = [
   { key: "result", label: "Post" },
   { key: "publish", label: "Share" },
 ] as const;
+
+export const NEXT_FLOW_STEP: Partial<Record<FlowStep, FlowStep>> = {
+  customer: "experience",
+  experience: "upload",
+  upload: "generating",
+  generating: "result",
+  result: "publish",
+};

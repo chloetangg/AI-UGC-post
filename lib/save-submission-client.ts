@@ -23,6 +23,7 @@ export async function saveSubmissionToServer(input: {
         : undefined,
       mealExpenseThb: input.mealExpenseThb,
     }),
+    keepalive: true,
   });
   if (!response.ok) {
     throw new Error("Could not save submission");

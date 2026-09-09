@@ -24,8 +24,8 @@ export function GeneratingState({
   useEffect(() => {
     if (error) return;
     const progressTimer = window.setInterval(() => {
-      setProgress((current) => Math.min(current + 8, 96));
-    }, 180);
+      setProgress((current) => Math.min(current + 3, 92));
+    }, 700);
     return () => {
       window.clearInterval(progressTimer);
     };

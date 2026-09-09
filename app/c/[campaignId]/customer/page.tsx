@@ -1,5 +1,6 @@
 "use client";
 
+import { startTransition } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { CustomerForm } from "@/components/customer/CustomerForm";
 import { PageTitle } from "@/components/campaign/PageTitle";
@@ -26,7 +27,9 @@ export default function CustomerPage() {
         onChange={setCustomer}
         onContinue={() => {
           void saveYouPage();
-          router.push(campaignPath(campaignId, "experience"));
+          startTransition(() => {
+            router.push(campaignPath(campaignId, "experience"));
+          });
         }}
       />
     </>

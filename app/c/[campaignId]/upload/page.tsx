@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { startTransition, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { PageTitle } from "@/components/campaign/PageTitle";
 import { StickyAction } from "@/components/campaign/StickyAction";
@@ -20,7 +20,9 @@ export default function UploadPage() {
   function generate() {
     setTouched(true);
     if (photos.length === 0) return;
-    router.push(campaignPath(campaignId, "generating"));
+    startTransition(() => {
+      router.push(campaignPath(campaignId, "generating"));
+    });
   }
 
   return (

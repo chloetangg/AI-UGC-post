@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, startTransition } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { PageTitle } from "@/components/campaign/PageTitle";
 import { StickyAction } from "@/components/campaign/StickyAction";
@@ -36,6 +36,7 @@ export default function ExperiencePage() {
   const { productFeedback, setProductFeedback, saveFeelExpense } = useCampaignFlow();
   const t = useT();
   const [touched, setTouched] = useState(false);
+  const [leaving, setLeaving] = useState(false);
   const feedback = withDefaultBranch({ ...emptyProductFeedback, ...productFeedback });
   const visitFrequency = VISIT_FREQUENCIES.includes(feedback.visitFrequency as VisitFrequency)
     ? feedback.visitFrequency
@@ -50,9 +51,12 @@ export default function ExperiencePage() {
   function continueNext() {
     setTouched(true);
     if (!ready) return;
+    setLeaving(true);
     setProductFeedback(withDefaultBranch(feedback));
     void saveFeelExpense();
-    router.push(campaignPath(campaignId, "upload"));
+    startTransition(() => {
+      router.push(campaignPath(campaignId, "upload"));
+    });
   }
 
   function toggleEnjoyMost(option: EnjoyMost) {
@@ -246,7 +250,7 @@ export default function ExperiencePage() {
           <p className="text-sm text-destructive">{t.experience.qExpenseError}</p>
         ) : null}
       </div>
-      <StickyAction onClick={continueNext}>{t.common.continue}</StickyAction>
+      <StickyAction disabled={leaving} onClick={continueNext}>{t.common.continue}</StickyAction>
     </>
   );
 }

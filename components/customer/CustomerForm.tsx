@@ -24,6 +24,7 @@ export function CustomerForm({
 }) {
   const t = useT();
   const [touched, setTouched] = useState(false);
+  const [leaving, setLeaving] = useState(false);
 
   const errors = useMemo(() => validateCustomer(value, t), [value, t]);
   const show = (field: CustomerFields) => (touched ? errors[field] : undefined);
@@ -36,6 +37,7 @@ export function CustomerForm({
     event.preventDefault();
     setTouched(true);
     if (Object.keys(errors).length > 0) return;
+    setLeaving(true);
     onContinue();
   }
 
@@ -87,7 +89,7 @@ export function CustomerForm({
         </p>
       ) : null}
 
-      <StickyAction type="submit">{t.common.continue}</StickyAction>
+      <StickyAction type="submit" disabled={leaving}>{t.common.continue}</StickyAction>
     </form>
   );
 }

@@ -1,7 +1,9 @@
-const MAX_EDGE = 1024;
-const JPEG_QUALITY = 0.72;
+const MAX_EDGE = 720;
+const JPEG_QUALITY = 0.62;
+const SKIP_IF_SMALLER_THAN = 350_000;
 
 export async function compressPhotoForGenerate(file: File): Promise<File> {
+  if (file.type === "image/jpeg" && file.size <= SKIP_IF_SMALLER_THAN) return file;
   if (typeof createImageBitmap !== "function") return file;
   if (!file.type.startsWith("image/") && !/\.(jpe?g|png|webp)$/i.test(file.name)) {
     return file;
@@ -32,9 +34,5 @@ export async function compressPhotoForGenerate(file: File): Promise<File> {
 }
 
 export async function compressPhotosForGenerate(files: File[]) {
-  const prepared: File[] = [];
-  for (const file of files.slice(0, 5)) {
-    prepared.push(await compressPhotoForGenerate(file));
-  }
-  return prepared;
+  return Promise.all(files.slice(0, 5).map((file) => compressPhotoForGenerate(file)));
 }

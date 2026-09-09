@@ -22,7 +22,7 @@ function getClient() {
   if (!apiKey) {
     throw new Error("Missing OPENAI_API_KEY");
   }
-  return new OpenAI({ apiKey, maxRetries: 4, timeout: 45_000 });
+  return new OpenAI({ apiKey, maxRetries: 1, timeout: 60_000 });
 }
 
 async function fileToImagePart(file: File) {
@@ -30,16 +30,18 @@ async function fileToImagePart(file: File) {
   if (!buffer.length) return null;
   let output: Buffer = buffer;
   let mime = file.type || "image/jpeg";
-  try {
-    const sharp = (await import("sharp")).default;
-    output = await sharp(buffer)
-      .rotate()
-      .resize(1280, 1280, { fit: "inside", withoutEnlargement: true })
-      .jpeg({ quality: 80 })
-      .toBuffer();
-    mime = "image/jpeg";
-  } catch {
-    // Keep the original bytes if the photo cannot be re-encoded.
+  if (buffer.length > 300_000) {
+    try {
+      const sharp = (await import("sharp")).default;
+      output = await sharp(buffer)
+        .rotate()
+        .resize(640, 640, { fit: "inside", withoutEnlargement: true })
+        .jpeg({ quality: 62 })
+        .toBuffer();
+      mime = "image/jpeg";
+    } catch {
+      // Keep the original bytes if the photo cannot be re-encoded.
+    }
   }
   return {
     type: "image_url" as const,
@@ -67,21 +69,19 @@ export async function POST(request: Request) {
       .filter((item): item is File => typeof item !== "string")
       .slice(0, MAX_IMAGES);
 
-    const imageParts: Array<
-      | { type: "text"; text: string }
-      | {
-          type: "image_url";
-          image_url: { url: string; detail: "low" };
-        }
-    > = [];
-    for (let index = 0; index < photos.length; index += 1) {
-      const part = await fileToImagePart(photos[index]);
-      imageParts.push({
-        type: "text",
-        text: `Photo ${index + 1} (selectedPhotoIndex ${index}):`,
-      });
-      if (part) imageParts.push(part);
-    }
+    const imageParts = (
+      await Promise.all(
+        photos.map(async (photo, index) => {
+          const part = await fileToImagePart(photo);
+          const pieces: Array<
+            | { type: "text"; text: string }
+            | { type: "image_url"; image_url: { url: string; detail: "low" } }
+          > = [{ type: "text", text: `Photo ${index + 1} (selectedPhotoIndex ${index}):` }];
+          if (part) pieces.push(part);
+          return pieces;
+        }),
+      )
+    ).flat();
 
     const openai = getClient();
     const model = process.env.OPENAI_MODEL || "gpt-4o";

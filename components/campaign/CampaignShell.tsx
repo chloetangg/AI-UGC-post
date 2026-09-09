@@ -1,10 +1,11 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
-import { campaignPath, PROGRESS_STEPS, type FlowStep } from "@/lib/flow";
+import { campaignPath, NEXT_FLOW_STEP, PROGRESS_STEPS, type FlowStep } from "@/lib/flow";
 import { getCampaign } from "@/lib/mock/campaign";
 import { cn } from "@/lib/utils";
 import { CampaignHeader } from "@/components/campaign/CampaignHeader";
@@ -36,6 +37,7 @@ export function CampaignShell({
   children: ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const t = useT();
   const campaign = getCampaign(campaignId);
   const segment = pathname.split("/").filter(Boolean)[2] ?? "";
@@ -45,6 +47,12 @@ export function CampaignShell({
   const isPrivacy = segment === "privacy";
   const showProgress = !isLanding && !isGenerating && !isPrivacy;
   const backStep = BACK_STEP[currentStep];
+
+  useEffect(() => {
+    const next = NEXT_FLOW_STEP[currentStep];
+    if (!next) return;
+    router.prefetch(campaignPath(campaignId, next));
+  }, [campaignId, currentStep, router]);
 
   return (
     <div className="min-h-dvh bg-[radial-gradient(circle_at_top,#e8f3ec_0%,#f5f8f5_38%,#eef4ef_100%)]">
