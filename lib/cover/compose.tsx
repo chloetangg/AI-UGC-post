@@ -1,8 +1,7 @@
 import satori from "satori";
 import { Resvg } from "@resvg/resvg-js";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 import { loadRequiredFonts, toSatoriFonts, getFontFamily, toUsedFont } from "./fonts";
+import { readPublicFile } from "./asset-path";
 import { encodeOutput, prepareBaseImage, prepareTileImage } from "./image";
 import type { ReactNode } from "react";
 import {
@@ -774,12 +773,15 @@ function topBannerFlagMetrics(fontSize: number) {
 }
 let thaiFlagSrcCache: string | null = null;
 
-function thaiFlagSrc() {
-  if (!thaiFlagSrcCache) {
-    const file = readFileSync(path.join(process.cwd(), "public", "cover", "thai-flag.png"));
-    thaiFlagSrcCache = `data:image/png;base64,${file.toString("base64")}`;
-  }
+async function ensureThaiFlagSrc() {
+  if (thaiFlagSrcCache) return thaiFlagSrcCache;
+  const file = await readPublicFile("cover/thai-flag.png");
+  thaiFlagSrcCache = `data:image/png;base64,${file.toString("base64")}`;
   return thaiFlagSrcCache;
+}
+
+function thaiFlagSrc() {
+  return thaiFlagSrcCache ?? "";
 }
 
 function renderThaiFlag(size: { width: number; height: number }) {
@@ -1651,6 +1653,11 @@ export async function composeCover(request: ComposeRequest): Promise<ComposeResu
   const fonts = await loadRequiredFonts(
     titleFontId === subtitleFontId ? [titleFontId] : [titleFontId, subtitleFontId],
   );
+  try {
+    await ensureThaiFlagSrc();
+  } catch {
+    thaiFlagSrcCache = "";
+  }
   const coverFont = fonts.get(titleFontId);
   const subtitleFont = fonts.get(subtitleFontId) ?? coverFont;
 

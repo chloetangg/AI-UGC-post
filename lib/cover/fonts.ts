@@ -1,6 +1,5 @@
-import { promises as fs } from "fs";
-import path from "path";
 import { create as createFontkitFont, type Font, type FontCollection } from "fontkit";
+import { readPublicFile } from "./asset-path";
 import { FONT_LABELS } from "./font-labels";
 import {
   CoverComposeError,
@@ -72,30 +71,21 @@ export type LoadedCoverFont = {
   metricsFont: Font;
 };
 
-const fontsDir = () => path.join(process.cwd(), "public", "fonts");
-
-async function fileExists(filePath: string): Promise<boolean> {
-  try {
-    await fs.access(filePath);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 export async function resolveFontFile(
   definition: FontDefinition,
-): Promise<{ filePath: string; fileName: string } | null> {
-  const dir = fontsDir();
-  const preferred = path.join(dir, definition.preferredFile);
-  if (await fileExists(preferred)) {
-    return { filePath: preferred, fileName: definition.preferredFile };
-  }
-  for (const ext of FONT_EXTENSIONS) {
-    const fileName = `${definition.fileBase}${ext}`;
-    const filePath = path.join(dir, fileName);
-    if (await fileExists(filePath)) {
-      return { filePath, fileName };
+): Promise<{ fileName: string; publicRel: string } | null> {
+  const names = [
+    definition.preferredFile,
+    ...FONT_EXTENSIONS.map((ext) => `${definition.fileBase}${ext}`),
+  ];
+  const unique = [...new Set(names)];
+  for (const fileName of unique) {
+    const publicRel = `fonts/${fileName}`;
+    try {
+      const buffer = await readPublicFile(publicRel);
+      if (buffer.length) return { fileName, publicRel };
+    } catch {
+      /* try next extension */
     }
   }
   return null;
@@ -150,7 +140,7 @@ export async function loadCoverFont(
 
   let fileBuffer: Buffer;
   try {
-    fileBuffer = await fs.readFile(resolved.filePath);
+    fileBuffer = await readPublicFile(resolved.publicRel);
   } catch {
     throw new CoverComposeError(
       `Chinese font failed to load: ${resolved.fileName}`,
