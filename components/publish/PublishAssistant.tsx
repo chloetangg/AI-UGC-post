@@ -14,13 +14,9 @@ import {
   copyRednoteText,
   formatRednotePasteText,
   isMobileDevice,
-  openRednotePublish,
-  saveRednoteImage,
-  saveRednoteImages,
   shareToRednote,
   type PublishStatus,
   type RednotePublishPackage,
-  type SaveImagesResult,
 } from "@/lib/rednote-publish";
 import { cn } from "@/lib/utils";
 
@@ -45,8 +41,6 @@ export function PublishAssistant({
   const [openFailed, setOpenFailed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [filesPartial, setFilesPartial] = useState(false);
-  const [saveHint, setSaveHint] = useState<"share" | "long-press" | "cancelled" | "">("");
-  const [showAlbumGuide, setShowAlbumGuide] = useState(false);
 
   const heading =
     status === "idle" || status === "preparing" || status === "cancelled"
@@ -78,56 +72,11 @@ export function PublishAssistant({
       setStatus("cancelled");
     } else if (result.outcome === "fallback-opened") {
       setStatus("completed");
-      if (!fileShare) setShowAlbumGuide(true);
     } else {
       setOpenFailed(true);
       setStatus(result.filesPartial ? "files-partial" : "fallback");
-      if (!fileShare) setShowAlbumGuide(true);
     }
     setBusy(false);
-  }
-
-  async function openRednoteOnly() {
-    if (busy) return;
-    setBusy(true);
-    setStatus("opening-rednote");
-    const result = await openRednotePublish();
-    if (result === "opened") {
-      setStatus("completed");
-    } else {
-      setOpenFailed(true);
-      setStatus("fallback");
-      setShowPaste(true);
-    }
-    setBusy(false);
-  }
-
-  async function handleSaveResult(result: SaveImagesResult) {
-    if (result === "shared") {
-      setSaveHint("share");
-      setShowAlbumGuide(false);
-      return;
-    }
-    if (result === "cancelled") {
-      setSaveHint("cancelled");
-      return;
-    }
-    if (result === "long-press") {
-      setSaveHint("long-press");
-      setShowAlbumGuide(true);
-      return;
-    }
-    setSaveHint("");
-  }
-
-  async function saveAll() {
-    const result = await saveRednoteImages(pkg);
-    await handleSaveResult(result);
-  }
-
-  async function saveOne(url: string, fileName: string) {
-    const result = await saveRednoteImage(url, fileName);
-    await handleSaveResult(result);
   }
 
   return (
@@ -150,20 +99,9 @@ export function PublishAssistant({
 
       {slides.length > 0 ? (
         <section className="rounded-3xl border border-border bg-card p-4 shadow-sm">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-              {t.publish.coverLabel}
-            </h2>
-            {pkg.coverImageUrl ? (
-              <button
-                type="button"
-                className="text-xs font-semibold text-primary"
-                onClick={() => saveOne(pkg.coverImageUrl, downloads[0]?.fileName || "rednote-cover.png")}
-              >
-                {t.publish.copyCover}
-              </button>
-            ) : null}
-          </div>
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+            {t.publish.coverLabel}
+          </h2>
           <PostSlideshow
             slides={slides}
             resetKey={slides.map((slide) => `${slide.id}:${slide.src}`).join("|")}
@@ -188,9 +126,7 @@ export function PublishAssistant({
             <li className="text-foreground">
               {fileShare && (status === "shared" || status === "sharing" || status === "files-partial")
                 ? t.publish.stepShare
-                : status === "opening-rednote" || status === "completed"
-                  ? t.publish.stepOpening
-                  : t.publish.stepOpen}
+                : t.publish.stepOpening}
             </li>
           </ul>
         </section>
@@ -220,39 +156,15 @@ export function PublishAssistant({
       ) : null}
 
       {status === "shared" || status === "fallback" || status === "files-partial" ? (
-        <p className="text-sm leading-relaxed text-muted-foreground whitespace-pre-wrap">
+        <p className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
           {t.publish.statusAppMissing}
         </p>
       ) : null}
 
-      <div className="space-y-2">
+      {mobile ? (
         <Button className="w-full" variant="outline" onClick={copyAll}>
           {t.publish.copyAll}
         </Button>
-        <Button className="w-full" variant="outline" onClick={saveAll}>
-          {t.publish.saveAll}
-        </Button>
-        {!mobile || !fileShare || status !== "idle" ? (
-          <Button className="w-full" variant="outline" disabled={busy} onClick={openRednoteOnly}>
-            {t.publish.openXiaohongshu}
-          </Button>
-        ) : null}
-        {mobile ? (
-          <p className="text-sm leading-relaxed text-muted-foreground">{t.publish.saveShareHint}</p>
-        ) : null}
-        {saveHint === "cancelled" ? (
-          <p className="text-sm leading-relaxed text-muted-foreground">{t.publish.saveCancelled}</p>
-        ) : null}
-        {saveHint === "long-press" ? (
-          <p className="text-sm leading-relaxed text-muted-foreground">{t.publish.longPressHint}</p>
-        ) : null}
-      </div>
-
-      {status === "fallback" || status === "completed" ? (
-        <div className="space-y-1 text-center text-sm text-muted-foreground">
-          <p>{t.publish.fallbackHint}</p>
-          {status === "fallback" ? <p>{t.publish.manualPublish}</p> : null}
-        </div>
       ) : null}
 
       <button
@@ -273,38 +185,7 @@ export function PublishAssistant({
             copyLabel={t.publish.copyHashtags}
             value={hashtagsLine}
           />
-          <div className="flex flex-wrap gap-2">
-            {downloads.map((item) => (
-              <Button
-                key={item.key}
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => saveOne(item.url, item.fileName)}
-              >
-                {item.kind === "cover"
-                  ? t.publish.copyCover
-                  : interpolate(t.publish.savePhoto, { index: item.labelIndex })}
-              </Button>
-            ))}
-          </div>
         </div>
-      ) : null}
-
-      {showAlbumGuide ? (
-        <section className="space-y-3 rounded-3xl border border-border bg-card p-4 shadow-sm">
-          <p className="text-sm leading-relaxed text-muted-foreground">{t.publish.longPressHint}</p>
-          <div className="grid grid-cols-2 gap-2">
-            {downloads.map((item) => (
-              <img
-                key={item.key}
-                src={item.url}
-                alt={item.fileName}
-                className="aspect-[4/5] w-full rounded-2xl object-cover"
-              />
-            ))}
-          </div>
-        </section>
       ) : null}
 
       <p className="text-sm leading-relaxed text-muted-foreground">{t.publish.photoNote}</p>

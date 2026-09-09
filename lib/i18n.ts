@@ -206,7 +206,7 @@ const en = {
     statusShared: "Choose Rednote in the share menu to attach your photos.",
     statusCancelled: "Publish cancelled.",
     statusFilesPartial:
-      "Couldn't prepare some images automatically.\nYou can still tap “Save to Photos” and publish manually.",
+      "Couldn't prepare some images automatically.\nTry Publish to Rednote again.",
     statusOpening: "Opening Rednote...",
     statusOpened: "Rednote is open.\nPlease complete the final publishing step in Rednote.",
     statusFallback: "Rednote could not be opened automatically.\n\nYour content is ready below.",
@@ -222,7 +222,7 @@ const en = {
     stepShare: "③ Choose Rednote in the share menu",
     fallbackHint: "If it didn't open automatically, tap Publish to Rednote again.",
     photoNote:
-      "On your phone, tap Publish to Rednote and choose Rednote in the share menu. The website cannot pick Rednote or drop photos into the editor for you.",
+      "On your phone, tap Publish to Rednote and choose Rednote in the share menu to attach the photos.",
     rednoteLimit:
       "This page only shares photos. It will not fill the Rednote title or caption. Copy text yourself if you need it.",
   },
@@ -490,7 +490,7 @@ const zh: typeof en = {
     statusSharing: "正在打开系统分享...",
     statusShared: "请在系统分享里选择小红书，即可带上图片。",
     statusCancelled: "已取消发布",
-    statusFilesPartial: "无法自动准备部分图片\n你仍然可以使用「保存全部图片」后手动发布。",
+    statusFilesPartial: "无法自动准备部分图片\n请再点一次「发布到小红书」。",
     statusOpening: "正在打开小红书...",
     statusOpened: "已打开小红书\n请在小红书中完成最后发布",
     statusFallback: "无法自动打开小红书。\n\n你的内容已准备好，请按下面步骤发布。",
@@ -504,7 +504,7 @@ const zh: typeof en = {
     stepOpen: "③ 打开小红书",
     stepShare: "③ 在系统分享里选择小红书",
     fallbackHint: "如果没有自动打开，请再点一次「发布到小红书」。",
-    photoNote: "手机上点「发布到小红书」，在系统分享里选择小红书即可带上图片。网站无法替你点选小红书，也不能直接把图放进编辑器。",
+    photoNote: "手机上点「发布到小红书」，在系统分享里选择小红书即可带上图片。",
     rednoteLimit: "点「发布到小红书」只会分享图片，不会填入标题和正文。需要文案时，请自己点「复制全部文案」。",
   },
   privacy: {
