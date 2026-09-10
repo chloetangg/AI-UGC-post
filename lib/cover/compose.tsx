@@ -1468,12 +1468,6 @@ function CoverMarkup(props: {
     height: number;
     radius: number;
   }>;
-  titleBackdrop?: {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  } | null;
   template: CoverTemplate;
   overlayEnabled: boolean;
   title: LaidOutSlot;
@@ -1559,40 +1553,6 @@ function CoverMarkup(props: {
       {props.template.decoration.map((decoration, index) =>
         renderDecoration(decoration, index),
       )}
-
-      {props.titleBackdrop ? (
-        <div
-          style={{
-            position: "absolute",
-            left: 0,
-            top: 0,
-            width: CANVAS_WIDTH,
-            height: CANVAS_HEIGHT,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              width: CANVAS_WIDTH,
-              height: props.titleBackdrop.y,
-              flexShrink: 0,
-            }}
-          />
-          <div
-            style={{
-              display: "flex",
-              width: props.titleBackdrop.width,
-              height: props.titleBackdrop.height,
-              backgroundColor: "rgba(15, 15, 15, 0.42)",
-              borderRadius: 28,
-              flexShrink: 0,
-            }}
-          />
-        </div>
-      ) : null}
 
       {renderCoverText(props.template, props.title, props.subtitle)}
     </div>
@@ -2000,7 +1960,6 @@ export async function composeCover(request: ComposeRequest): Promise<ComposeResu
     };
   }
 
-  let titleBackdrop: { x: number; y: number; width: number; height: number } | null = null;
   let renderTemplate = template;
   if (template.layout === "collage") {
     const grid = collageGridBounds();
@@ -2030,36 +1989,23 @@ export async function composeCover(request: ComposeRequest): Promise<ComposeResu
         };
       }
     } else {
-      const padX = 36;
-      const padY = 22;
-      const innerWidth = Math.max(
-        titleLayout.measured.width,
-        subtitleLayout?.measured.width ?? 0,
-      );
-      const blockWidth = Math.min(
-        Math.max(innerWidth + padX * 2, 420),
-        CANVAS_WIDTH - edge.x * 2,
-      );
       const blockHeight =
         titleLayout.measured.height +
-        (subtitleLayout ? SUBTITLE_GAP + subtitleLayout.measured.height : 0) +
-        padY * 2;
-      const blockX = Math.round(grid.centerX - blockWidth / 2);
+        (subtitleLayout ? SUBTITLE_GAP + subtitleLayout.measured.height : 0);
       const blockY = centeredOn(grid.centerY, blockHeight);
-      titleBackdrop = { x: blockX, y: blockY, width: blockWidth, height: blockHeight };
       titleLayout.slot = {
         ...titleLayout.slot,
-        x: blockX + padX,
-        y: blockY + padY,
-        maxWidth: blockWidth - padX * 2,
+        x: edge.x,
+        y: blockY,
+        maxWidth: CANVAS_WIDTH - edge.x * 2,
         align: "center",
       };
       if (subtitleLayout) {
         subtitleLayout.slot = {
           ...subtitleLayout.slot,
-          x: blockX + padX,
-          y: blockY + padY + titleLayout.measured.height + SUBTITLE_GAP,
-          maxWidth: blockWidth - padX * 2,
+          x: edge.x,
+          y: blockY + titleLayout.measured.height + SUBTITLE_GAP,
+          maxWidth: CANVAS_WIDTH - edge.x * 2,
           align: "center",
         };
       }
@@ -2087,7 +2033,6 @@ export async function composeCover(request: ComposeRequest): Promise<ComposeResu
     <CoverMarkup
       photoDataUrl={photo.dataUrl}
       collageTiles={collageTiles}
-      titleBackdrop={titleBackdrop}
       template={renderTemplate}
       overlayEnabled={request.overlayEnabled ?? true}
       title={titleLayout}

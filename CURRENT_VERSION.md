@@ -141,7 +141,7 @@ SHARE（分别复制标题、正文、标签；可保存封面）
 | 字段 | 值 |
 | --- | --- |
 | Brand | Baan Ying |
-| Campaign | Baan Ying Thai Food Experience |
+| Campaign | Baan Ying centralwOrld |
 | Category | Thai Restaurant / Food & Dining |
 | Logo | `/baan-ying-logo.png` |
 | Content Type（品牌侧，消费者不选） | `restaurant-recommendation` |

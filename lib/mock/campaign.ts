@@ -7,7 +7,7 @@ export const MOCK_CAMPAIGN_ID = "baan-ying";
 
 export const mockCampaign: Campaign = {
   id: MOCK_CAMPAIGN_ID,
-  campaignName: "Baan Ying Thai Food Experience",
+  campaignName: "Baan Ying centralwOrld",
   brandName: "Baan Ying",
   productName: "Baan Ying",
   productCategory: "Thai Restaurant / Food & Dining",
