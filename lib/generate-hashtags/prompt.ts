@@ -22,14 +22,14 @@ The caption has already been generated. Your only job is to output hashtags for 
 
 LANGUAGE:
 - Hashtags may mix Simplified Chinese (${CONTENT_LANGUAGE}) and the two fixed brand tags.
-- Do not translate or rewrite the two fixed hashtags.
+- Do not translate or rewrite the three fixed hashtags.
 
 ${STRICT_HASHTAG_RULES}`;
 }
 
 export function buildHashtagUserPrompt(input: HashtagGenerateInput) {
   const previousDynamic = (input.previousHashtags ?? []).filter(
-    (tag) => tag !== "#baanying曼谷" && tag !== "#曼谷必吃",
+    (tag) => tag !== "#baanying曼谷" && tag !== "#曼谷必吃" && tag !== "#centralworld泰餐推荐",
   );
 
   return `Generate hashtags for this completed Xiaohongshu caption.
@@ -48,10 +48,10 @@ ${input.contentAngle?.trim() || "Not provided"}
 
 PREVIOUS DYNAMIC HASHTAGS:
 ${previousDynamic.length > 0 ? previousDynamic.join(" ") : "None"}
-The 3 dynamic hashtags MUST differ from the previous dynamic hashtags when another relevant set exists.
+The 2 random pool hashtags MUST differ from the previous random pair when another pair exists.
 
 ${STRICT_HASHTAG_RULES}
 
 Return ONLY the 5 hashtags, in this order:
-#baanying曼谷 #曼谷必吃 #动态标签1 #动态标签2 #动态标签3`;
+#baanying曼谷 #曼谷必吃 #centralworld泰餐推荐 #随机1 #随机2`;
 }

@@ -85,7 +85,7 @@ async function modelRewrite(
     messages: [
       {
         role: "system",
-        content: `Rewrite only the risky sentences in this Xiaohongshu post into neutral, factual, personal experience. Keep dishes, facts, emoji count, and a natural spoken tone. Do not delete the thought — rewrite it. Keep required hashtags #baanying曼谷 and #曼谷必吃 exactly. COVER mainTitle 4–7 units, subTitle 4–9 units, keep EXACTLY 2 cover keywords from 曼谷/centralwOrld/泰餐/美食/必吃 plus KSP. 必吃 is allowed on the cover only, never as a post-title/caption claim. Never copy customer negatives such as 贵/难吃/踩雷/抽奖送东西 onto titles or cover; keep meaning as neutral wording, never as false praise. Do not truncate titles. Return JSON only. No analysis.
+        content: `Rewrite only the risky sentences in this Xiaohongshu post into neutral, factual, personal experience. Keep dishes, facts, emoji count, and a natural spoken tone. Do not delete the thought — rewrite it. Keep required hashtags #baanying曼谷, #曼谷必吃, and #centralworld泰餐推荐 exactly. Random hashtags must stay in the approved pool. COVER mainTitle 4–7 units, subTitle 4–9 units, keep EXACTLY 2 cover keywords from 曼谷/centralwOrld/泰餐/美食/必吃 plus KSP. 必吃 is allowed on the cover only, never as a post-title/caption claim. Never copy customer negatives such as 贵/难吃/踩雷/抽奖送东西 onto titles or cover; keep meaning as neutral wording, never as false praise. Do not truncate titles. Return JSON only. No analysis.
 ${complianceGenerationRules()}`,
       },
       {

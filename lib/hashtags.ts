@@ -1,10 +1,29 @@
-export const REQUIRED_HASHTAGS = ["#baanying曼谷", "#曼谷必吃"] as const;
-export const FALLBACK_HASHTAGS = ["#泰菜推荐", "#曼谷美食", "#曼谷探店"] as const;
+export const REQUIRED_HASHTAGS = ["#baanying曼谷", "#曼谷必吃", "#centralworld泰餐推荐"] as const;
+export const RANDOM_HASHTAG_POOL = [
+  "#centralworld",
+  "#曼谷centralworld",
+  "#centralworld美食",
+  "#泰国",
+  "#泰国旅游",
+  "#泰国旅游攻略",
+  "#泰国美食",
+  "#曼谷泰餐推荐",
+  "#centralworld泰餐",
+  "#曼谷",
+  "#曼谷美食",
+  "#泰国菜",
+  "#曼谷打卡",
+  "#曼谷探店推荐",
+  "#曼谷正宗泰餐",
+  "#曼谷泰式家常菜",
+] as const;
 export const HASHTAG_COUNT = 5;
-export const DYNAMIC_HASHTAG_COUNT = 3;
-export const FIXED_HASHTAG_LINE = `${REQUIRED_HASHTAGS[0]} ${REQUIRED_HASHTAGS[1]}`;
+export const DYNAMIC_HASHTAG_COUNT = 2;
+export const FIXED_HASHTAG_LINE = REQUIRED_HASHTAGS.join(" ");
 
 export type GeneratedHashtags = [string, string, string, string, string];
+
+const POOL_KEYS = new Set(RANDOM_HASHTAG_POOL.map((tag) => tag.toLowerCase()));
 
 export const CAPTION_NO_HASHTAG_RULES = `【CAPTION MUST NOT CONTAIN HASHTAGS】
 
@@ -33,61 +52,38 @@ If a previous caption included hashtags, ignore them and do not copy them.`;
 
 export const HASHTAGS_JSON_FIELD_RULES = `HASHTAGS — JSON field "hashtags" only. Never put hashtags in titles or caption.
 
-Exactly 5 hashtags:
+Exactly 5 hashtags, in this order:
 1. #baanying曼谷
 2. #曼谷必吃
-3–5. three dynamic tags based on THIS caption, selected dishes that actually appear, food qualities, Thai/Bangkok dining.
+3. #centralworld泰餐推荐
+4–5. exactly 2 tags randomly chosen from the approved pool. Never invent, shorten, combine, translate, or rewrite pool tags.
 
-Fixed tags must be exact. Never #BaanYing曼谷, #BaanYing, #baanying, #曼谷必吃餐厅.
-Dynamic tags should vary vs previousHashtags when another relevant set exists.
-Derive the 3 dynamic tags from the FINAL caption plus actual customer evidence (dish, Thai cuisine, Bangkok dining, location, travel, shopping, dining context). Do NOT hard-code hashtags by Storyline or KSP.
-Forbidden dynamic tags: #米其林餐厅 #曼谷第一 #曼谷唯一 #曼谷顶级 #曼谷最强 #明星同款 #必吃第一名 #最好吃 #全网第一 #销量冠军 #顶级 #封神 #必吃.
-If unsure, use #泰菜推荐 #曼谷美食 #曼谷探店. The two fixed tags stay exact, including #曼谷必吃.`;
+Approved pool ONLY:
+#centralworld #曼谷centralworld #centralworld美食 #泰国 #泰国旅游 #泰国旅游攻略 #泰国美食 #曼谷泰餐推荐 #centralworld泰餐 #曼谷 #曼谷美食 #泰国菜 #曼谷打卡 #曼谷探店推荐 #曼谷正宗泰餐 #曼谷泰式家常菜
+
+The 2 random tags MUST be different from each other and should differ from previousHashtags when another pair exists.
+Never pick the 3 fixed tags as the random pair. Never output a tag outside this pool.`;
 
 export const STRICT_HASHTAG_RULES = `【HASHTAG GENERATION — SEPARATE MODULE】
 
 You generate hashtags ONLY. You do NOT write captions.
 
-The caption has already been written. Use that completed caption as context.
+Return ONLY the 5 hashtags. No explanations.
 
-Return ONLY the 5 hashtags. No explanations, sentences, bullet points, labels, or caption content.
-
-1. FIXED HASHTAGS (MUST always be included, exactly as written, in this order):
+1. FIXED HASHTAGS (always first, exact spelling, this order):
 ${FIXED_HASHTAG_LINE}
-NEVER change spelling, capitalization, Chinese characters, or wording.
-NEVER translate, remove, replace, or shorten them.
-NEVER use variations such as #BaanYing曼谷, #BaanYing, #baanYing曼谷, #baanying, #曼谷必吃餐厅.
 
-2. DYNAMIC HASHTAGS:
-Generate exactly 3 additional hashtags based on the completed caption.
-Base them on: selected dishes in this caption, main food characteristics, content angle, Thai food, Bangkok food, restaurant / dining context.
-They SHOULD vary between generations. Do NOT always reuse the same 3 dynamic hashtags.
-If the featured dish or content angle changes, change at least 1–2 dynamic hashtags.
-Examples:
-- Yellow Curry Crab Meat focus: #黄咖喱蟹肉 #泰国菜 #曼谷美食
-- Mango Sticky Rice focus: #芒果糯米饭 #泰国甜品 #曼谷美食
-Avoid generic tags with no connection to the caption.
+2. RANDOM HASHTAGS:
+Select exactly 2 different hashtags from this pool only:
+#centralworld #曼谷centralworld #centralworld美食 #泰国 #泰国旅游 #泰国旅游攻略 #泰国美食 #曼谷泰餐推荐 #centralworld泰餐 #曼谷 #曼谷美食 #泰国菜 #曼谷打卡 #曼谷探店推荐 #曼谷正宗泰餐 #曼谷泰式家常菜
+Do not invent, shorten, combine, translate, or rewrite them.
+Do not pick any of the 3 fixed hashtags as the random pair.
+Do not repeat the previous random pair when another pair exists.
 
-3. COUNT:
-Exactly 5 hashtags in total: 2 fixed + 3 dynamic. Not 4, not 6, not more.
+3. COUNT: exactly 5. Order: 3 fixed, then 2 random.
 
-4. OUTPUT FORMAT:
-Return ONLY this line:
-${FIXED_HASHTAG_LINE} #动态标签1 #动态标签2 #动态标签3
-
-Do NOT return explanations, "Here are your hashtags:", bullet points, extra text, or any caption content.
-
-5. DO NOT INVENT FACTS:
-Dynamic hashtags must be based on the completed caption, the customer's answers, or verified restaurant data.
-Do NOT use unsupported or exaggerated tags such as #米其林餐厅 #曼谷第一 #明星同款 #必吃第一名 #最好吃 #全网第一 #销量冠军 #顶级 #封神 #必吃.
-
-6. FINAL VALIDATION:
-- Exactly 5 hashtags
-- First two are exactly ${FIXED_HASHTAG_LINE}
-- Exactly 3 relevant dynamic hashtags
-- Fixed hashtags unmodified
-- No additional text
-If any check fails, correct before returning.`;
+4. OUTPUT:
+${FIXED_HASHTAG_LINE} #随机1 #随机2`;
 
 function formatHashtag(value: string) {
   const trimmed = value.trim().replace(/^#+/, "").replace(/\s+/g, "");
@@ -98,15 +94,28 @@ function tagKey(value: string) {
   return formatHashtag(value).toLowerCase();
 }
 
-function isForbiddenHashtag(tag: string) {
-  if (isRequiredHashtag(tag)) return false;
-  return /米其林|明星同款|必吃第一名|曼谷第一|曼谷唯一|曼谷最强|曼谷顶级|number\s*one|最好吃|全网第一|销量冠军|封神|顶级|最便宜|#第一|#必吃|#绝对/i.test(
-    tag,
-  );
+export function isRequiredHashtag(tag: string) {
+  return (REQUIRED_HASHTAGS as readonly string[]).some((required) => tagKey(required) === tagKey(tag));
 }
 
-export function isRequiredHashtag(tag: string) {
-  return (REQUIRED_HASHTAGS as readonly string[]).includes(tag);
+export function isPoolHashtag(tag: string) {
+  return POOL_KEYS.has(tagKey(tag));
+}
+
+function previousRandomTags(previous?: string[] | null) {
+  return (previous ?? []).map(formatHashtag).filter((tag) => tag && isPoolHashtag(tag) && !isRequiredHashtag(tag));
+}
+
+function pickRandomPoolHashtags(exclude: string[] = []): [string, string] {
+  const blocked = new Set(exclude.map(tagKey));
+  const available = RANDOM_HASHTAG_POOL.filter((tag) => !blocked.has(tagKey(tag)));
+  const source = available.length >= DYNAMIC_HASHTAG_COUNT ? available : [...RANDOM_HASHTAG_POOL];
+  const shuffled = [...source];
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const swap = Math.floor(Math.random() * (index + 1));
+    [shuffled[index], shuffled[swap]] = [shuffled[swap], shuffled[index]];
+  }
+  return [shuffled[0], shuffled[1]];
 }
 
 export function extractHashtags(text: string): string[] {
@@ -133,42 +142,60 @@ export function captionContainsHashtags(caption: string) {
 }
 
 /**
- * AI output pipeline: first two are always the fixed tags, then exactly 3 extras.
+ * Always 3 fixed tags, then exactly 2 approved-pool tags.
+ * Candidates outside the pool are dropped. Gaps are filled at random.
  */
-export function normalizeHashtags(candidates: string[] = []): GeneratedHashtags {
-  const required = [REQUIRED_HASHTAGS[0], REQUIRED_HASHTAGS[1]];
+export function normalizeHashtags(
+  candidates: string[] = [],
+  previousHashtags: string[] = [],
+): GeneratedHashtags {
+  const required = [...REQUIRED_HASHTAGS];
   const seen = new Set(required.map(tagKey));
+  const previousRandom = previousRandomTags(previousHashtags);
   const extras: string[] = [];
 
   for (const candidate of candidates) {
     const tag = formatHashtag(candidate);
-    if (!tag || seen.has(tagKey(tag))) continue;
-    if (tagKey(tag) === "#baanying") continue;
-    if (isForbiddenHashtag(tag)) continue;
+    if (!tag || seen.has(tagKey(tag)) || !isPoolHashtag(tag)) continue;
     seen.add(tagKey(tag));
     extras.push(tag);
     if (extras.length === DYNAMIC_HASHTAG_COUNT) break;
   }
 
-  for (const fallback of FALLBACK_HASHTAGS) {
-    if (extras.length === DYNAMIC_HASHTAG_COUNT) break;
-    if (seen.has(tagKey(fallback))) continue;
-    seen.add(tagKey(fallback));
-    extras.push(fallback);
+  const sameAsPrevious =
+    extras.length === DYNAMIC_HASHTAG_COUNT &&
+    previousRandom.length === DYNAMIC_HASHTAG_COUNT &&
+    extras.every((tag) => previousRandom.some((item) => tagKey(item) === tagKey(tag)));
+  if (sameAsPrevious) {
+    for (const tag of extras) seen.delete(tagKey(tag));
+    extras.length = 0;
   }
 
-  return [
-    required[0],
-    required[1],
-    extras[0] ?? FALLBACK_HASHTAGS[0],
-    extras[1] ?? FALLBACK_HASHTAGS[1],
-    extras[2] ?? FALLBACK_HASHTAGS[2],
-  ];
+  if (extras.length < DYNAMIC_HASHTAG_COUNT) {
+    const [first, second] = pickRandomPoolHashtags([...required, ...extras, ...previousRandom]);
+    for (const tag of [first, second]) {
+      if (extras.length === DYNAMIC_HASHTAG_COUNT) break;
+      if (seen.has(tagKey(tag))) continue;
+      seen.add(tagKey(tag));
+      extras.push(tag);
+    }
+  }
+
+  if (extras.length < DYNAMIC_HASHTAG_COUNT) {
+    const [first, second] = pickRandomPoolHashtags([...required, ...extras]);
+    extras.push(first, second);
+  }
+
+  return [required[0], required[1], required[2], extras[0], extras[1]];
 }
 
-export function validateHashtags(aiHashtags?: string[] | null, caption?: string): GeneratedHashtags {
+export function validateHashtags(
+  aiHashtags?: string[] | null,
+  caption?: string,
+  previousHashtags: string[] = [],
+): GeneratedHashtags {
   const fromCaption = caption ? extractHashtags(caption) : [];
-  return normalizeHashtags([...(aiHashtags ?? []), ...fromCaption]);
+  return normalizeHashtags([...(aiHashtags ?? []), ...fromCaption], previousHashtags);
 }
 
 export function isHashtagOnlyOutput(raw: string) {
@@ -186,8 +213,8 @@ export function parseHashtagOnlyOutput(raw: string): GeneratedHashtags | null {
   if (missingFixed) return null;
   const extras = tags.filter((tag) => !isRequiredHashtag(tag));
   if (extras.length !== DYNAMIC_HASHTAG_COUNT) return null;
-  if (extras.some(isForbiddenHashtag)) return null;
-  return [REQUIRED_HASHTAGS[0], REQUIRED_HASHTAGS[1], extras[0], extras[1], extras[2]];
+  if (extras.some((tag) => !isPoolHashtag(tag))) return null;
+  return normalizeHashtags(tags);
 }
 
 export function applyHashtagsToCaption(caption: string, tags: string[]) {
@@ -200,15 +227,16 @@ export function applyHashtagsToCaption(caption: string, tags: string[]) {
 export function finalizeGeneratedHashtags(
   caption: string,
   aiHashtags?: string[] | null,
+  previousHashtags: string[] = [],
 ): { caption: string; hashtags: GeneratedHashtags } {
   const fromCaption = extractHashtags(caption);
   return {
     caption: stripAllHashtagsFromCaption(caption),
-    hashtags: normalizeHashtags([...(aiHashtags ?? []), ...fromCaption]),
+    hashtags: normalizeHashtags([...(aiHashtags ?? []), ...fromCaption], previousHashtags),
   };
 }
 
-/** Keep required tags first; keep at most 3 extras. */
+/** Keep required tags first; keep at most 2 approved-pool extras. */
 export function ensureRequiredHashtags(tags: string[]): GeneratedHashtags {
   return normalizeHashtags(tags);
 }

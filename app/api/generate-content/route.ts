@@ -11,6 +11,7 @@ import {
   generateContentJsonSchema,
 } from "@/lib/generate-content/prompt";
 import { generateHashtags } from "@/lib/generate-hashtags/generate";
+import { ensureCaptionEmojis, fixFruitEmojisInTitles } from "@/lib/caption-emoji";
 import { attachOfficialLocationTime, resolveDiningBranch, stripGeneratedLocationTime } from "@/lib/locations";
 import { enforceXiaohongshuCompliance } from "@/lib/compliance";
 import {
@@ -73,7 +74,7 @@ export async function POST(request: Request) {
 
     try {
       const generated = parseGenerateContentResponse(text);
-      const story = stripGeneratedLocationTime(generated.body);
+      const story = ensureCaptionEmojis(stripGeneratedLocationTime(generated.body));
       let hashtags = generated.hashtags;
       const usageCalls = [usageFromCompletion(completion, model, "caption-1")];
       try {
@@ -90,7 +91,7 @@ export async function POST(request: Request) {
       }
       const compliant = await enforceXiaohongshuCompliance({
         content: {
-          titles: generated.titles,
+          titles: fixFruitEmojisInTitles(generated.titles),
           caption: story,
           hashtags,
           coverTitle: "",
@@ -100,10 +101,13 @@ export async function POST(request: Request) {
         model,
       });
       usageCalls.push(...compliant.usage);
-      const located = attachOfficialLocationTime(compliant.caption, resolveDiningBranch(payload.experience.branch));
+      const located = attachOfficialLocationTime(
+        ensureCaptionEmojis(compliant.caption),
+        resolveDiningBranch(payload.experience.branch),
+      );
       logGenerationCost(aggregateGenerationCost(usageCalls));
       return Response.json({
-        titles: compliant.titles,
+        titles: fixFruitEmojisInTitles(compliant.titles),
         body: located.caption,
         hashtags: compliant.hashtags,
         locationFormat: located.format,

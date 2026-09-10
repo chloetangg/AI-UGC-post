@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { X } from "lucide-react";
-import { isRequiredHashtag } from "@/lib/hashtags";
+import { isPoolHashtag, isRequiredHashtag } from "@/lib/hashtags";
 import { Input } from "@/components/ui/input";
 import { useT } from "@/components/providers/language-provider";
 
@@ -24,6 +24,10 @@ export function HashtagEditor({
   function addTag(raw: string) {
     const tag = normalizeTag(raw);
     if (!tag) return;
+    if (!isPoolHashtag(tag) || isRequiredHashtag(tag)) {
+      setDraft("");
+      return;
+    }
     if (value.includes(tag) || value.length >= 5) {
       setDraft("");
       return;

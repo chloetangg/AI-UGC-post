@@ -117,5 +117,5 @@ ${lineList(evidenceLines)}
 Photo selection should support the selected Storyline / Angle.
 ${photoSelectionHint(suggested.contentAngleId)}
 
-Hashtags: derive the 3 dynamic tags from the FINAL caption + actual customer evidence (dish, Thai cuisine, Bangkok dining, location, travel, shopping, dining context). Do NOT hard-code hashtags by Storyline.`;
+Hashtags: pick exactly 2 random tags from the approved pool. Do NOT invent tags. Do NOT hard-code hashtags by Storyline.`;
 }

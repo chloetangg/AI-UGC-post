@@ -46,6 +46,7 @@ type LaidOutSlot = {
 
 const SUBTITLE_GAP = 32;
 const POLAROID_SUBTITLE_GAP = 28;
+const CENTER_PACK_TEMPLATE_IDS = new Set(["badge-stack", "dual-line", "bottom-bar"]);
 
 function canvasEdgeInset() {
   return {
@@ -297,7 +298,9 @@ function renderDecoration(decoration: Decoration, index: number) {
           top: decoration.y,
           width: decoration.width,
           height: decoration.height,
-          backgroundColor: decoration.fill,
+          ...(decoration.fill === "transparent" || decoration.fill === "none"
+            ? {}
+            : { backgroundColor: decoration.fill }),
           opacity: decoration.opacity ?? 1,
           borderRadius: decoration.radius ?? 0,
           display: "flex",
@@ -1991,7 +1994,9 @@ export async function composeCover(request: ComposeRequest): Promise<ComposeResu
     );
     titleLayout.slot = {
       ...titleLayout.slot,
-      y: preferredTextTop(pack.height),
+      y: CENTER_PACK_TEMPLATE_IDS.has(template.id)
+        ? centeredOn(Math.round(CANVAS_HEIGHT / 2), pack.height)
+        : preferredTextTop(pack.height),
     };
   }
 
@@ -2064,9 +2069,16 @@ export async function composeCover(request: ComposeRequest): Promise<ComposeResu
       decoration: template.decoration.map((item) =>
         offsetDecoration(
           item,
-          titleLayout.slot.x - template.slots.title.x,
+          template.textStyle ? 0 : titleLayout.slot.x - template.slots.title.x,
           titleLayout.slot.y - template.slots.title.y,
         ),
+      ),
+    };
+  } else if (template.textStyle && CENTER_PACK_TEMPLATE_IDS.has(template.id)) {
+    renderTemplate = {
+      ...template,
+      decoration: template.decoration.map((item) =>
+        offsetDecoration(item, 0, titleLayout.slot.y - template.slots.title.y),
       ),
     };
   }

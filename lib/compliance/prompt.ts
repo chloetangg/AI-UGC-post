@@ -38,7 +38,7 @@ No unverifiable photo claims: 完全无P 100%真实 原图直出 零滤镜 绝�
 
 Titles must pass the same rules. BAD: 曼谷最好吃的泰餐！真的封神了！ GOOD: 曼谷最近吃到的一家泰餐｜这几道菜很喜欢
 
-Hashtags: keep exact #baanying曼谷 and #曼谷必吃. Dynamic tags must be factual. Forbidden dynamic tags: #全网第一 #最好吃 #必吃 #销量冠军 #顶级 #第一 #最便宜 #绝对 #封神.
+Hashtags: keep exact #baanying曼谷 #曼谷必吃 #centralworld泰餐推荐, then exactly 2 tags from the approved pool. Never invent hashtags.
 
 Do not copy sample posts, openings, or paragraph skeletons.
 

@@ -547,7 +547,11 @@ export function CampaignFlowProvider({
       console.log(formatGenerationCostLog(data.cost));
     }
 
-    const finalized = finalizeGeneratedHashtags(data.caption, data.hashtags);
+    const finalized = finalizeGeneratedHashtags(
+      data.caption,
+      data.hashtags,
+      current.draft?.hashtags ?? current.generated?.hashtags,
+    );
     const located = attachOfficialLocationTime(
       finalized.caption,
       diningBranch,

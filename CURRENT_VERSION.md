@@ -346,7 +346,7 @@ Caption
   [Location & Time]
 
 Hashtags
-  #baanying曼谷 #曼谷必吃 #动态1 #动态2 #动态3
+  #baanying曼谷 #曼谷必吃 #centralworld泰餐推荐 #随机1 #随机2
 ```
 
 保存 / 发布前会从正文里清掉误带的 `#`，标签单独放在 Hashtags 区。
@@ -381,7 +381,7 @@ JSON 形状：
 {
   "titles": ["标题1", "标题2", "标题3"],
   "caption": "故事正文。不要写 Location & Time，不要写 hashtag。",
-  "hashtags": ["#baanying曼谷", "#曼谷必吃", "#动态1", "#动态2", "#动态3"],
+  "hashtags": ["#baanying曼谷", "#曼谷必吃", "#centralworld泰餐推荐", "#曼谷美食", "#泰国菜"],
   "mainTitle": "封面主标题",
   "subTitle": "封面副标题",
   "selectedPhotoIndex": 0,
@@ -406,18 +406,18 @@ JSON 形状：
   → Content Angle
   → Search Keyword
   → 标题 / 正文 / 封面 / 选图
-  → 从终稿正文派生 3 个动态 hashtag
+  → 从批准池随机抽 2 个话题标签
 ```
 
 可复用结构：`lib/content-strategy/`。Baan Ying 的 10 个 KSP、10 条 Storyline、12 个 Content Angle、主/次搜索词和兼容矩阵在 `lib/brand/baan-ying-strategy.ts`。
 
 Storyline **只定义叙事意图**，禁止写成「ST-01 必须用某某开头」。
 
-本地会按顾客证据给一个 suggested 组合；模型可在证据支持时另选。重新生成会避开上一轮的 KSP / Storyline / Angle（还有别的合法选项时），并换标题关键词、开头、结构和动态标签。顾客事实不变，不为了变化而编造经历。
+本地会按顾客证据给一个 suggested 组合；模型可在证据支持时另选。重新生成会避开上一轮的 KSP / Storyline / Angle（还有别的合法选项时），并换标题关键词、开头、结构和随机话题标签。顾客事实不变，不为了变化而编造经历。
 
 KSP-03 Family Recipes & Heritage 是低频策略，不默认写 1999 / Auntie Ying / Siam Square。
 
-动态 hashtag **不按 Storyline 写死**，只根据终稿正文和顾客证据选 3 个。固定两个仍是 `#baanying曼谷` `#曼谷必吃`。
+随机话题标签只能从批准池抽 2 个，不按 Storyline 写死。固定三个是 `#baanying曼谷` `#曼谷必吃` `#centralworld泰餐推荐`。
 
 ### 12.4 标题
 
@@ -475,7 +475,7 @@ KSP-03 Family Recipes & Heritage 是低频策略，不默认写 1999 / Auntie Yi
 
 封面字数不够时用更短同义：口味看个人喜好 / 整体风味比较经典 / 价格看个人预期。禁止把难吃改成超级好吃。
 
-品牌固定标签 `#baanying曼谷` `#曼谷必吃` 仍保留；正文和标题里不再把「必吃」当卖点。封面允许用池子里的「必吃」作为两个关键词之一。用户只看到终稿，看不到内部合规分析。
+品牌固定标签 `#baanying曼谷` `#曼谷必吃` `#centralworld泰餐推荐` 仍保留；正文和标题里不再把「必吃」当卖点。封面允许用池子里的「必吃」作为两个关键词之一。用户只看到终稿，看不到内部合规分析。
 
 写法应口语、自然、略带情绪；避免「作为一家…」「值得一提的是…」「整体来说…」「如果你正在寻找…」这类评测 / 广告句式。
 
@@ -546,20 +546,20 @@ UI 一律显示 **Template 1 … Template 10**（中英文相同）。内部 `te
 
 | UI | templateId |
 | --- | --- |
-| Template 1 | `top-stroke` |
-| Template 2 | `bottom-bar` |
-| Template 3 | `bottom-card` |
-| Template 4 | `top-banner` |
-| Template 5 | `left-spine` |
-| Template 6 | `polaroid` |
-| Template 7 | `center-lower` |
-| Template 8 | `badge-stack` |
-| Template 9 | `split-band` |
-| Template 10 | `dual-line` |
+| Style 1 | `top-stroke` |
+| Style 2 | `badge-stack` |
+| Style 3 | `dual-line` |
+| Style 4 | `top-banner` |
+| Style 5 | `left-spine` |
+| Style 6 | `polaroid` |
+| Style 7 | `center-lower` |
+| Style 8 | `bottom-bar` |
+| Style 9 | `split-band` |
+| Style 10 | `bottom-card` |
 
 POST 页可点选模板；换模板只重打 `/api/compose-cover`，**不再调用 OpenAI**。
 
-`top-stroke`（Template 1）在 **正好 4 张照片** 时做 2×2 拼贴；标题 / 副标题 / 背景装饰叠在四宫格几何中心。其余张数以及另外 9 个模板都是单图封面。输出 1080×1350。Vercel 上中文字体从 `public/fonts` 读取（`lib/cover/asset-path.ts` + `outputFileTracingIncludes`）。
+`top-stroke` / `badge-stack` / `dual-line`（Style 1 / 2 / 3）在 **4 张及以上照片** 时做 2×2 拼贴；标题 / 副标题 / 背景装饰叠在四宫格几何中心。1–3 张以及另外 7 个模板都是单图封面。输出 1080×1350。Vercel 上中文字体从 `public/fonts` 读取（`lib/cover/asset-path.ts` + `outputFileTracingIncludes`）。
 
 ### Template 4（`top-banner`）
 
@@ -574,10 +574,10 @@ POST 页可点选模板；换模板只重打 `/api/compose-cover`，**不再调�
 
 ### 其他版式要点
 
-- Template 3 / 4：标题在安全框内左对齐
-- Template 8 / 9：更大字号，优先换行而不是缩小
-- Template 10：白 blob + 橙胶囊，不要把标题拆成两个白 blob
-- Template 6：标题在拍立得白边里，统一字号
+- Style 10 / 4：标题在安全框内左对齐
+- Style 2 / 9：更大字号，优先换行而不是缩小
+- Style 3：白 blob + 橙胶囊，不要把标题拆成两个白 blob
+- Style 6：标题在拍立得白边里，统一字号
 
 Cover Composer 失败时：「Cover generation failed」+ Retry Cover（只重打 `/api/compose-cover`，不再调用 OpenAI）。
 
@@ -706,24 +706,36 @@ Version 1 和 Version 6 使用单换行，行与行之间没有空行。
 
 ## 14. Hashtag 规则
 
-每一次生成必须 **正好 5 个**。Hashtag 和标题、正文在**同一次** OpenAI 请求里生成，但页面上仍分开展示。正文里不能出现 `#`。
+每一次生成必须 **正好 5 个**。Hashtag 和标题、正文在**同一次** OpenAI 请求里生成，但页面上仍分开展示。正文里不能出现 `#`。系统会把结果强制整理成下面的结构。
 
-固定 2 个（永远原样，不可改、不可译、不可删）：
+固定 3 个（永远原样，不可改、不可译、不可删，且必须按此顺序）：
 
 1. `#baanying曼谷`
 2. `#曼谷必吃`
+3. `#centralworld泰餐推荐`
 
-动态 3 个：根据**这篇已完成正文**、菜、口味、内容角度、泰餐 / 曼谷餐饮来写。不同次生成应有变化。
+随机 2 个：只能从批准池里选，且彼此不同。不能自造、缩短、合并、翻译或改写池子里的标签。每次生成应换一对，不要总用同一组。
 
-兜底（动态位不够时）：
+批准池：
 
-- `#泰菜推荐`
+- `#centralworld`
+- `#曼谷centralworld`
+- `#centralworld美食`
+- `#泰国`
+- `#泰国旅游`
+- `#泰国旅游攻略`
+- `#泰国美食`
+- `#曼谷泰餐推荐`
+- `#centralworld泰餐`
+- `#曼谷`
 - `#曼谷美食`
-- `#曼谷探店`
+- `#泰国菜`
+- `#曼谷打卡`
+- `#曼谷探店推荐`
+- `#曼谷正宗泰餐`
+- `#曼谷泰式家常菜`
 
-禁止无依据标签：`#米其林餐厅` `#曼谷第一` `#明星同款` `#必吃第一名`。
-
-结果页固定标签不能删除；动态标签最多 3 个。
+最终顺序永远是：3 个固定 + 2 个随机。固定标签不能当随机位。结果页固定标签不能删除；随机标签最多 2 个，且只能是池子里的。
 
 ---
 
@@ -736,7 +748,7 @@ Version 1 和 Version 6 使用单换行，行与行之间没有空行。
 - 3 个正文标题里选 1 个
 - 可改正文、可改动态标签
 - 可重新生成（会再走 1 次 OpenAI + 1 次 Cover Composer）
-- 保存时：正文去 hashtag，标签补齐固定 2 + 动态最多 3
+- 保存时：正文去 hashtag，标签补齐固定 3 + 随机 2（仅批准池）
 
 **SHARE**
 

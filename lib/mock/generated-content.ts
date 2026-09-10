@@ -33,7 +33,7 @@ export const mockGeneratedContent: GeneratedContent = {
   ],
   caption:
     `来曼谷当然要安排一顿泰国菜🇹🇭 这次吃到 Baan Ying，整体体验很适合和朋友一起约饭！从经典泰菜到各种适合分享的料理，一桌点起来超满足😋 如果你最近也在找曼谷餐厅，不妨把这家先收藏起来✨\n\n📍 尚泰世界购物中心（centralwOrld）3楼\n⏰ 10:00–22:00`,
-  hashtags: validateHashtags(["#泰菜推荐", "#曼谷美食", "#曼谷探店"]),
+  hashtags: validateHashtags(["#曼谷美食", "#泰国菜"]),
   coverTitle: "曼谷必吃",
   coverSubtitle: "家常泰式料理",
   selectedPhotoIndex: 0,
@@ -80,27 +80,15 @@ const CONTENT_OPENERS: Record<ContentType, string[]> = {
   ],
 };
 
-const DISH_HASHTAGS: Record<RecommendedDish, string> = {
-  "Yellow Curry Crab Meat": "#黄咖喱蟹肉",
-  "Tom Yum Goong": "#冬阴功",
-  "Thai Sweet & Sour Steamed Fish": "#酸甜蒸鱼",
-  "Stir-Fried Shrimp with Garlic": "#蒜蓉炒虾",
-  "Mango Sticky Rice": "#芒果糯米饭",
-  Others: "",
-};
-
 const ANGLE_HASHTAG_SETS = [
-  ["#泰菜推荐", "#曼谷美食", "#曼谷探店"],
-  ["#泰国菜", "#曼谷泰餐", "#曼谷吃什么"],
-  ["#泰式料理", "#曼谷餐厅", "#泰国美食"],
+  ["#曼谷美食", "#泰国菜"],
+  ["#泰国美食", "#曼谷泰餐推荐"],
+  ["#centralworld", "#曼谷打卡"],
 ] as const;
 
 function mockDynamicHashtags(input: GeneratePostInput): GeneratedHashtags {
-  const fromDishes = (input.recommendedDishes ?? [])
-    .map((dish) => DISH_HASHTAGS[dish])
-    .filter(Boolean);
   const angle = ANGLE_HASHTAG_SETS[input.variantIndex % ANGLE_HASHTAG_SETS.length];
-  return validateHashtags([...fromDishes, ...angle]);
+  return validateHashtags([...angle]);
 }
 
 type CoverOverlay = { title: string; subtitle: string };

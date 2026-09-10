@@ -1,5 +1,6 @@
 import {
   CANVAS_WIDTH,
+  CANVAS_HEIGHT,
   SAFE_AREA,
   type CoverTemplate,
 } from "./types";
@@ -64,7 +65,7 @@ export const TEMPLATES: CoverTemplate[] = [
   },
   {
     id: "bottom-bar",
-    name: "Style 2",
+    name: "Style 8",
     layout: "single",
     overlay: {
       position: "bottom",
@@ -136,7 +137,7 @@ export const TEMPLATES: CoverTemplate[] = [
   },
   {
     id: "bottom-card",
-    name: "Style 3",
+    name: "Style 10",
     layout: "single",
     overlay: {
       position: "bottom",
@@ -276,6 +277,17 @@ export const TEMPLATES: CoverTemplate[] = [
     badgeStyle: "capsule",
     badgeBackground: COLORS.black,
     decoration: [
+      {
+        type: "rect",
+        x: 40,
+        y: 40,
+        width: W - 80,
+        height: CANVAS_HEIGHT - 80,
+        fill: "transparent",
+        borderWidth: 8,
+        borderColor: COLORS.yellow,
+        radius: 32,
+      },
       {
         type: "gradient",
         x: 0,
@@ -452,7 +464,7 @@ export const TEMPLATES: CoverTemplate[] = [
   },
   {
     id: "badge-stack",
-    name: "Style 8",
+    name: "Style 2",
     layout: "single",
     overlay: {
       position: "bottom",
@@ -552,7 +564,7 @@ export const TEMPLATES: CoverTemplate[] = [
   },
   {
     id: "dual-line",
-    name: "Style 10",
+    name: "Style 3",
     layout: "single",
     overlay: {
       position: "top",

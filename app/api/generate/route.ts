@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import { ensureCaptionEmojis } from "@/lib/caption-emoji";
+import { ensureCaptionEmojis, fixFruitEmojisInTitles } from "@/lib/caption-emoji";
 import {
   buildSystemPrompt,
   buildUserPrompt,
@@ -125,9 +125,11 @@ export async function POST(request: Request) {
       coverContext,
     );
 
-    const formatted = evaluateTitleFormats(parsed.titles, previousTitles).ok
-      ? parsed.titles
-      : ensureTitleFormats(parsed.titles, previousTitles);
+    const formatted = fixFruitEmojisInTitles(
+      evaluateTitleFormats(parsed.titles, previousTitles).ok
+        ? parsed.titles
+        : ensureTitleFormats(parsed.titles, previousTitles),
+    );
 
     const story = ensureCaptionEmojis(stripGeneratedLocationTime(parsed.caption));
     const compliant = await enforceXiaohongshuCompliance({
@@ -142,9 +144,11 @@ export async function POST(request: Request) {
       model,
       coverContext,
     });
-    const titles = evaluateTitleFormats(compliant.titles, previousTitles).ok
-      ? compliant.titles
-      : ensureTitleFormats(compliant.titles, previousTitles);
+    const titles = fixFruitEmojisInTitles(
+      evaluateTitleFormats(compliant.titles, previousTitles).ok
+        ? compliant.titles
+        : ensureTitleFormats(compliant.titles, previousTitles),
+    );
     const storySafe = ensureCaptionEmojis(compliant.caption);
     const located = attachOfficialLocationTime(
       storySafe,
@@ -163,7 +167,7 @@ export async function POST(request: Request) {
     return Response.json({
       titles,
       caption: located.caption,
-      hashtags: normalizeHashtags(compliant.hashtags),
+      hashtags: normalizeHashtags(compliant.hashtags, payload.previousHashtags ?? []),
       coverTitle: compliant.coverTitle,
       coverSubtitle: compliant.coverSubtitle,
       selectedPhotoIndex: parsed.selectedPhotoIndex,

@@ -317,6 +317,7 @@ VALIDATE before return: mainTitle 4–7; subTitle 4–9; exactly 2 pool keywords
 
 FORBIDDEN on cover except the allowed keyword 必吃: 第一 / 唯一 / 顶级 / 最强 / 最好吃 / 封神 / 全网第一 / 曼谷第一 / invented 泰国人爱吃 / 本地人爱吃 / 明星爱吃
 Never copy customer negatives onto mainTitle/subTitle: 贵 / 太贵 / 难吃 / 不好吃 / 踩雷 / 避雷 / 不推荐 / 不值得 / 失望 / 抽奖送东西 / 贵到吃不起 / 性价比低 / 很普通 / 没什么特别 / 服务不好 / 态度不好 / 不会回购.
+Never write 第一次美食冒险 / 美食冒险 / 味蕾冒险. First-visit mood on a cover can be 第一次尝试, not an adventure metaphor.
 If that information is relevant, keep the same meaning in neutral wording: 口味看个人喜好 / 整体风味比较经典 / 价格看个人预期 / 价格偏高 / 互动抽奖活动 / 曼谷特色泰餐 / centralwOrld美食. Do not invent praise.
 No hashtag, address, hours, emoji, Location & Time. Never invent a dish. Optional real selected dish only.`;
 }

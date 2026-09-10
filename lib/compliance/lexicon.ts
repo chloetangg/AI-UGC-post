@@ -1,3 +1,4 @@
+import { RANDOM_HASHTAG_POOL, REQUIRED_HASHTAGS } from "@/lib/hashtags";
 import { NEGATIVE_PHRASE_RULES } from "./negative-feedback";
 
 export type ComplianceCategory =
@@ -21,7 +22,7 @@ export type PhraseRule = {
   replacement: string;
 };
 
-export const REQUIRED_SAFE_HASHTAGS = ["#baanying曼谷", "#曼谷必吃"] as const;
+export const REQUIRED_SAFE_HASHTAGS = [...REQUIRED_HASHTAGS, ...RANDOM_HASHTAG_POOL] as const;
 
 /** Exact phrases, longest-first at runtime. Required hashtags are allowlisted separately. */
 export const PHRASE_RULES: PhraseRule[] = [

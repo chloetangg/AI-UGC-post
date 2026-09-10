@@ -89,6 +89,7 @@ Do not write Location & Time, 📍 address lines, ⏰ hours, mall floors, or a 7
 XIAOHONGSHU STYLE:
 - Titles should be short, catchy, and curiosity-driven.
 - Titles can use emojis naturally.
+- 🍋 is lemon / 柠檬 only. 🥭 is mango / 芒果 only. Never use 🍋 for 芒果糯米饭.
 - Use conversational Chinese.
 - The body should have a natural social-media rhythm with short paragraphs.
 - The content should feel like something a real person would post after dining at a restaurant.
@@ -159,6 +160,7 @@ ${text(input.experience.customerType)}
 
 Is this your first time at Baan Ying:
 ${text(input.experience.visitFrequency)}
+If this is a first visit and the copy mentions first time, write 第一次来尝试Baan Ying. Never 第一次美食冒险 / 美食冒险.
 
 What did you enjoy most:
 ${lines(input.experience.enjoyedMost)}

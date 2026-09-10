@@ -103,7 +103,7 @@ export const BAAN_YING_CONTENT_STRATEGY: ContentStrategyLibrary = {
       name: "Approachable Thai Flavors",
       purpose: "Make Thai food feel easy to discover, choose, and enjoy.",
       useWhen: [
-        "Customer is trying Thai food for the first time",
+        "Customer is visiting Baan Ying for the first time",
         "Customer explicitly says dishes are easy to enjoy",
         "Customer needs help choosing Thai food",
       ],

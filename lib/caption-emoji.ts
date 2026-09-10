@@ -28,10 +28,40 @@ function pickFallbackEmojis(story: string) {
   if (/蟹|curry crab|咖喱蟹/i.test(story)) emojis.push("🦀");
   else if (/虾|goong|冬阴功|蒜蓉炒虾/i.test(story)) emojis.push("🍤");
   else if (/芒果|mango/i.test(story)) emojis.push("🥭");
+  else if (/柠檬|檸檬|lemon/i.test(story)) emojis.push("🍋");
   else if (/鱼|蒸鱼/i.test(story)) emojis.push("🐟");
   else emojis.push("🍛");
   emojis.push("😋");
   return emojis.slice(0, 2);
+}
+
+function chunkHasMango(text: string) {
+  return /芒果|mango/i.test(text);
+}
+
+function chunkHasLemon(text: string) {
+  return /柠檬|檸檬|lemon/i.test(text);
+}
+
+function fixFruitEmojisInChunk(chunk: string) {
+  const mango = chunkHasMango(chunk);
+  const lemon = chunkHasLemon(chunk);
+  if (mango && !lemon) return chunk.replaceAll("🍋", "🥭");
+  if (lemon && !mango) return chunk.replaceAll("🥭", "🍋");
+  return chunk;
+}
+
+/** 🍋 is lemon only. 🥭 is mango only. */
+export function fixFruitEmojis(text: string) {
+  const mango = chunkHasMango(text);
+  const lemon = chunkHasLemon(text);
+  if (mango && !lemon) return text.replaceAll("🍋", "🥭");
+  if (lemon && !mango) return text.replaceAll("🥭", "🍋");
+  return text.split(/([。！？!?\n])/).map(fixFruitEmojisInChunk).join("");
+}
+
+export function fixFruitEmojisInTitles(titles: [string, string, string]): [string, string, string] {
+  return titles.map(fixFruitEmojis) as [string, string, string];
 }
 
 /**
@@ -39,9 +69,10 @@ function pickFallbackEmojis(story: string) {
  * Never writes hashtags. Never touches Location & Time.
  */
 export function ensureCaptionEmojis(caption: string) {
-  if (captionHasRequiredEmojis(caption)) return caption;
+  const captionWithFruit = fixFruitEmojis(caption);
+  if (captionHasRequiredEmojis(captionWithFruit)) return captionWithFruit;
 
-  const { story, location } = splitCaptionStoryAndLocation(caption);
+  const { story, location } = splitCaptionStoryAndLocation(captionWithFruit);
   if (!story) return caption;
 
   const extras = pickFallbackEmojis(story);

@@ -1,6 +1,6 @@
 import { CONTENT_LANGUAGE } from "@/lib/i18n";
 import { resolveDiningBranch } from "@/lib/locations";
-import { HASHTAGS_JSON_FIELD_RULES } from "@/lib/hashtags";
+import { HASHTAGS_JSON_FIELD_RULES, REQUIRED_HASHTAGS } from "@/lib/hashtags";
 import { formatTitleFormatRules } from "@/lib/title-formats";
 import { formatTitleKeywordRules } from "@/lib/title-keywords";
 import { complianceGenerationRules } from "@/lib/compliance/prompt";
@@ -48,7 +48,7 @@ export const generatePostJsonSchema = {
       hashtags: {
         type: "array",
         description:
-          "Exactly 5 hashtags: #baanying曼谷, #曼谷必吃, then 3 dynamic tags. Never appear in titles, mainTitle, subTitle, or caption.",
+          "Exactly 5 hashtags in order: #baanying曼谷, #曼谷必吃, #centralworld泰餐推荐, then 2 tags from the approved pool only.",
         minItems: 5,
         maxItems: 5,
         items: { type: "string" },
@@ -280,13 +280,14 @@ INTERNAL PROCESS (do not print KSP / Storyline / Content Angle / Search Keyword 
 4. Select the most natural Content Angle.
 5. Select a Search Keyword and weave it naturally into at least one title.
 6. Generate 3 titles, 1 caption, 5 hashtags, mainTitle, subTitle, photo selection, and return the chosen strategy ids in JSON.
-7. Derive 3 dynamic hashtags from the FINAL caption + customer evidence. Do not hard-code hashtags by Storyline.
+7. Choose 2 random hashtags from the approved pool. Do not invent tags. Do not hard-code hashtags by Storyline.
 8. At most ONE small brand detail if it helps; otherwise omit brand history. KSP-03 is low-frequency.
 
 TITLES: Exactly 3 Simplified Chinese titles with different editorial angles AND different formats.
 Each title must feel like Xiaohongshu, reflect actual customer experience, and naturally contain at least one Bangkok food search keyword. Prefer 3 different keywords. Do not keyword-stuff. Do not sound like an advertisement.
 Unacceptable: 曼谷Baan Ying好好吃 / 真的好好吃 / 超好吃. Do not make the 3 titles the same sentence with different adjectives.
 ZERO hashtags in titles.
+If a title mentions 芒果 / 芒果糯米饭 / mango, use 🥭 not 🍋. 🍋 is lemon / 柠檬 only.
 ${formatTitleKeywordRules()}
 ${formatTitleFormatRules()}
 
@@ -303,6 +304,9 @@ Vary: surprise, dish-first, discovery, friend rec (only if supported), travel co
 CUSTOMER STORYTELLING:
 Customer-written notes are INTERNAL evidence. If they contain harsh negatives, keep the meaning and rewrite into neutral wording in the published post. Do not delete the point. Do not flip it into praise the customer did not give.
 Tourist + first visit (Yes): discovery / first time trying Baan Ying. Not a repeat-customer voice.
+If the titles or caption need to say this is the first time at Baan Ying, write 第一次来尝试Baan Ying.
+Do NOT write 第一次美食冒险 / 美食冒险 / 味蕾冒险 / 美食探险 / 第一次冒险. Do not dress a first visit as an “adventure”.
+Do not force 第一次来尝试Baan Ying into every first-visit post, and do not open every post with 第一次来曼谷. Use it only when the story actually mentions first time.
 Not first visit (No): they have been before. Do not write as a first-time discovery. Do not invent 每次来 / 又来了 unless the dining note says they return often.
 Local: do not explain basic Bangkok tourist info.
 Favorite = food → food is central. Atmosphere → environment may appear. Variety → ordering several dishes. Sharing → sharing/group, but do not invent companions.
@@ -310,7 +314,10 @@ Avoid empty lines like “这里提供丰富的泰式料理，适合朋友聚餐
 
 EMOJI — MANDATORY in the STORY BODY. Location 📍/⏰ do not count.
 2–6 natural emojis. Never 0. Never an emoji after every sentence. Vary quantity, placement, and type.
-Relevant: 🍛 🦀 🍤 🍚 🍜 🥭 🌶️ 😍 🥹 🤤 🥰 ❤️ ✨ 🇹🇭 👀 🤯 😳 😋
+Relevant: 🍛 🦀 🍤 🍚 🍜 🥭 🍋 🌶️ 😍 🥹 🤤 🥰 ❤️ ✨ 🇹🇭 👀 🤯 😳 😋
+🍋 = lemon / 柠檬 ONLY. Never use 🍋 for mango / 芒果 / 芒果糯米饭.
+🥭 = mango / 芒果 ONLY. Never use 🥭 for lemon / 柠檬.
+If the dish is 芒果糯米饭, use 🥭 not 🍋.
 Do NOT always use 🇹🇭 + 🍽️ + 🦀 + 😋 + 📍 + 🕐.
 
 ${MALL_MENTION_RULES}
@@ -353,17 +360,17 @@ Then choose ONE of these 6 patterns that the remaining photos can actually suppo
 remainingPhotoOrder = remaining indexes in that story order. Exclude selectedPhotoIndex. If only 1 photo, return [].
 EXCEPTION — 4-grid cover only (photoCount >= 4 AND selectedTemplateId is top-stroke, badge-stack, or dual-line): after the 4-grid cover is chosen, put ALL uploaded photos back into the body pool and re-run these 6 patterns on the full set, including the 4 cover photos. remainingPhotoOrder must contain every uploaded index in story order. Do NOT exclude cover photos. Do NOT force upload order. Do NOT append the cover photos after sorting the rest. Non-4-grid styles keep excluding the cover source.
 
-REGENERATION: If previous title/caption/strategy/hashtags are provided, keep all customer facts identical. Avoid the previous Content Angle when another valid angle exists; prefer a different Storyline and KSP when another naturally fits. Change title keywords, opening, narrative structure, dish emphasis where possible, emoji placement, and dynamic hashtags. Variation must come from storytelling approach, not invented experience. Do not copy previous mainTitle or subTitle. Location & Time is chosen by the system.
+REGENERATION: If previous title/caption/strategy/hashtags are provided, keep all customer facts identical. Avoid the previous Content Angle when another valid angle exists; prefer a different Storyline and KSP when another naturally fits. Change title keywords, opening, narrative structure, dish emphasis where possible, emoji placement, and the 2 random pool hashtags. Variation must come from storytelling approach, not invented experience. Do not copy previous mainTitle or subTitle. Location & Time is chosen by the system.
 
 OUTPUT: Return ONLY JSON matching the schema. No Markdown fences.
-{"titles":["标题1","标题2","标题3"],"caption":"正文 only. No Location & Time. No hashtags.","hashtags":["#baanying曼谷","#曼谷必吃","#动态1","#动态2","#动态3"],"mainTitle":"曼谷必吃","subTitle":"招牌泰式料理","selectedPhotoIndex":0,"selectedPhotoIndexes":[0],"photoSelectionReason":"...","selectedTemplateId":"<one of 10>","suitableTemplateIds":["<id>","<id>","<id>"],"remainingPhotoOrder":[1,2],"remainingOrderPattern":"5","selectedKspId":"KSP-01","selectedStorylineId":"ST-01","selectedContentAngleId":"CA-01","selectedSearchKeyword":"曼谷美食"}
+{"titles":["标题1","标题2","标题3"],"caption":"正文 only. No Location & Time. No hashtags.","hashtags":["#baanying曼谷","#曼谷必吃","#centralworld泰餐推荐","#曼谷美食","#泰国菜"],"mainTitle":"曼谷必吃","subTitle":"招牌泰式料理","selectedPhotoIndex":0,"selectedPhotoIndexes":[0],"photoSelectionReason":"...","selectedTemplateId":"<one of 10>","suitableTemplateIds":["<id>","<id>","<id>"],"remainingPhotoOrder":[1,2],"remainingOrderPattern":"5","selectedKspId":"KSP-01","selectedStorylineId":"ST-01","selectedContentAngleId":"CA-01","selectedSearchKeyword":"曼谷美食"}
 
 The sample JSON is FORMAT ONLY. Do not copy its selectedTemplateId, suitableTemplateIds, or strategy ids.
 
 VALIDATE before returning:
 - 3 different spoken titles, mixed formats, no hashtags, no 必吃/最好吃/封神/顶级 hard-sell
 - 1 personal caption that does not repeat the titles, 2–6 story emojis, no Location & Time, no hashtags, Xiaohongshu-compliant wording
-- 5 hashtags: two fixed tags exact, then 3 relevant dynamic tags with no exaggerated claims
+- 5 hashtags: #baanying曼谷 #曼谷必吃 #centralworld泰餐推荐 plus 2 different tags from the approved pool only
 - 1 independent mainTitle (HARD 4–7 units) and subTitle (HARD 4–9 units) generated in this same JSON. EXACTLY 2 keywords from 曼谷 / centralwOrld / 泰餐 / 美食 / 必吃 across the pair. centralwOrld is optional, never mandatory. KSP required. Complementary, not repetitive. No emoji. Never truncate. Not copied from titles[]. Do not reuse the previous cover formula.
 - selectedPhotoIndex in range; selectedPhotoIndexes unique and in range
 - selectedTemplateId is one of the 10 existing IDs, not copied from the sample JSON, not always left-spine, not always bottom-card, and differs from previous when another suitable option exists
@@ -393,7 +400,7 @@ export function buildUserPrompt(input: GenerateRequestBody) {
     (title) => title.trim() && title.trim() !== previousTitle,
   );
   const previousDynamicHashtags = (input.previousHashtags ?? []).filter(
-    (tag) => tag !== "#baanying曼谷" && tag !== "#曼谷必吃",
+    (tag) => !REQUIRED_HASHTAGS.some((required) => required === tag),
   );
   const library = resolveContentStrategy(input);
   const suggestedStrategy = {
@@ -428,7 +435,7 @@ export function buildUserPrompt(input: GenerateRequestBody) {
 
   const previousBlock =
     previousTitle || previousCaption
-      ? `PREVIOUS GENERATION (do not paraphrase; change KSP/Storyline/Angle when another valid set exists; change opening, structure, dish emphasis, rhythm, emoji pattern, dynamic hashtags):
+      ? `PREVIOUS GENERATION (do not paraphrase; change KSP/Storyline/Angle when another valid set exists; change opening, structure, dish emphasis, rhythm, emoji pattern, random pool hashtags):
 Previous KSP: ${input.previousKspId?.trim() || "none"}
 Previous Storyline: ${input.previousStorylineId?.trim() || "none"}
 Previous content angle: ${previousAngle || "Not provided"}
@@ -441,7 +448,8 @@ ${
 }previousTitleKeywords: ${previousKeywords.length > 0 ? previousKeywords.join("、") : "none"}
 Do NOT stuff 曼谷美食 / 曼谷泰餐 into titles.
 Caption: ${previousCaption || "Not provided"}
-Previous dynamic hashtags: ${previousDynamicHashtags.length > 0 ? previousDynamicHashtags.join(" ") : "none"}
+Previous random pool hashtags: ${previousDynamicHashtags.length > 0 ? previousDynamicHashtags.join(" ") : "none"}
+Pick 2 different pool tags. Do not repeat this pair when another pair exists.
 Ignore any previous Location & Time or hashtag block. Do not invent new facts for variety.`
       : `PREVIOUS GENERATION: none. Still choose a fitting angle and vary structure.`;
 
@@ -496,7 +504,7 @@ ${formatCoverTitleRules({
   kspId: suggestedStrategy.kspId,
   contentAngleId: suggestedStrategy.contentAngleId,
 })}
-Cover overlay: write mainTitle (4–7 units) + subTitle (4–9 units) in THIS JSON. No extra API call. No emoji. Do not shorten titles[]. Do not truncate. Use EXACTLY 2 keywords from 曼谷 / centralwOrld / 泰餐 / 美食 / 必吃 across the pair. Vary the pair, structure, and KSP from the previous cover. centralwOrld is optional. GOOD: 曼谷必吃 + 招牌泰式料理 / 泰餐必吃 + 招牌冬阴功 / 曼谷美食 + 家常泰式料理 / centralwOrld美食 + 招牌泰式料理. BAD: 曼谷必吃泰餐 (3 keywords) / always 曼谷+泰餐 / always centralwOrld+美食 / same formula every generation / 3-character mainTitle / 曼谷难吃泰餐 / centralwOrld踩雷美食 / 贵到吃不起 / 抽奖送东西. Optional real dish only if it fits. No 最好吃 / 封神 / 顶级. Never copy customer negatives onto the cover; if needed use 价格偏高 / 互动抽奖活动 / 特色泰餐. 必吃 is allowed on the COVER only. No hashtag, address, hours.
+Cover overlay: write mainTitle (4–7 units) + subTitle (4–9 units) in THIS JSON. No extra API call. No emoji. Do not shorten titles[]. Do not truncate. Use EXACTLY 2 keywords from 曼谷 / centralwOrld / 泰餐 / 美食 / 必吃 across the pair. Vary the pair, structure, and KSP from the previous cover. centralwOrld is optional. GOOD: 曼谷必吃 + 招牌泰式料理 / 泰餐必吃 + 招牌冬阴功 / 曼谷美食 + 家常泰式料理 / centralwOrld美食 + 招牌泰式料理. BAD: 曼谷必吃泰餐 (3 keywords) / always 曼谷+泰餐 / always centralwOrld+美食 / same formula every generation / 3-character mainTitle / 第一次美食冒险 / 曼谷难吃泰餐 / centralwOrld踩雷美食 / 贵到吃不起 / 抽奖送东西. Optional real dish only if it fits. No 最好吃 / 封神 / 顶级. Never copy customer negatives onto the cover; if needed use 价格偏高 / 互动抽奖活动 / 特色泰餐. 必吃 is allowed on the COVER only. No hashtag, address, hours.
 Cover photo: pick ONE selectedPhotoIndex from 0 to ${Math.max((input.photoCount || 1) - 1, 0)}. selectedPhotoIndexes[0] must equal selectedPhotoIndex. If photoCount >= 4 and the cover style is top-stroke, badge-stack, or dual-line, also return 3 more unique indexes so selectedPhotoIndexes has the best 4 photos for the 2x2 grid.
 Automatically choose selectedTemplateId from the existing 10 templates based on the photos. Do not default to bottom-card or left-spine. Do not copy sample JSON template IDs. Include 3–8 suitableTemplateIds. Avoid previousCoverTemplateId when another fit exists. Diversity seed: ${input.variantIndex}.
 The website assigns the final visible Style 1–10 after this JSON, so do not always return left-spine.

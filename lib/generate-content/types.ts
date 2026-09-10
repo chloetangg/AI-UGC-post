@@ -1,5 +1,9 @@
 export const GENERATE_CONTENT_LANGUAGE = "zh-CN" as const;
-export const GENERATE_CONTENT_REQUIRED_HASHTAGS = ["#baanying曼谷", "#曼谷必吃"] as const;
+export const GENERATE_CONTENT_REQUIRED_HASHTAGS = [
+  "#baanying曼谷",
+  "#曼谷必吃",
+  "#centralworld泰餐推荐",
+] as const;
 
 export type GenerateContentCampaign = {
   brand: string;

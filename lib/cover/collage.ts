@@ -10,27 +10,27 @@ export type CollageTile = {
   zoom: number;
 };
 
-export const COLLAGE_BACKGROUND = "#fff6ea";
+export const COLLAGE_BACKGROUND = "#000000";
 
-const TILE_MARGIN = 18;
-const TILE_GAP = 16;
-const TILE_RADIUS = 22;
-const TILE_WIDTH = Math.floor((CANVAS_WIDTH - TILE_MARGIN * 2 - TILE_GAP) / 2);
-const TILE_HEIGHT = Math.floor((CANVAS_HEIGHT - TILE_MARGIN * 2 - TILE_GAP) / 2);
+const TILE_WIDTH = Math.floor(CANVAS_WIDTH / 2);
+const TILE_HEIGHT = Math.floor(CANVAS_HEIGHT / 2);
 
 function equalTile(col: 0 | 1, row: 0 | 1, crop: CropMode): CollageTile {
+  const x = col * TILE_WIDTH;
+  const y = row * TILE_HEIGHT;
   return {
-    x: TILE_MARGIN + col * (TILE_WIDTH + TILE_GAP),
-    y: TILE_MARGIN + row * (TILE_HEIGHT + TILE_GAP),
-    width: TILE_WIDTH,
-    height: TILE_HEIGHT,
-    radius: TILE_RADIUS,
+    x,
+    y,
+    // +1px overlap so satori/resvg cannot leave a cream hairline at the cross.
+    width: col === 0 ? TILE_WIDTH + 1 : CANVAS_WIDTH - x,
+    height: row === 0 ? TILE_HEIGHT + 1 : CANVAS_HEIGHT - y,
+    radius: 0,
     crop,
     zoom: 1,
   };
 }
 
-/** Even 2×2 grid: all four cells share the same size, gap, and corner radius. */
+/** Edge-to-edge 2×2: photos fill the canvas with no margin, gap, or rounded corners. */
 export const COLLAGE_TILES: CollageTile[] = [
   equalTile(0, 0, "attention"),
   equalTile(1, 0, "center-top"),
