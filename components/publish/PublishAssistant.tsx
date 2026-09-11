@@ -18,6 +18,7 @@ import {
   type PublishStatus,
   type RednotePublishPackage,
 } from "@/lib/rednote-publish";
+import { trackAnalyticsEvent } from "@/lib/analytics/track-client";
 import { cn } from "@/lib/utils";
 
 export function PublishAssistant({
@@ -58,6 +59,10 @@ export function PublishAssistant({
   async function publishToRednote() {
     if (busy) return;
     setBusy(true);
+    trackAnalyticsEvent({
+      eventType: "xhs_publish_click",
+      metadata: { platform: "xiaohongshu", action: "publish" },
+    });
     setOpenFailed(false);
     setFilesPartial(false);
     setCopyFailed(false);

@@ -56,12 +56,12 @@ export const generatePostJsonSchema = {
       mainTitle: {
         type: "string",
         description:
-          "Independent Xiaohongshu COVER mainTitle. HARD 4–7 Chinese-character-equivalent units. Never 3. Never 8+. Together with subTitle, use EXACTLY 2 keywords from 曼谷 / centralwOrld / 泰餐 / 美食 / 必吃. Communicate KSP. No emoji. Never shorten titles[]. Never truncate. Do not pad with filler.",
+          "Independent Xiaohongshu COVER mainTitle. Natural headline with AT LEAST ONE keyword from 曼谷 / centralwOrld / 泰餐 / 美食 / 必吃. Do not keyword-stuff. 4–7 units. Count centralwOrld as 1 unit. No emoji. Never shorten titles[]. Never truncate.",
       },
       subTitle: {
         type: "string",
         description:
-          "Independent COVER subTitle under mainTitle. HARD 4–9 units. Different role from mainTitle: add KSP/context, not a keyword repeat. Together with mainTitle, exactly 2 pool keywords. No emoji. Never empty. Never truncate.",
+          "Independent COVER subTitle. Extracted from this customer's FEEL tags, dining note, spend, dishes, and KSP — not a fixed template. Strongest save/click reason. 6–10 units. Do not repeat mainTitle. No emoji. Never empty.",
       },
       selectedPhotoIndex: {
         type: "integer",
@@ -330,7 +330,7 @@ COVER OVERLAY — JSON "mainTitle" + "subTitle". Completely independent from "ti
 ${formatCoverHookRules()}
 
 Do not pad mainTitle with filler. No hashtag, address, hours, phone, URL, or Location & Time.
-Do not copy titles[]. Before return, check: mainTitle 4–7 units; subTitle 4–9 units; exactly 2 pool keywords; KSP present; complementary not repetitive; complete wording; different STRUCTURE and keyword pair from the previous cover.
+Do not copy titles[]. Before return, check: mainTitle has at least one pool keyword and is not stuffed; subTitle is extracted from this customer's evidence, not a generic 招牌泰式料理 template, and does not repeat the mainTitle.
 
 COVER PHOTOS — selectedPhotoIndex is the ONE Cover Source for a normal cover.
 Photos are attached in order: Photo 1 = 0, Photo 2 = 1, …
@@ -363,7 +363,7 @@ EXCEPTION — 4-grid cover only (photoCount >= 4 AND selectedTemplateId is top-s
 REGENERATION: If previous title/caption/strategy/hashtags are provided, keep all customer facts identical. Avoid the previous Content Angle when another valid angle exists; prefer a different Storyline and KSP when another naturally fits. Change title keywords, opening, narrative structure, dish emphasis where possible, emoji placement, and the 2 random pool hashtags. Variation must come from storytelling approach, not invented experience. Do not copy previous mainTitle or subTitle. Location & Time is chosen by the system.
 
 OUTPUT: Return ONLY JSON matching the schema. No Markdown fences.
-{"titles":["标题1","标题2","标题3"],"caption":"正文 only. No Location & Time. No hashtags.","hashtags":["#baanying曼谷","#曼谷必吃","#centralworld泰餐推荐","#曼谷美食","#泰国菜"],"mainTitle":"曼谷必吃","subTitle":"招牌泰式料理","selectedPhotoIndex":0,"selectedPhotoIndexes":[0],"photoSelectionReason":"...","selectedTemplateId":"<one of 10>","suitableTemplateIds":["<id>","<id>","<id>"],"remainingPhotoOrder":[1,2],"remainingOrderPattern":"5","selectedKspId":"KSP-01","selectedStorylineId":"ST-01","selectedContentAngleId":"CA-01","selectedSearchKeyword":"曼谷美食"}
+{"titles":["标题1","标题2","标题3"],"caption":"正文 only. No Location & Time. No hashtags.","hashtags":["#baanying曼谷","#曼谷必吃","#centralworld泰餐推荐","#曼谷美食","#泰国菜"],"mainTitle":"曼谷泰餐新体验","subTitle":"DIY打抛饭很好玩","selectedPhotoIndex":0,"selectedPhotoIndexes":[0],"photoSelectionReason":"...","selectedTemplateId":"<one of 10>","suitableTemplateIds":["<id>","<id>","<id>"],"remainingPhotoOrder":[1,2],"remainingOrderPattern":"5","selectedKspId":"KSP-01","selectedStorylineId":"ST-01","selectedContentAngleId":"CA-01","selectedSearchKeyword":"曼谷美食"}
 
 The sample JSON is FORMAT ONLY. Do not copy its selectedTemplateId, suitableTemplateIds, or strategy ids.
 
@@ -371,7 +371,7 @@ VALIDATE before returning:
 - 3 different spoken titles, mixed formats, no hashtags, no 必吃/最好吃/封神/顶级 hard-sell
 - 1 personal caption that does not repeat the titles, 2–6 story emojis, no Location & Time, no hashtags, Xiaohongshu-compliant wording
 - 5 hashtags: #baanying曼谷 #曼谷必吃 #centralworld泰餐推荐 plus 2 different tags from the approved pool only
-- 1 independent mainTitle (HARD 4–7 units) and subTitle (HARD 4–9 units) generated in this same JSON. EXACTLY 2 keywords from 曼谷 / centralwOrld / 泰餐 / 美食 / 必吃 across the pair. centralwOrld is optional, never mandatory. KSP required. Complementary, not repetitive. No emoji. Never truncate. Not copied from titles[]. Do not reuse the previous cover formula.
+- 1 independent mainTitle with at least one pool keyword (曼谷 / centralwOrld / 泰餐 / 美食 / 必吃), not keyword-stuffed, 4–7 units, centralwOrld = 1 unit; subTitle extracted from this customer's note/tags/spend/dishes, 6–10 units, not 招牌泰式料理. No emoji. Never truncate. Not copied from titles[]. Do not reuse the previous cover formula.
 - selectedPhotoIndex in range; selectedPhotoIndexes unique and in range
 - selectedTemplateId is one of the 10 existing IDs, not copied from the sample JSON, not always left-spine, not always bottom-card, and differs from previous when another suitable option exists
 - remainingPhotoOrder excludes the cover source, except 4-grid styles (top-stroke / badge-stack / dual-line with 4+ photos) which re-sort ALL uploaded photos including the cover photos
@@ -503,8 +503,13 @@ ${formatCoverTitleRules({
   variantIndex: input.variantIndex,
   kspId: suggestedStrategy.kspId,
   contentAngleId: suggestedStrategy.contentAngleId,
+  diningNote,
+  mealAmount: input.totalMealExpense,
+  enjoyMost: input.enjoyMost,
+  visitFrequency: input.visitFrequency,
+  customerType: input.customerType,
 })}
-Cover overlay: write mainTitle (4–7 units) + subTitle (4–9 units) in THIS JSON. No extra API call. No emoji. Do not shorten titles[]. Do not truncate. Use EXACTLY 2 keywords from 曼谷 / centralwOrld / 泰餐 / 美食 / 必吃 across the pair. Vary the pair, structure, and KSP from the previous cover. centralwOrld is optional. GOOD: 曼谷必吃 + 招牌泰式料理 / 泰餐必吃 + 招牌冬阴功 / 曼谷美食 + 家常泰式料理 / centralwOrld美食 + 招牌泰式料理. BAD: 曼谷必吃泰餐 (3 keywords) / always 曼谷+泰餐 / always centralwOrld+美食 / same formula every generation / 3-character mainTitle / 第一次美食冒险 / 曼谷难吃泰餐 / centralwOrld踩雷美食 / 贵到吃不起 / 抽奖送东西. Optional real dish only if it fits. No 最好吃 / 封神 / 顶级. Never copy customer negatives onto the cover; if needed use 价格偏高 / 互动抽奖活动 / 特色泰餐. 必吃 is allowed on the COVER only. No hashtag, address, hours.
+Cover overlay: write mainTitle + subTitle in THIS JSON. No extra API call. No emoji. mainTitle must include at least one of 曼谷 / centralwOrld / 泰餐 / 美食 / 必吃 and feel like a natural cover headline, not a keyword dump. Length 4–7 units. Count centralwOrld as 1 unit. subTitle must be rewritten from this customer's dining note, FEEL tags, spend, dishes, and scene — never a fixed 招牌泰式料理 template. Length 6–10 units. GOOD: 曼谷泰餐新体验 + DIY打抛饭很好玩 / centralwOrld泰餐推荐 + 逛街后舒服聚餐 / 曼谷必吃泰餐 + 两人600泰铢很满足. BAD: 曼谷centralwOrld泰餐美食必吃推荐 / centralwOrld必吃 / 副标题永远招牌泰式料理 / copying the dining note verbatim. 必吃 is allowed on the COVER only. No hashtag, address, hours.
 Cover photo: pick ONE selectedPhotoIndex from 0 to ${Math.max((input.photoCount || 1) - 1, 0)}. selectedPhotoIndexes[0] must equal selectedPhotoIndex. If photoCount >= 4 and the cover style is top-stroke, badge-stack, or dual-line, also return 3 more unique indexes so selectedPhotoIndexes has the best 4 photos for the 2x2 grid.
 Automatically choose selectedTemplateId from the existing 10 templates based on the photos. Do not default to bottom-card or left-spine. Do not copy sample JSON template IDs. Include 3–8 suitableTemplateIds. Avoid previousCoverTemplateId when another fit exists. Diversity seed: ${input.variantIndex}.
 The website assigns the final visible Style 1–10 after this JSON, so do not always return left-spine.
@@ -545,5 +550,5 @@ Allowed cover dishes = only the recommended/mentioned list above. Never invent P
 
 ${previousBlock}
 
-Return JSON with titles[3], caption (story only), hashtags[5], mainTitle (4–7 units, exactly 2 pool keywords across main+sub + KSP), subTitle (4–9 units), selectedPhotoIndex, selectedPhotoIndexes, photoSelectionReason, selectedTemplateId, suitableTemplateIds, remainingPhotoOrder, remainingOrderPattern, selectedKspId, selectedStorylineId, selectedContentAngleId, selectedSearchKeyword.`;
+Return JSON with titles[3], caption (story only), hashtags[5], mainTitle (at least one pool keyword, not stuffed), subTitle (from this customer's evidence, not a template), selectedPhotoIndex, selectedPhotoIndexes, photoSelectionReason, selectedTemplateId, suitableTemplateIds, remainingPhotoOrder, remainingOrderPattern, selectedKspId, selectedStorylineId, selectedContentAngleId, selectedSearchKeyword.`;
 }

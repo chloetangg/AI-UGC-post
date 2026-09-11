@@ -14,6 +14,8 @@ export type SubmissionUpsert = {
   submissionId: string;
   campaignId: string;
   customer?: SavedCustomerInfo;
+  customerType?: string;
+  visitFrequency?: string;
   mealExpenseThb?: number | null;
 };
 
@@ -27,6 +29,12 @@ export async function upsertSubmission(input: SubmissionUpsert) {
   };
   if (input.customer) {
     set.customer = input.customer;
+  }
+  if (input.customerType !== undefined) {
+    set.customerType = input.customerType.trim();
+  }
+  if (input.visitFrequency !== undefined) {
+    set.visitFrequency = input.visitFrequency.trim();
   }
   if (input.mealExpenseThb !== undefined) {
     set.mealExpenseThb = input.mealExpenseThb;

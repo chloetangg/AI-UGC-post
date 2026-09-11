@@ -24,7 +24,7 @@ export const MAX_TITLE_CHARS = 7;
 /** Layout grapheme cap — high enough that Latin mall names are never sliced. */
 export const MAX_TITLE_LAYOUT_CHARS = 24;
 export const MAX_TITLE_LINES = 2;
-export const MAX_SUBTITLE_CHARS = 9;
+export const MAX_SUBTITLE_CHARS = 10;
 export const MAX_SUBTITLE_LAYOUT_CHARS = 24;
 export const MAX_SUBTITLE_LINES = 2;
 export const MAX_BADGE_CHARS = 8;

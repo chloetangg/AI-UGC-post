@@ -190,7 +190,7 @@ Preferred neutral wording — keep the meaning, weave it in naturally. Do not pa
 为了抽奖才来 → 活动提供额外互动体验 / 店内设有互动抽奖和礼品活动
 
 These neutralized meanings apply to the Xiaohongshu caption AND any cover text derived from customer feedback. Never put the raw negative on the cover.
-If the full phrase is too long for mainTitle (4–7) or subTitle (4–9), use a shorter sibling of the SAME meaning: 口味看个人喜好 / 整体风味比较经典 / 价格看个人预期. Never 难吃 / 性价比低 / 很普通 / 服务不好 / 态度不好 / 不会回购.
+If the full phrase is too long for mainTitle (4–7) or subTitle (6–10), use a shorter sibling of the SAME meaning: 口味看个人喜好 / 整体风味比较经典 / 价格看个人预期. Never 难吃 / 性价比低 / 很普通 / 服务不好 / 态度不好 / 不会回购.
 If price or activity is relevant on cover, also fine: 价格偏高 / 互动抽奖活动 / 曼谷特色泰餐 / centralwOrld美食.
 
 COVER mainTitle / subTitle must NEVER use raw negatives: 贵 / 太贵 / 难吃 / 不好吃 / 踩雷 / 避雷 / 不推荐 / 不值得 / 失望 / 抽奖送东西 / 贵到吃不起 / 性价比低 / 很普通 / 没什么特别 / 服务不好 / 态度不好 / 不会回购.

@@ -9,11 +9,11 @@ import {
   coverFallbackPairs,
   countCoverUnits,
   coverKeywordPairKey,
-  hasCoverKsp,
-  hasExactCoverKeywordPair,
+  hasCoverTitleKeyword,
   hasMandatoryCoverKeyword,
   isCoverKeywordStuffing,
   normalizeCoverLocations,
+  subtitleFromCoverContext,
   uniqueCoverPoolKeywords,
   usesUnselectedCoverLocation,
   type CoverTitleContext,
@@ -27,17 +27,16 @@ export {
 export {
   countCoverUnits,
   formatCoverTitleRules,
-  hasCoverKsp,
-  hasExactCoverKeywordPair,
+  hasCoverTitleKeyword,
   hasMandatoryCoverKeyword,
   type CoverTitleContext,
 } from "./cover-rules";
 
 export const MIN_MAIN_TITLE_CHARS = 4;
-export const PREFERRED_MAIN_TITLE_CHARS = 7;
+export const PREFERRED_MAIN_TITLE_CHARS = 6;
 export const MAX_MAIN_TITLE_CHARS = 7;
-export const MIN_SUB_TITLE_CHARS = 4;
-export const MAX_SUB_TITLE_CHARS = 9;
+export const MIN_SUB_TITLE_CHARS = 6;
+export const MAX_SUB_TITLE_CHARS = 10;
 
 /** @deprecated Use MIN_MAIN_TITLE_CHARS */
 export const MIN_COVER_TITLE_CHARS = MIN_MAIN_TITLE_CHARS;
@@ -47,18 +46,13 @@ export const PREFERRED_COVER_TITLE_HAN = PREFERRED_MAIN_TITLE_CHARS;
 export const MAX_COVER_TITLE_HAN = MAX_MAIN_TITLE_CHARS;
 
 export const FALLBACK_COVER_PAIRS = [
-  { title: "曼谷必吃", subtitle: "招牌泰式料理" },
-  { title: "曼谷美食", subtitle: "家常泰式料理" },
-  { title: "曼谷泰餐", subtitle: "招牌菜值得试" },
-  { title: "泰餐必吃", subtitle: "招牌泰式料理" },
-  { title: "美食必吃", subtitle: "家常泰式料理" },
-  { title: "必吃泰餐", subtitle: "招牌菜值得试" },
-  { title: "曼谷探店", subtitle: "必吃招牌料理" },
-  { title: "特色泰餐", subtitle: "曼谷招牌料理" },
-  { title: "美食推荐", subtitle: "泰餐招牌味道" },
-  { title: "centralwOrld美食", subtitle: "招牌泰式料理" },
-  { title: "centralwOrld泰餐", subtitle: "人气招牌料理" },
-  { title: "centralwOrld必吃", subtitle: "特色招牌好味道" },
+  { title: "曼谷隐藏泰餐", subtitle: "这顿泰餐让人想收藏" },
+  { title: "曼谷泰餐推荐", subtitle: "逛街后也能坐下慢慢吃" },
+  { title: "必吃泰式料理", subtitle: "味道很像泰式家常菜" },
+  { title: "曼谷美食发现", subtitle: "这几道菜让人想再点" },
+  { title: "曼谷泰餐新体验", subtitle: "第一次来尝试Baan Ying" },
+  { title: "centralwOrld泰餐推荐", subtitle: "逛街后舒服聚餐" },
+  { title: "centralwOrld必吃美食", subtitle: "环境舒服适合慢慢聊" },
 ] as const;
 
 export const FALLBACK_COVER_TITLES = FALLBACK_COVER_PAIRS.map((item) => item.title);
@@ -138,6 +132,9 @@ function prepareCoverLine(raw: string) {
   return normalizeCoverLocations(sanitizeCoverLine(raw));
 }
 
+const GENERIC_SUBTITLE =
+  /^(招牌泰式料理|家常泰式料理|特色泰式料理|人气招牌料理|招牌菜值得试|泰餐招牌味道|曼谷招牌料理|必吃招牌料理|特色招牌好味道|整体体验非常不错)$/;
+
 export function isAcceptableMainTitle(
   title: string,
   postTitles: string[] = [],
@@ -150,6 +147,8 @@ export function isAcceptableMainTitle(
   if (FORBIDDEN_COVER_CLAIMS.test(cleaned)) return false;
   if (containsHarshNegative(cleaned)) return false;
   if (/#|📍|⏰|http|www\.|\+\d/.test(cleaned)) return false;
+  if (!hasCoverTitleKeyword(cleaned)) return false;
+  if (isCoverKeywordStuffing(cleaned)) return false;
   if (countHanChars(cleaned) < 2 && !hasMandatoryCoverKeyword(cleaned)) return false;
   if (usesUnselectedCoverLocation(cleaned, context.branch)) return false;
   if (postTitles.some((postTitle) => copiedFromPostTitle(cleaned, postTitle))) return false;
@@ -171,6 +170,7 @@ export function isAcceptableSubtitle(
   if (/#|📍|⏰|http|www\.|\+\d/.test(cleaned)) return false;
   if (usesUnselectedCoverLocation(cleaned, context.branch)) return false;
   if (mainTitle && repeatsMain(mainTitle, cleaned)) return false;
+  if (GENERIC_SUBTITLE.test(cleaned)) return false;
   return true;
 }
 
@@ -182,9 +182,6 @@ export function isAcceptableCoverOverlay(
 ) {
   if (!isAcceptableMainTitle(title, postTitles, context)) return false;
   if (!isAcceptableSubtitle(subtitle, title, context)) return false;
-  if (!hasExactCoverKeywordPair(title, subtitle)) return false;
-  if (!hasCoverKsp(title, subtitle)) return false;
-  if (isCoverKeywordStuffing(title, subtitle)) return false;
   return true;
 }
 
@@ -214,7 +211,7 @@ export function splitCoverTitleSemantically(title: string, subtitle = "") {
   const first = prepareCoverLine(title);
   const second = prepareCoverLine(subtitle);
   if (second) return { title: first, subtitle: second };
-  const split = splitTitleIntoLines(first, { oneLineMax: PREFERRED_MAIN_TITLE_CHARS });
+  const split = splitTitleIntoLines(first, { oneLineMax: MAX_MAIN_TITLE_CHARS });
   return { title: split.line1, subtitle: split.line2 };
 }
 
@@ -237,8 +234,12 @@ export function layoutCoverOverlay(
 
   if (
     isAcceptableMainTitle(first, postTitles, context) &&
-    uniqueCoverPoolKeywords(first).length <= 2
+    uniqueCoverPoolKeywords(first).length <= 3
   ) {
+    const subtitle = subtitleFromCoverContext(context);
+    if (isAcceptableCoverOverlay(first, subtitle, postTitles, context)) {
+      return { title: first, subtitle };
+    }
     const fallback = pickFallbackPair(postTitles, context);
     if (isAcceptableCoverOverlay(first, fallback.subtitle, postTitles, context)) {
       return { title: first, subtitle: fallback.subtitle };

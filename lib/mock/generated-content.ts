@@ -34,8 +34,8 @@ export const mockGeneratedContent: GeneratedContent = {
   caption:
     `来曼谷当然要安排一顿泰国菜🇹🇭 这次吃到 Baan Ying，整体体验很适合和朋友一起约饭！从经典泰菜到各种适合分享的料理，一桌点起来超满足😋 如果你最近也在找曼谷餐厅，不妨把这家先收藏起来✨\n\n📍 尚泰世界购物中心（centralwOrld）3楼\n⏰ 10:00–22:00`,
   hashtags: validateHashtags(["#曼谷美食", "#泰国菜"]),
-  coverTitle: "曼谷必吃",
-  coverSubtitle: "家常泰式料理",
+  coverTitle: "曼谷泰餐推荐",
+  coverSubtitle: "这几道菜让人想再点",
   selectedPhotoIndex: 0,
   selectedPhotoIndexes: [0],
   photoSelectionReason: "食物主体清晰、构图完整，适合叠加标题。",

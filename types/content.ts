@@ -215,6 +215,8 @@ export type GeneratePostInput = {
   dinerOrigin?: string;
   dinerAgeRange?: string;
   dinerGender?: string;
+  dinerCountryIso2?: string;
+  dinerCountryCode?: string;
   suggestedKspId?: string;
   suggestedStorylineId?: string;
   suggestedSearchKeyword?: string;
@@ -233,4 +235,6 @@ export type GeneratePostInput = {
   previousTitleKeywords?: string[];
   previousCoverTemplateId?: string;
   previousCoverTitle?: string;
+  campaignId?: string;
+  submissionId?: string;
 };

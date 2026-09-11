@@ -21,6 +21,11 @@ function parseCustomer(value: unknown): SavedCustomerInfo | undefined {
   };
 }
 
+function parseOptionalString(value: unknown): string | undefined {
+  if (value === undefined) return undefined;
+  return asString(value);
+}
+
 function parseMealExpense(value: unknown): number | null | undefined {
   if (value === undefined) return undefined;
   if (value === null) return null;
@@ -41,6 +46,8 @@ export async function POST(request: Request) {
       submissionId,
       campaignId,
       customer: parseCustomer(body.customer),
+      customerType: parseOptionalString(body.customerType),
+      visitFrequency: parseOptionalString(body.visitFrequency),
       mealExpenseThb: parseMealExpense(body.mealExpenseThb),
     });
 

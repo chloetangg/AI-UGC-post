@@ -2,7 +2,7 @@
 
 **版本：** Consumer Demo v0.11  
 **日期：** 2026-09-09  
-**状态：** 消费者端前端 + OpenAI 真实生成（标题 / 正文 / 话题标签 / 封面 mainTitle + subTitle / 封面选图）+ 内部 Content Strategy Layer + Cover Composer + MongoDB 保存 YOU 资料与 FEEL 餐费 + GitHub / Vercel 部署
+**状态：** 消费者端前端 + OpenAI 真实生成（标题 / 正文 / 话题标签 / 封面 mainTitle + subTitle / 封面选图）+ 内部 Content Strategy Layer + Cover Composer + MongoDB 保存 YOU / FEEL 选项与生成文案 + GitHub / Vercel 部署
 
 这不是完整产品 spec。本文记录**现在已经上线到 Demo 里的行为**。
 
@@ -33,7 +33,7 @@
 不是品牌广告、不是正式餐厅评测、也不是把问卷关键词拼成文章。
 
 **没有：** 注册、登录、品牌 Dashboard、Cloudinary、小红书自动发布、AI 生图。  
-**已有：** MongoDB Atlas 保存 YOU 页客户资料 + FEEL 页餐费（同一条 `submissions` 记录）。
+**已有：** MongoDB Atlas 在生成成功后写入 `generations`（YOU / FEEL + 标题 / 正文 / hashtag / 封面标题 / 封面副标题 / token 费用），以及 `analytics_events` 转化漏斗。
 
 ---
 
@@ -58,9 +58,9 @@ MONGODB_URI=
 MONGODB_DB_NAME=baan-ying
 ```
 
-生成帖子必须有 `OPENAI_API_KEY`。MongoDB 只用于保存 YOU / 餐费；缺了不会挡住翻页，但数据不会入库。
+生成帖子必须有 `OPENAI_API_KEY`。MongoDB 用于保存每次成功生成的 `generations`（含 YOU / FEEL 快照 + 文案）；缺了不会挡住翻页或出帖，但数据不会入库。
 
-Vercel 需配置同样的环境变量（Production / Preview / Development），改完后 Redeploy。生成走 OpenAI，不走 MongoDB。
+Vercel 需配置同样的环境变量（Production / Preview / Development），改完后 Redeploy。生成走 OpenAI；成功后把文案写入 Mongo `generations`，失败不挡住出帖。
 
 如果浏览器报 `ERR_CONNECTION_REFUSED`，说明 `npm run dev` 没在跑。
 
@@ -75,12 +75,12 @@ Vercel 需配置同样的环境变量（Production / Preview / Development），
 | 样式 | Tailwind CSS v4 |
 | UI | shadcn/ui + 自定义下拉 `MenuSelect` |
 | 流程状态 | React 内存（同一次填写可前后翻页）；Continue 不等待 MongoDB |
-| 客户资料 | YOU 的年龄 / 性别 / 国家，以及 FEEL 餐费，写入 MongoDB `baan-ying.submissions`；刷新后表单仍清空 |
+| 客户资料 | YOU / FEEL 只存在浏览器内存；生成成功后一并写入 `generations`。刷新后表单仍清空 |
 | UI 语言 | `localStorage` key：`xhs-ugc-ui-language` |
 | AI | OpenAI Chat Completions，**一次请求**写出标题 + 正文 + 标签 + 封面 mainTitle / subTitle + 封面选图 |
 | 照片 | 浏览器 `File API`；发给 `/api/generate` 前会在客户端压缩，避免 Vercel 4.5MB 限制 |
 | 封面 | Cover Composer：`POST /api/compose-cover`；字体从 `public/fonts` 读取（Vercel 需 file tracing） |
-| 数据库 | MongoDB Atlas；接口 `POST /api/submissions` |
+| 数据库 | MongoDB Atlas；`generations` 集合（每次成功生成：YOU / FEEL + 标题、文案、hashtag、封面标题、token 费用）；`analytics_events` 集合（转化漏斗） |
 
 主色：Baan Ying 森林绿。手机宽布局，`max-w-[430px]`。页面标题：`Rednote UGC Generator`。
 
@@ -131,7 +131,7 @@ SHARE（分别复制标题、正文、标签；可保存封面）
 
 消费者主生成接口：`POST /api/generate`  
 封面合成接口：`POST /api/compose-cover`（非 OpenAI）  
-顾客资料接口：`POST /api/submissions`（YOU + 餐费 upsert）  
+生成结果接口：成功的 `/api/generate` 写入 `generations`（YOU / FEEL、标题、正文、hashtag、封面标题、封面副标题、token 费用）
 另有 `POST /api/generate-content`（JSON 入参的备用生成接口）。
 
 ---
@@ -179,21 +179,7 @@ Origins 下拉置顶：Thailand、Singapore、Malaysia、China、Hong Kong、Tai
 
 Age Range 和 Gender 使用自定义下拉：圆角按钮、右侧箭头、点开后是选项列表，不再用系统 `select`。
 
-点 Continue 时 `void saveYouPage()`：**不等待** MongoDB 返回就翻到 FEEL。刷新后表单仍清空；同一 `submissionId` 在本次访问内可 upsert。
-
-内部 `CustomerInfo` 仍保留空的 `name` / `email` / `phone*` / `consent` 字段，不展示、不校验。旧版完整代码在 `snapshots/you-page-2026-09-06/`。
-
-MongoDB `baan-ying.submissions` 保存：
-
-```text
-customer.ageRange
-customer.gender
-customer.location
-customer.countryIso2
-customer.countryCode
-```
-
-不保存照片、不保存用餐补充说明。
+点 Continue 只翻到 FEEL。YOU / FEEL **不再写入** `submissions`。这些字段只在生成成功时进入 `generations`。刷新后表单仍清空。
 
 ---
 
@@ -226,25 +212,25 @@ customer.countryCode
 
 联系邮箱：**admin@trendplay.com.sg**（可点 `mailto`）。
 
-政策正文写明：回答会在活动结束后保存最多 12 个月。**当前实现：** MongoDB 只存 YOU（年龄 / 性别 / 国家）和 FEEL 餐费；照片、用餐补充说明、问卷多选项**不入库**。刷新后浏览器表单仍清空。
+政策正文写明：回答会在活动结束后保存最多 12 个月。**当前实现：** 只有生成成功才写入 Mongo `generations`（YOU / FEEL 快照 + 3 个标题、正文、5 个 hashtag、封面标题、封面副标题、token 费用）。不再写入 `submissions`。照片、封面 JPEG、策略、用餐补充说明不入库。刷新后浏览器表单仍清空。
 
 ---
 
 ## 9. FEEL（体验问卷）
 
-**没有分店选择题。** 用餐地点一律由系统定为 `Baan Ying (centralwOrld, 3rd Floor)`（`DEFAULT_BAAN_YING_BRANCH` / `resolveDiningBranch()`）。Location & Time 始终用 centralwOrld 官方地点和营业时间。`centralwOrld` 可作为封面两个关键词之一。
+**没有分店选择题。** 用餐地点一律由系统定为 `Baan Ying (centralwOrld, 3rd Floor)`（`DEFAULT_BAAN_YING_BRANCH` / `resolveDiningBranch()`）。Location & Time 始终用 centralwOrld 官方地点和营业时间。`centralwOrld` 可作为封面主标题的池子关键词之一。
 
 | # | 问题 | 必填 | 选项 |
 | --- | --- | --- | --- |
-| 1 | Are you a tourist or a local? | 单选必填 | Tourist / Local |
-| 2 | Is this your first time at Baan Ying? | 单选必填 | 内部值 `1st time` / `Not first time`。UI：EN Yes / No；中文 是 / 不是 |
-| 3 | How much is the total expenses for this meal? | 必填 | THB 金额；写入 Mongo `mealExpenseThb` |
+| 1 | Are you a tourist or a local? | 单选必填 | Tourist / Local；生成成功后写入 `generations.customerType` |
+| 2 | Is this your first time at Baan Ying? | 单选必填 | 内部值 `1st time` / `Not first time`。UI：EN Yes / No；中文 是 / 不是；生成成功后写入 `generations.visitFrequency` |
+| 3 | How much is the total expenses for this meal? | 必填 | THB 金额；生成成功后写入 `generations.mealExpenseThb` |
 | 4 | What did you enjoy most? | 多选可选 | The food / flavors / presentation / variety / atmosphere / service / overall experience |
 | 5 | What dish would you recommend the most? | 多选可选 | Yellow Curry Crab Meat / Tom Yum Goong / Thai Sweet & Sour Steamed Fish / Stir-Fried Shrimp with Garlic / Mango Sticky Rice / Others（可填其他） |
 | 6 | Why do you recommend it? | 多选可选 | Delicious / Flavorful / Authentic / Fresh / Tender / Crispy / Fragrant / Rich / Creamy / Satisfying / Well-balanced（**没有 Others**） |
-| 7 | Tell us more about your dining experience | 必填 | 多行文本框；**不写入 Mongo** |
+| 7 | Tell us more about your dining experience | 必填 | 多行文本框；只用于生成，不写入 Mongo |
 
-点 Continue 时 `void saveFeelExpense()`：不等待 Mongo 就翻到 PHOTOS。
+点 Continue 翻到 PHOTOS。FEEL 答案不单独入库，生成成功后才写入 `generations`。
 
 第 7 题标题下**不再**显示「中文按字计算…」这类说明。输入框下方仍显示 `{count} / 10`。至少 **10 个计数单位** 才能继续：
 
@@ -475,7 +461,7 @@ KSP-03 Family Recipes & Heritage 是低频策略，不默认写 1999 / Auntie Yi
 
 封面字数不够时用更短同义：口味看个人喜好 / 整体风味比较经典 / 价格看个人预期。禁止把难吃改成超级好吃。
 
-品牌固定标签 `#baanying曼谷` `#曼谷必吃` `#centralworld泰餐推荐` 仍保留；正文和标题里不再把「必吃」当卖点。封面允许用池子里的「必吃」作为两个关键词之一。用户只看到终稿，看不到内部合规分析。
+品牌固定标签 `#baanying曼谷` `#曼谷必吃` `#centralworld泰餐推荐` 仍保留；正文和标题里不再把「必吃」当卖点。封面主标题允许用池子里的「必吃」作为自然关键词之一。用户只看到终稿，看不到内部合规分析。
 
 写法应口语、自然、略带情绪；避免「作为一家…」「值得一提的是…」「整体来说…」「如果你正在寻找…」这类评测 / 广告句式。
 
@@ -513,20 +499,26 @@ KSP-03 Family Recipes & Heritage 是低频策略，不默认写 1999 / Auntie Yi
 
 Generating 页文案：先 `Generating your post...`，再 `Creating your cover...`，完成后进入 Result。用户不必再点 Generate Cover，也不必另选 Cover Title。
 
-封面叠字来自独立的 JSON `mainTitle` + `subTitle`（解析后存在 `coverTitle` / `coverSubtitle`），**不是**正文 3 个标题的缩写，也不是 SEO 搜索短标题。禁止先写长句再截断、禁止用填充字凑字数。
+封面叠字来自独立的 JSON `mainTitle` + `subTitle`（解析后存在 `coverTitle` / `coverSubtitle`），**不是**正文 3 个标题的缩写。禁止先写长句再截断、禁止用填充字凑字数。
 
 | 字段 | 字数（汉字等价单位） |
 | --- | --- |
-| mainTitle | **正好 4–7**。禁止 3，禁止 8+ |
-| subTitle | **正好 4–9**。禁止 1–3，禁止 10+ |
+| mainTitle / coverTitle | **4–7**。禁止 3。`centralwOrld` 整词算 **1** 单位 |
+| subTitle | **6–10**。禁止空、禁止套模板 |
 
-**mainTitle + subTitle 合起来必须正好 2 个池子关键词**（不重复、不能 1 个也不能 3 个）：
+**主标题必须自然带至少 1 个池子关键词**（选最贴这篇内容的，不要堆）：
 
 `曼谷` / `centralwOrld` / `泰餐` / `美食` / `必吃`
 
-有效组合例如：曼谷+泰餐、曼谷+美食、曼谷+必吃、centralwOrld+美食、泰餐+必吃。关键词不能当整句；副标题要带 KSP，不要重复主标题公式。`必吃` **只允许出现在封面**（以及固定话题 `#曼谷必吃`）。封面禁止：第一 / 唯一 / 顶级 / 最强 / 最好吃 / 封神。不要编造「泰国人爱吃 / 明星爱吃」。菜名可选，且必须是顾客选过或写过的。
+合格例如：曼谷隐藏泰餐、centralwOrld泰餐推荐、曼谷泰餐推荐、必吃泰式料理、曼谷美食发现、曼谷泰餐新体验。  
+不合格：曼谷centralwOrld泰餐美食必吃推荐、centralwOrld必吃（只有 3 单位）。
 
-不合格时整条换成完整短标题，不截原句。封面标题与正文标题分开校验。`layoutCoverOverlay` 的叠字架构不变。
+**副标题不是固定句。** 从 FEEL 标签、顾客自己写的句子、餐费、菜、场景、KSP 里抽出最能让人收藏/点开的一点，改写成短句，不要复述主标题，也不要整句抄用餐说明。  
+例如：DIY打抛饭很好玩 / 逛街后舒服聚餐 / 两人600泰铢很满足。禁止永远用「招牌泰式料理」。
+
+`必吃` **只允许出现在封面**（以及固定话题 `#曼谷必吃`）。封面禁止：第一 / 唯一 / 顶级 / 最强 / 最好吃 / 封神。不要编造「泰国人爱吃 / 明星爱吃」。菜名可选，且必须是顾客选过或写过的。
+
+主标题缺关键词时，在**同一次** JSON 里改写主标题，不再多打 OpenAI。校验失败才用证据向的短标题兜底，不截原句。`layoutCoverOverlay` 的叠字架构不变。
 
 ### 封面标题换行（10 个模板共用）
 
@@ -581,7 +573,42 @@ POST 页可点选模板；换模板只重打 `/api/compose-cover`，**不再调�
 
 Cover Composer 失败时：「Cover generation failed」+ Retry Cover（只重打 `/api/compose-cover`，不再调用 OpenAI）。
 
-封面状态：`coverTitle`、`coverSubtitle`、`selectedPhotoIndex`、`selectedCoverTemplateId`、`generatedCoverImageUrl`。刷新仍会清空。不写 MongoDB / Cloudinary。
+封面状态：`coverTitle`、`coverSubtitle`、`selectedPhotoIndex`、`selectedCoverTemplateId`、`generatedCoverImageUrl`。刷新仍会清空浏览器里的 blob 封面。封面 JPEG **不写入** Mongo。
+
+### 12.9 生成结果入库（`generations`）
+
+每一次 **成功的** `/api/generate` 写入 Mongo `baan-ying.generations` **一条新文档**（重新生成也是新文档，不覆盖旧的）。Mongo 失败只打日志，不挡住出帖。
+
+| 字段 | 内容 |
+| --- | --- |
+| `generationId` | UUID |
+| `createdAt` | 生成成功时间 |
+| `customer` | YOU 快照：年龄 / 性别 / 国家 |
+| `customerType` | Tourist / Local |
+| `visitFrequency` | `1st time` / `Not first time` |
+| `mealExpenseThb` | FEEL 餐费 THB |
+| `titles` | 终稿 3 个标题 |
+| `caption` | 终稿正文（含 Location & Time） |
+| `hashtags` | 终稿 5 个标签 |
+| `coverTitle` / `coverSubtitle` | 封面主标题、副标题 |
+| `aiUsage` | model / inputTokens / outputTokens / totalTokens / cost |
+
+另存 `campaignId`、`submissionId`，方便和 YOU / FEEL 记录对上。不存照片、封面 JPEG、KSP、用餐补充说明。
+
+### 12.10 转化分析（`analytics_events`）
+
+漏斗埋点复用现有 Mongo（`MONGODB_URI` / `MONGODB_DB_NAME`），不另开库、不加 OpenAI 请求。分析失败只打日志，不挡住扫码、生成、发帖。
+
+| 事件 | 何时写入 | 去重 |
+| --- | --- | --- |
+| `qr_scan` | `GET /qr/:qrCodeId` | 每次扫码一条 |
+| `form_submit` | 现有 `POST /api/generate` 真正发出时 | 每 session 一次 |
+| `generation_complete` | 现有 `/api/generate` 成功返回前 | 每 session 一次 |
+| `xhs_publish_click` | SHARE 页点 Publish to Rednote | 每 session 一次；只计点击，不代表小红书已发成功 |
+
+扫码后自动跳到 `/c/baan-ying/customer`（YOU 页）。也可以把 `https://aiugcpost.vercel.app/c/baan-ying/customer?qr=baan-ying` 直接印成码。访客 cookie：`ugc_sid`（httpOnly session）、`ugc_qr`（来源码）。不存 IP、姓名、电话、邮箱。
+
+看板：`GET /api/analytics?range=today|yesterday|last_7_days|last_30_days|this_month|all`，可加 `startDate` / `endDate` / `qrCodeId`。页面 `/analytics`。日期按 Asia/Bangkok。
 
 ---
 
@@ -771,15 +798,22 @@ Version 1 和 Version 6 使用单换行，行与行之间没有空行。
 | `snapshots/you-page-2026-09-06/` | 含姓名 / 邮箱 / 电话的旧版 YOU 快照 |
 | `app/c/[campaignId]/privacy/page.tsx` | 隐私政策页 |
 | `lib/mongodb.ts` | MongoDB Atlas 连接 |
-| `lib/submissions.ts` | `submissions` upsert（YOU + 餐费） |
-| `lib/save-submission-client.ts` | 浏览器调用 `POST /api/submissions`（fire-and-forget） |
-| `app/api/submissions/route.ts` | 顾客资料 API |
+| `lib/analytics/` | 转化事件写入、日期窗口、看板查询 |
+| `middleware.ts` | 匿名 `ugc_sid` session cookie |
+| `app/qr/[qrCodeId]/route.ts` | 扫码记 `qr_scan` 后跳进 campaign |
+| `app/api/analytics/route.ts` | 看板汇总 / 转化率 / 按日 / 按 QR |
+| `app/api/analytics/events/route.ts` | 客户端点击事件（XHS） |
+| `app/analytics/page.tsx` | 内部转化看板 |
+| `lib/submissions.ts` | 旧 `submissions` 类型（现流程不再写入该集合） |
+| `lib/generations.ts` | `generations` 写入（YOU / FEEL 快照 + 标题、正文、hashtag、封面标题、token 费用） |
+| `lib/save-submission-client.ts` | 旧 submissions 客户端（现流程不再调用） |
+| `app/api/submissions/route.ts` | 旧顾客资料 API（现流程不再调用） |
 | `lib/compress-photo.ts` | 生成前压缩照片 |
 | `lib/compliance/negative-feedback.ts` | 负面用语 → 中性表述 |
 | `lib/cover/asset-path.ts` | 服务端读取 `public/fonts`、`public/cover` |
 | `lib/cover/collage.ts` | Template 1 四图 2×2 与中心点 |
 | `components/providers/language-provider.tsx` | UI 语言 |
-| `components/providers/campaign-flow-provider.tsx` | 流程状态、照片、封面、保存 YOU / 餐费、调用生成 |
+| `components/providers/campaign-flow-provider.tsx` | 流程状态、照片、封面、调用生成 |
 | `lib/compose-cover-client.ts` | 浏览器把 File 转 data URL，调用 `/api/compose-cover` |
 | `lib/cover/` | Cover Composer：模板、字体、合成 |
 | `lib/cover/templates.ts` | 10 个模板定义；`name` 为 Template 1–10 |
@@ -820,13 +854,12 @@ Version 1 和 Version 6 使用单换行，行与行之间没有空行。
 
 ## 17. 明确没做的事
 
-- 登录 / 注册 / 品牌 Dashboard
-- Cloudinary / 图片存储（照片不进 Mongo）
-- 用餐补充说明、问卷多选项写入 Mongo（目前只存 YOU + 餐费）
-- 小红书 / Rednote 自动发布
+- 登录 / 注册 / 品牌后台配置
+- Cloudinary / 图片存储（照片和封面 JPEG 都不进 Mongo）
+- 用餐补充说明、KSP 写入 Mongo
+- 小红书 / Rednote 自动发布（SHARE 只计 Publish 点击）
 - AI 生图 / 修图 / 用模型绘制中文封面（封面是 Cover Composer 叠字，不是生图）
-- QR Code 生成服务
+- QR 图片生成服务（只追踪已有 `/qr/:qrCodeId` 扫码）
 - 多品牌多 Campaign 后台配置
-- Token / 费用写入 MongoDB（目前只打服务端控制台和浏览器 console 日志）
 - YOU 页同意勾选（组件还在，表单未展示）
 - 隐私政策正文与现表单完全对齐（仍写性别选填、到访门店等）

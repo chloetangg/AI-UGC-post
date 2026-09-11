@@ -70,15 +70,15 @@ export function suggestCoverHookFamily(input: {
 export function formatCoverHookRules(context: CoverTitleContext = {}) {
   return `${formatCoverTitleRules(context)}
 
-HOOK FAMILIES — pick from evidence after keyword + KSP + length are satisfied. Do not copy these exact sentences:
-HOOK-01 Search: 曼谷必吃 / 曼谷美食 — still exactly 2 pool keywords across the pair
-HOOK-02 Adjective only if the meal supports it: 超好吃泰式料理 as subTitle
-HOOK-03 Reaction: 发现宝藏店 as supporting mood, not a 3-character mainTitle
-HOOK-04 Soft CTA lives in caption, not as a 3-character cover
+HOOK FAMILIES — pick from evidence after the coverTitle keyword + subtitle-from-customer rules are satisfied. Do not copy these exact sentences:
+HOOK-01 Search mood in the title: 曼谷必吃 / 曼谷美食 — still at least one pool keyword, never a keyword dump
+HOOK-02 Adjective only if the meal supports it, prefer it in subTitle
+HOOK-03 Reaction belongs in subTitle, not as a 3-character mainTitle
+HOOK-04 Soft CTA lives in caption
 HOOK-05 Local identity ONLY with evidence. Never invent 泰国人爱吃.
-HOOK-06 Dish-led subtitle: 招牌冬阴功 — real selected dish only
-HOOK-07 Warm: 家常泰式料理 as subTitle
-HOOK-08 Location is optional as ONE of the two keywords, e.g. centralwOrld美食 + 招牌泰式料理. Never add a third pool keyword. Never force centralwOrld.
+HOOK-06 Dish-led subtitle from a real selected dish or the dining note
+HOOK-07 Warm home-style feeling in subTitle when the note supports it
+HOOK-08 Location in the title only when it is the hook, e.g. centralwOrld泰餐推荐. Never force centralwOrld.
 
-DIVERSITY: do not repeat the same 2-keyword pair or the same main/sub formula. Changing only 推荐/泰菜 is NOT enough. Do not copy the previous mainTitle.`;
+DIVERSITY: do not repeat the previous coverTitle/subTitle formula. Changing only 推荐/泰菜 is NOT enough.`;
 }

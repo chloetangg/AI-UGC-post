@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import OpenAI from "openai";
 import { ensureCaptionEmojis, fixFruitEmojisInTitles } from "@/lib/caption-emoji";
 import {
@@ -6,6 +7,8 @@ import {
   generatePostJsonSchema,
   type GenerateRequestBody,
 } from "@/lib/generate-prompt";
+import { insertGeneration } from "@/lib/generations";
+import { trackServerEvent } from "@/lib/analytics/server";
 import { normalizeHashtags } from "@/lib/hashtags";
 import { attachOfficialLocationTime, resolveDiningBranch, stripGeneratedLocationTime } from "@/lib/locations";
 import { parseGeneratedContent } from "@/lib/parse-generated";
@@ -16,6 +19,28 @@ import { enforceXiaohongshuCompliance } from "@/lib/compliance";
 export const maxDuration = 60;
 
 const MAX_IMAGES = 5;
+
+function errorDetail(error: unknown) {
+  const parts: string[] = [];
+  let current: unknown = error;
+  for (let depth = 0; depth < 4 && current; depth += 1) {
+    if (current instanceof Error) {
+      parts.push(current.message);
+      current = current.cause;
+      continue;
+    }
+    parts.push(String(current));
+    break;
+  }
+  return parts.filter(Boolean).join(" | ");
+}
+
+function isOpenAIConnectionError(error: unknown, detail: string) {
+  return (
+    error instanceof OpenAI.APIConnectionError ||
+    /connection error|fetch failed|econnreset|enotfound|etimedout|cert|certificate|ssl/i.test(detail)
+  );
+}
 
 function getClient() {
   const apiKey = process.env.OPENAI_API_KEY;
@@ -53,6 +78,7 @@ async function fileToImagePart(file: File) {
 }
 
 export async function POST(request: Request) {
+  let formSubmitTrack: Promise<void> | null = null;
   try {
     const form = await request.formData();
     const rawPayload = form.get("payload");
@@ -86,6 +112,8 @@ export async function POST(request: Request) {
     const openai = getClient();
     const model = process.env.OPENAI_MODEL || "gpt-4o";
     const previousTitles = payload.previousTitles ?? [];
+    const formSubmitTrackTask = trackServerEvent("form_submit", { formType: "baan-ying-ugc" });
+    formSubmitTrack = formSubmitTrackTask;
 
     const completion = await openai.chat.completions.create({
       model,
@@ -117,6 +145,11 @@ export async function POST(request: Request) {
       variantIndex: payload.variantIndex,
       kspId: payload.suggestedKspId,
       contentAngleId: payload.suggestedContentAngle,
+      diningNote: payload.diningExperienceNote,
+      mealAmount: payload.totalMealExpense,
+      enjoyMost: payload.enjoyMost,
+      visitFrequency: payload.visitFrequency,
+      customerType: payload.customerType,
     };
     const parsed = parseGeneratedContent(
       text,
@@ -164,10 +197,49 @@ export async function POST(request: Request) {
     ]);
     logGenerationCost(cost);
 
+    const hashtags = normalizeHashtags(compliant.hashtags, payload.previousHashtags ?? []);
+
+    const generationId = randomUUID();
+    try {
+      await insertGeneration({
+        generationId,
+        campaignId: payload.campaignId,
+        submissionId: payload.submissionId,
+        customer: {
+          ageRange: payload.dinerAgeRange,
+          gender: payload.dinerGender,
+          location: payload.dinerOrigin,
+          countryIso2: payload.dinerCountryIso2,
+          countryCode: payload.dinerCountryCode,
+        },
+        customerType: payload.customerType,
+        visitFrequency: payload.visitFrequency,
+        mealExpenseThb: payload.totalMealExpense,
+        titles,
+        caption: located.caption,
+        hashtags,
+        coverTitle: compliant.coverTitle,
+        coverSubtitle: compliant.coverSubtitle,
+        cost,
+      });
+    } catch (error) {
+      console.error("[generations] save failed");
+      const detail = error instanceof Error ? error.message : "";
+      if (detail) console.error("[generations]", detail);
+    }
+
+    await Promise.all([
+      formSubmitTrackTask,
+      trackServerEvent("generation_complete", {
+        generationType: "baan-ying-ugc",
+        generationId,
+      }),
+    ]);
+
     return Response.json({
       titles,
       caption: located.caption,
-      hashtags: normalizeHashtags(compliant.hashtags, payload.previousHashtags ?? []),
+      hashtags,
       coverTitle: compliant.coverTitle,
       coverSubtitle: compliant.coverSubtitle,
       selectedPhotoIndex: parsed.selectedPhotoIndex,
@@ -183,16 +255,24 @@ export async function POST(request: Request) {
       selectedSearchKeyword: parsed.selectedSearchKeyword,
       locationFormat: located.format,
       cost,
+      generationId,
     });
   } catch (error) {
+    if (formSubmitTrack) await formSubmitTrack;
     const raw = error instanceof Error ? error.message : "Generation failed";
-    const connection =
-      error instanceof OpenAI.APIConnectionError || /connection error/i.test(raw);
-    const message = /sk-|api[_-]?key/i.test(raw)
+    const detail = errorDetail(error);
+    console.error("[generate] failed");
+    if (detail) console.error("[generate]", detail);
+    const tls =
+      /cert|certificate|ssl|unable to verify|unable to get local issuer/i.test(detail);
+    const connection = isOpenAIConnectionError(error, detail);
+    const message = /sk-|api[_-]?key/i.test(detail)
       ? "Generation failed"
-      : connection
-        ? "Could not reach OpenAI. Check the network and retry."
-        : raw;
+      : tls
+        ? "Could not reach OpenAI. If a VPN or proxy is on, turn it off and retry."
+        : connection
+          ? "Could not reach OpenAI. Check the network and retry."
+          : raw;
     return Response.json({ error: message }, { status: 500 });
   }
 }

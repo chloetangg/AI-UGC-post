@@ -10,7 +10,7 @@ export const COVER_LOCATION_KEYWORDS = [
 
 export const COVER_GENERIC_KEYWORDS = ["曼谷", "泰餐", "美食", "必吃"] as const;
 
-/** Cover titles must use exactly two of these, across mainTitle + subTitle. */
+/** Cover titles must use at least one of these in the main title. */
 export const COVER_POOL_KEYWORDS = ["曼谷", "centralwOrld", "泰餐", "美食", "必吃"] as const;
 
 export const COVER_MANDATORY_KEYWORDS = [
@@ -18,12 +18,12 @@ export const COVER_MANDATORY_KEYWORDS = [
   ...COVER_LOCATION_KEYWORDS,
 ] as const;
 
-/** Latin mall names count as compact CJK-equivalent units, not 1 unit per letter. */
+/** Latin mall names count as 1 Chinese-character-equivalent unit each. */
 export const COVER_LOCATION_UNITS: Record<(typeof COVER_LOCATION_KEYWORDS)[number], number> = {
-  centralwOrld: 4,
-  "Terminal 21": 4,
-  "Siam Center": 4,
-  "One Bangkok": 4,
+  centralwOrld: 1,
+  "Terminal 21": 1,
+  "Siam Center": 1,
+  "One Bangkok": 1,
 };
 
 const LOCATION_ALIASES: Array<{ canonical: (typeof COVER_LOCATION_KEYWORDS)[number]; pattern: RegExp }> = [
@@ -72,11 +72,11 @@ const KSP_MARKERS = [
 ] as const;
 
 const DISH_SUBTITLES: Array<{ match: RegExp; subtitle: string }> = [
-  { match: /yellow curry|咖喱蟹|黄咖喱/i, subtitle: "招牌咖喱蟹" },
-  { match: /tom yum|冬阴功/i, subtitle: "招牌冬阴功" },
-  { match: /sweet\s*&\s*sour|酸甜.*鱼|蒸鱼/i, subtitle: "招牌酸甜鱼" },
-  { match: /garlic|蒜蓉|炒虾/i, subtitle: "蒜蓉炒虾" },
-  { match: /mango|芒果糯米/i, subtitle: "芒果糯米饭" },
+  { match: /yellow curry|咖喱蟹|黄咖喱/i, subtitle: "招牌黄咖喱蟹" },
+  { match: /tom yum|冬阴功/i, subtitle: "必吃招牌冬阴功" },
+  { match: /sweet\s*&\s*sour|酸甜.*鱼|蒸鱼/i, subtitle: "招牌酸甜蒸鱼" },
+  { match: /garlic|蒜蓉|炒虾/i, subtitle: "必点蒜蓉炒虾" },
+  { match: /mango|芒果糯米/i, subtitle: "必点芒果糯米饭" },
 ];
 
 export type CoverTitleContext = {
@@ -87,6 +87,11 @@ export type CoverTitleContext = {
   variantIndex?: number;
   kspId?: string;
   contentAngleId?: string;
+  diningNote?: string;
+  mealAmount?: number | null;
+  enjoyMost?: string[];
+  visitFrequency?: string;
+  customerType?: string;
 };
 
 function escapeRegExp(value: string) {
@@ -131,6 +136,11 @@ export function uniqueCoverPoolKeywords(mainTitle: string, subTitle = "") {
   return [...new Set(findCoverKeywords(`${mainTitle}${subTitle}`))];
 }
 
+/** Cover main title must contain at least one pool keyword. */
+export function hasCoverTitleKeyword(mainTitle: string) {
+  return uniqueCoverPoolKeywords(mainTitle).length >= 1;
+}
+
 export function hasExactCoverKeywordPair(mainTitle: string, subTitle = "") {
   return uniqueCoverPoolKeywords(mainTitle, subTitle).length === 2;
 }
@@ -141,7 +151,7 @@ export function coverKeywordPairKey(mainTitle: string, subTitle = "") {
 
 /**
  * Chinese-character-equivalent units for cover length rules.
- * Han = 1. Approved Latin mall names = 4. Other Latin/digits = 0.5, rounded up.
+ * Han = 1. Approved Latin mall names such as centralwOrld = 1. Other Latin/digits = 0.5, rounded up.
  */
 export function countCoverUnits(text: string) {
   let remaining = normalizeCoverLocations(sanitizeCoverLine(text));
@@ -192,13 +202,12 @@ export function hasCoverKsp(mainTitle: string, subTitle = "") {
   return (leftover.match(/\p{Script=Han}/gu)?.length ?? 0) >= 2;
 }
 
-export function isCoverKeywordStuffing(mainTitle: string, subTitle = "") {
-  const unique = uniqueCoverPoolKeywords(mainTitle, subTitle);
-  if (unique.length > 2) return true;
-  const combined = `${mainTitle}${subTitle}`;
+export function isCoverKeywordStuffing(mainTitle: string, _subTitle = "") {
+  const unique = uniqueCoverPoolKeywords(mainTitle);
+  if (unique.length >= 4) return true;
   return unique.some((keyword) => {
     const pattern = new RegExp(escapeRegExp(keyword), "gi");
-    const matches = combined.match(pattern) ?? [];
+    const matches = mainTitle.match(pattern) ?? [];
     return matches.length >= 2;
   });
 }
@@ -242,31 +251,48 @@ function dishSubtitle(dishes: string[] = []) {
   return "";
 }
 
+const ENJOY_SUBTITLES: Array<{ match: RegExp; subtitle: string }> = [
+  { match: /atmosphere|环境/i, subtitle: "环境舒服适合慢慢聊" },
+  { match: /service|服务/i, subtitle: "用餐气氛让人放松" },
+  { match: /presentation|摆盘/i, subtitle: "摆盘好看很想拍照" },
+  { match: /variety|菜品多|variety of dishes/i, subtitle: "一次能点到很多菜" },
+  { match: /flavor|口味/i, subtitle: "味道很像泰式家常菜" },
+  { match: /food|the food/i, subtitle: "这几道菜让人想再点" },
+];
+
+export function subtitleFromCoverContext(context: CoverTitleContext = {}) {
+  const dish = dishSubtitle(context.dishes);
+  if (dish) return dish;
+  const amount = context.mealAmount;
+  if (typeof amount === "number" && Number.isFinite(amount) && amount > 0) {
+    return `这餐${Math.round(amount)}泰铢很满足`;
+  }
+  if (/1st time|first/i.test(context.visitFrequency ?? "")) {
+    return "第一次来尝试Baan Ying";
+  }
+  for (const tag of context.enjoyMost ?? []) {
+    const hit = ENJOY_SUBTITLES.find((item) => item.match.test(tag));
+    if (hit) return hit.subtitle;
+  }
+  if (shouldUseCoverLocation(context)) return "逛街后也能坐下慢慢吃";
+  return "这顿泰餐让人想收藏";
+}
+
 export function coverFallbackPairs(context: CoverTitleContext = {}) {
   const location = selectedCoverLocation(context.branch);
-  const dish = dishSubtitle(context.dishes);
-  const ksp = dish || "招牌泰式料理";
-  const kspWarm = dish || "家常泰式料理";
-  const kspTaste = dish || "特色招牌好味道";
-  const kspTry = dish || "招牌菜值得试";
+  const subtitle = subtitleFromCoverContext(context);
   const pairs = [
-    { title: "曼谷必吃", subtitle: ksp },
-    { title: "曼谷美食", subtitle: kspWarm },
-    { title: "曼谷泰餐", subtitle: ksp },
-    { title: "泰餐必吃", subtitle: ksp },
-    { title: "美食必吃", subtitle: kspWarm },
-    { title: "必吃泰餐", subtitle: kspTry },
-    { title: "曼谷探店", subtitle: "必吃招牌料理" },
-    { title: "特色泰餐", subtitle: "曼谷招牌料理" },
-    { title: "美食推荐", subtitle: "泰餐招牌味道" },
-    { title: "必吃推荐", subtitle: "曼谷招牌料理" },
+    { title: "曼谷隐藏泰餐", subtitle },
+    { title: "曼谷泰餐推荐", subtitle },
+    { title: "必吃泰式料理", subtitle },
+    { title: "曼谷美食发现", subtitle },
+    { title: "曼谷泰餐新体验", subtitle },
+    { title: "泰餐必吃推荐", subtitle },
   ];
   if (location === "centralwOrld") {
-    pairs.push(
-      { title: "centralwOrld美食", subtitle: ksp },
-      { title: "centralwOrld泰餐", subtitle: ksp },
-      { title: "centralwOrld必吃", subtitle: kspTaste },
-      { title: "曼谷探店", subtitle: "centralwOrld分店" },
+    pairs.unshift(
+      { title: "centralwOrld泰餐推荐", subtitle },
+      { title: "centralwOrld必吃美食", subtitle },
     );
   }
   return pairs;
@@ -274,50 +300,57 @@ export function coverFallbackPairs(context: CoverTitleContext = {}) {
 
 export function formatCoverTitleRules(context: CoverTitleContext = {}) {
   const location = selectedCoverLocation(context.branch);
-  const previousPair = coverKeywordPairKey(context.previousCoverTitle ?? "");
+  const previousMain = (context.previousCoverTitle ?? "").split("/")[0]?.trim() || "none";
+  const note = context.diningNote?.trim() || "none";
+  const amount =
+    typeof context.mealAmount === "number" && Number.isFinite(context.mealAmount) && context.mealAmount > 0
+      ? `${Math.round(context.mealAmount)} THB`
+      : "not provided";
+  const enjoy = (context.enjoyMost ?? []).filter(Boolean).join(", ") || "none";
+  const dishes = (context.dishes ?? []).filter(Boolean).join(", ") || "none";
   const locationHint = location
-    ? `Dining location (system-provided): ${location}. It is ONE optional keyword in the pool, never mandatory. Use ${location} as one of the two keywords only when it naturally strengthens this KSP. Do NOT force it into every cover. Do NOT invent Terminal 21 / Siam Center / One Bangkok.`
+    ? `Dining location (system-provided): ${location}. Use it in the coverTitle only when it is the strongest hook. Do NOT invent Terminal 21 / Siam Center / One Bangkok.`
     : "No dining mall keyword is available. Do NOT invent centralwOrld, Terminal 21, Siam Center, or One Bangkok.";
 
-  return `COVER OVERLAY — JSON "mainTitle" + "subTitle". Independent from titles[]. Never shorten titles[]. Never extra API calls. Generate both in THIS same JSON.
+  return `COVER OVERLAY — JSON "mainTitle" (= coverTitle) + "subTitle" (= subtitle). Independent from titles[]. Never shorten titles[]. Never extra API calls. Generate both in THIS same JSON.
 
-HARD LENGTH
-- mainTitle: 4–7 Chinese-character-equivalent units ONLY. Never 3. Never 8+. Do not truncate. Do not pad with filler.
-- subTitle: 4–9 units ONLY. Never 1–3. Never 10+. Do not truncate. Do not pad with filler.
-- Count Han as 1. Count approved Latin mall names as about 4 units total (not 1 per letter): centralwOrld.
-- If the chosen 2 keywords + KSP cannot fit, pick another valid 2-keyword combination. Never drop a keyword after writing.
+COVER TITLE (mainTitle)
+Must naturally include AT LEAST ONE keyword from: 曼谷 / centralwOrld / 泰餐 / 美食 / 必吃
+Pick the ONE keyword that best matches this post. Two keywords are allowed if they still read as a headline. Never stuff 3+ pool keywords plus 推荐 into a keyword list.
+Do NOT force every keyword into one title.
+GOOD: 曼谷隐藏泰餐 / centralwOrld泰餐推荐 / 曼谷泰餐推荐 / 必吃泰式料理 / 曼谷美食发现 / 曼谷泰餐新体验
+BAD: 曼谷centralwOrld泰餐美食必吃推荐 / 曼谷最好吃centralwOrld泰餐美食 / centralwOrld必吃
+Style: short, eye-catching Xiaohongshu cover headline. Curiosity and click-through. Communicate what is special, why to click, and the strongest angle. Not a search-keyword list.
+Length: 4–7 Chinese-character-equivalent units. Count Han as 1. Count centralwOrld as 1 unit total. Never 3. Never 8+. Do not truncate. Do not pad.
+Previous coverTitle (do not copy): ${previousMain}
 
-EXACTLY 2 KEYWORDS from this pool, across mainTitle + subTitle combined:
-曼谷 / centralwOrld / 泰餐 / 美食 / 必吃
-Never 1. Never 3+. Never repeat the same keyword. Distribute them naturally (both in mainTitle, or 1+1).
-Valid pairs include: 曼谷+泰餐 / 曼谷+美食 / 曼谷+必吃 / centralwOrld+美食 / centralwOrld+泰餐 / centralwOrld+必吃 / 泰餐+美食 / 泰餐+必吃 / 美食+必吃.
-Do NOT always pick 曼谷+泰餐 or centralwOrld+美食. Avoid previous keyword pair: ${previousPair || "none"}.
+COVER SUBTITLE (subTitle)
+Do NOT use a fixed template such as 招牌泰式料理 / 家常泰式料理.
+Analyze FEEL tags, the customer's own sentences, meal cost, restaurant traits, KSP, dining scenario, and unique points. Extract the strongest reason someone would save or click. Rewrite it concisely. Do not copy the original sentence. Do not repeat the coverTitle.
+Priority: 1 unique experience 2 food highlight 3 atmosphere 4 price/value 5 location convenience 6 emotional reaction.
+Length: 6–10 units. Never empty. Never 5 or shorter. Never 11+.
+
+Customer evidence for subtitle (INTERNAL):
+- Dining note: ${note}
+- Meal spend: ${amount}
+- Enjoy-most tags: ${enjoy}
+- Selected dishes: ${dishes}
+- Visit: ${context.visitFrequency || "none"} / ${context.customerType || "none"}
 ${locationHint}
 
-PRIORITY: KSP relevance > natural wording > content relevance > keyword diversity.
-First lock the strongest real KSP from customer evidence / dishes / photos / selected KSP. Then pick the 2 keywords that support that KSP. Do not pick keywords at random. Do not force a keyword that weakens the KSP.
+EXAMPLES (learn the method; do not copy unless the evidence matches):
+Dining note "第一次吃到可以自己DIY打抛饭，觉得很有趣，而且味道很像泰国家常菜"
+→ mainTitle 曼谷泰餐新体验 / subTitle DIY打抛饭很好玩
+"在centralwOrld逛街累了发现这家泰餐，环境很舒服，适合朋友聊天"
+→ mainTitle centralwOrld泰餐推荐 / subTitle 逛街后舒服聚餐
+"两个人吃了600泰铢，点了很多菜，份量很足"
+→ mainTitle 曼谷必吃泰餐 / subTitle 两人600泰铢很满足
 
-MAIN vs SUB must have different roles. Keywords are not the whole title. Subtitle must add KSP, not repeat the mainTitle formula.
-GOOD: 曼谷必吃 + 招牌泰式料理 (keywords 曼谷/必吃; subtitle carries KSP)
-GOOD: centralwOrld美食 + 招牌泰式料理 (keywords centralwOrld/美食)
-GOOD: 泰餐必吃 + 招牌冬阴功 (keywords 泰餐/必吃; real dish only if selected)
-BAD: 曼谷必吃泰餐 (3 keywords) / 曼谷必吃 + centralwOrld泰餐 (3+ keywords) / 曼谷必吃 + 曼谷美食 (repeat 曼谷) / same mainTitle every generation / keyword-only titles with no KSP.
+VALIDATE before return:
+1) mainTitle contains at least one pool keyword and is not keyword stuffing.
+2) subTitle is from this customer's actual input/context, has the strongest selling point, is not a generic restaurant line, does not repeat mainTitle, and does not copy the note verbatim.
+If mainTitle is missing a required keyword, rewrite mainTitle in this same JSON. Do not make a second request.
 
-STRUCTURES — rotate; do not copy these exact phrases:
-A Location+hook: centralwOrld美食 + 招牌泰式料理
-B Destination+recommend: 曼谷必吃 + 特色招牌料理
-C Cuisine+hook: 泰餐必吃 + 招牌冬阴功
-D Food+KSP: 曼谷美食 + 泰式招牌好味道
-E Location+food: centralwOrld泰餐 + 人气招牌料理
-Change word order, rhythm, and main/sub relationship across generations. Do not reuse the previous mainTitle, subTitle, keyword pair, or sentence formula unless the evidence truly requires it.
-
-KSP is required. Never invent dishes, 老字号, 全曼谷最好吃, 曼谷第一, 必须打卡, 全网第一, 最好吃, TOP 1.
-
-VALIDATE before return: mainTitle 4–7; subTitle 4–9; exactly 2 pool keywords; no keyword repeated; KSP present; different roles; natural Chinese; different from previous generation; no stuffing; no truncation.
-
-FORBIDDEN on cover except the allowed keyword 必吃: 第一 / 唯一 / 顶级 / 最强 / 最好吃 / 封神 / 全网第一 / 曼谷第一 / invented 泰国人爱吃 / 本地人爱吃 / 明星爱吃
-Never copy customer negatives onto mainTitle/subTitle: 贵 / 太贵 / 难吃 / 不好吃 / 踩雷 / 避雷 / 不推荐 / 不值得 / 失望 / 抽奖送东西 / 贵到吃不起 / 性价比低 / 很普通 / 没什么特别 / 服务不好 / 态度不好 / 不会回购.
-Never write 第一次美食冒险 / 美食冒险 / 味蕾冒险. First-visit mood on a cover can be 第一次尝试, not an adventure metaphor.
-If that information is relevant, keep the same meaning in neutral wording: 口味看个人喜好 / 整体风味比较经典 / 价格看个人预期 / 价格偏高 / 互动抽奖活动 / 曼谷特色泰餐 / centralwOrld美食. Do not invent praise.
-No hashtag, address, hours, emoji, Location & Time. Never invent a dish. Optional real selected dish only.`;
+FORBIDDEN except the allowed keyword 必吃: 第一 / 唯一 / 顶级 / 最强 / 最好吃 / 封神 / 全网第一 / 曼谷第一 / invented 泰国人爱吃 / 本地人爱吃 / 明星爱吃
+Never copy customer negatives onto the cover. Never write 第一次美食冒险. No hashtag, address, hours, emoji, Location & Time. Never invent a dish.`;
 }

@@ -54,7 +54,6 @@ import {
 import type { LocationTimeFormatId } from "@/lib/locations";
 import { formatGenerationCostLog, type GenerationCostReport } from "@/lib/openai-usage";
 import { createId } from "@/lib/id";
-import { saveSubmissionToServer } from "@/lib/save-submission-client";
 import { compressPhotoForGenerate, compressPhotosForGenerate, makePhotoThumbUrl } from "@/lib/compress-photo";
 import type { FlowStep } from "@/lib/flow";
 
@@ -63,6 +62,7 @@ const SERVER_DEFAULT = defaultPersisted();
 
 type PersistedFlow = {
   submissionId: string;
+  generationId: string;
   customer: CustomerInfo;
   productFeedback: ProductFeedback;
   photoCount: number;
@@ -125,6 +125,7 @@ function clearLegacyStorage(campaignId: string) {
 function defaultPersisted(): PersistedFlow {
   return {
     submissionId: "",
+    generationId: "",
     customer: emptyCustomerInfo,
     productFeedback: emptyProductFeedback,
     photoCount: 0,
@@ -304,32 +305,11 @@ export function CampaignFlowProvider({
   );
 
   const saveYouPage = useCallback(async () => {
-    const submissionId = ensureSubmissionId(campaignId);
-    const current = getFlowSnapshot(campaignId);
-    try {
-      await saveSubmissionToServer({
-        submissionId,
-        campaignId,
-        customer: current.customer,
-      });
-    } catch {
-      /* Saving to MongoDB should not block the customer flow. */
-    }
+    ensureSubmissionId(campaignId);
   }, [campaignId]);
 
   const saveFeelExpense = useCallback(async () => {
-    const submissionId = ensureSubmissionId(campaignId);
-    const current = getFlowSnapshot(campaignId);
-    try {
-      await saveSubmissionToServer({
-        submissionId,
-        campaignId,
-        customer: current.customer,
-        mealExpenseThb: current.productFeedback.totalMealExpense,
-      });
-    } catch {
-      /* Saving to MongoDB should not block the customer flow. */
-    }
+    ensureSubmissionId(campaignId);
   }, [campaignId]);
 
   const addPhotos = useCallback(
@@ -481,6 +461,8 @@ export function CampaignFlowProvider({
       dinerOrigin: current.customer.location.trim(),
       dinerAgeRange: current.customer.ageRange || "",
       dinerGender: current.customer.gender || "",
+      dinerCountryIso2: current.customer.countryIso2 || "",
+      dinerCountryCode: current.customer.countryCode || "",
       previousTitle: previousSelectedTitle,
       previousCaption: stripAllHashtagsFromCaption(previousCaption),
       previousTitles: previousTitles.length > 0 ? previousTitles : undefined,
@@ -501,6 +483,8 @@ export function CampaignFlowProvider({
       previousCoverTitle: [current.cover?.coverTitle || current.generated?.coverTitle, current.cover?.coverSubtitle || current.generated?.coverSubtitle]
         .filter((part) => Boolean(part?.trim()))
         .join(" / "),
+      campaignId,
+      submissionId: ensureSubmissionId(campaignId),
     });
 
     const form = new FormData();
@@ -518,12 +502,14 @@ export function CampaignFlowProvider({
       error?: string;
       locationFormat?: string;
       cost?: GenerationCostReport;
+      generationId?: string;
     };
     try {
       data = (await response.json()) as GeneratedContent & {
         error?: string;
         locationFormat?: string;
         cost?: GenerationCostReport;
+        generationId?: string;
       };
     } catch {
       if (response.status === 413) {
@@ -579,6 +565,11 @@ export function CampaignFlowProvider({
       variantIndex: current.variantIndex,
       kspId: data.selectedKspId || suggestedStrategy.kspId,
       contentAngleId: data.selectedContentAngleId || suggestedStrategy.contentAngleId,
+      diningNote: current.productFeedback.diningExperienceNote,
+      mealAmount: current.productFeedback.totalMealExpense,
+      enjoyMost: current.productFeedback.enjoyMost,
+      visitFrequency: current.productFeedback.visitFrequency,
+      customerType: current.productFeedback.customerType,
     };
     const overlay = layoutCoverOverlay(data.coverTitle ?? "", data.coverSubtitle ?? "", [
       data.titles[0],
@@ -649,7 +640,9 @@ export function CampaignFlowProvider({
     const storylineHistory = [...(current.storylineHistory ?? []), selectedStrategy.storylineId].slice(-8);
     const searchKeywordHistory = [...(current.searchKeywordHistory ?? []), selectedStrategy.searchKeyword].slice(-8);
     const coverTemplateHistory = [...(current.coverTemplateHistory ?? []), selectedTemplateId].slice(-9);
+    const generationId = data.generationId?.trim() || "";
     patchFlow(campaignId, {
+      generationId,
       generated: {
         ...nextGenerated,
         selectedKspId: selectedStrategy.kspId,

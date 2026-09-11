@@ -4,6 +4,8 @@ export async function saveSubmissionToServer(input: {
   submissionId: string;
   campaignId: string;
   customer?: Pick<CustomerInfo, "ageRange" | "gender" | "location" | "countryIso2" | "countryCode">;
+  customerType?: string;
+  visitFrequency?: string;
   mealExpenseThb?: number | null;
 }) {
   const response = await fetch("/api/submissions", {
@@ -21,6 +23,8 @@ export async function saveSubmissionToServer(input: {
             countryCode: input.customer.countryCode,
           }
         : undefined,
+      customerType: input.customerType,
+      visitFrequency: input.visitFrequency,
       mealExpenseThb: input.mealExpenseThb,
     }),
     keepalive: true,
