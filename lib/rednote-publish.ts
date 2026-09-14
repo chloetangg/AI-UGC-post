@@ -204,25 +204,47 @@ export function isMobileDevice() {
 }
 
 async function copyWithFallback(text: string) {
-  try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch {
+  const value = text.trim() ? text : "";
+  if (!value || typeof document === "undefined") return false;
+
+  if (typeof navigator !== "undefined" && typeof navigator.clipboard?.writeText === "function") {
     try {
-      const textarea = document.createElement("textarea");
-      textarea.value = text;
-      textarea.setAttribute("readonly", "");
-      textarea.style.position = "fixed";
-      textarea.style.left = "-9999px";
-      document.body.appendChild(textarea);
-      textarea.select();
-      const ok = document.execCommand("copy");
-      textarea.remove();
-      return ok;
+      await navigator.clipboard.writeText(value);
+      return true;
     } catch {
-      return false;
+      /* iOS / in-app browsers often block Clipboard API; fall through. */
     }
   }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = value;
+  textarea.contentEditable = "true";
+  textarea.style.position = "fixed";
+  textarea.style.top = "0";
+  textarea.style.left = "0";
+  textarea.style.width = "2em";
+  textarea.style.height = "2em";
+  textarea.style.padding = "0";
+  textarea.style.border = "none";
+  textarea.style.outline = "none";
+  textarea.style.boxShadow = "none";
+  textarea.style.background = "transparent";
+  textarea.style.opacity = "0.01";
+  textarea.style.zIndex = "-1";
+  textarea.style.webkitUserSelect = "text";
+  textarea.style.userSelect = "text";
+  document.body.appendChild(textarea);
+  textarea.focus();
+  textarea.select();
+  textarea.setSelectionRange(0, value.length);
+  let ok = false;
+  try {
+    ok = document.execCommand("copy");
+  } catch {
+    ok = false;
+  }
+  textarea.remove();
+  return ok;
 }
 
 export async function copyRednoteText(text: string) {

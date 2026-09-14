@@ -3,22 +3,24 @@
 import { useMemo, useState, useSyncExternalStore } from "react";
 import { Check, ChevronDown, ChevronUp } from "lucide-react";
 import { CopyButton } from "@/components/publish/CopyButton";
+import { DianpingManualPublish } from "@/components/publish/DianpingManualPublish";
 import { PostSlideshow } from "@/components/result/PostSlideshow";
 import { Button } from "@/components/ui/button";
 import { useT } from "@/components/providers/language-provider";
 import { interpolate, type Dictionary } from "@/lib/i18n";
 import type { FinalSlide } from "@/lib/cover/post-layout";
 import {
-  buildPublishText,
   canShareFiles,
   collectRednoteDownloads,
   copyPublishText,
+  formatRednotePasteText,
   isMobileDevice,
   openRednotePublish,
   type PublishStatus,
   type RednotePublishPackage,
 } from "@/lib/rednote-publish";
 import { downloadGeneratedImage, sharePost } from "@/lib/publish/share";
+import type { PublishPlatform } from "@/lib/publish/types";
 import { trackAnalyticsEvent } from "@/lib/analytics/track-client";
 import { cn } from "@/lib/utils";
 
@@ -32,12 +34,14 @@ export function PublishAssistant({
   const t = useT();
   const mobile = useSyncExternalStore(emptySubscribe, isMobileDevice, () => false);
   const fileShare = useSyncExternalStore(emptySubscribe, canShareFiles, () => false);
-  const pasteText = useMemo(() => buildPublishText(pkg), [pkg]);
+  const pasteText = useMemo(() => formatRednotePasteText(pkg), [pkg]);
   const downloads = useMemo(() => collectRednoteDownloads(pkg), [pkg]);
   const hashtagsLine = pkg.hashtags.join(" ");
 
+  const [screen, setScreen] = useState<"home" | "choose" | "dianping">("home");
   const [status, setStatus] = useState<PublishStatus>("idle");
   const [copyFailed, setCopyFailed] = useState(false);
+  const [copiedAll, setCopiedAll] = useState(false);
   const [showPaste, setShowPaste] = useState(false);
   const [showMore, setShowMore] = useState(false);
   const [openFailed, setOpenFailed] = useState(false);
@@ -51,9 +55,24 @@ export function PublishAssistant({
   async function copyAll() {
     const ok = await copyPublishText(pasteText);
     setCopyFailed(!ok);
-    if (ok) setStatus((current) => (current === "idle" ? "copied" : current));
-    if (!ok) setShowPaste(true);
-    return ok;
+    if (ok) {
+      setCopiedAll(true);
+      window.setTimeout(() => setCopiedAll(false), 1800);
+      setStatus((current) => (current === "idle" ? "copied" : current));
+      return true;
+    }
+    setShowPaste(true);
+    return false;
+  }
+
+  function trackPlatformSelected(platform: PublishPlatform) {
+    trackAnalyticsEvent({
+      eventType: "publish_platform_selected",
+      metadata: {
+        platform,
+        source: "share_page",
+      },
+    });
   }
 
   function trackWebShare() {
@@ -78,17 +97,16 @@ export function PublishAssistant({
     });
   }
 
-  async function handlePublish() {
+  async function handleXiaohongshu() {
     if (busy) return;
+    trackPlatformSelected("xiaohongshu");
     setBusy(true);
     setOpenFailed(false);
     setFilesPartial(false);
-    setCopyFailed(false);
     setStatus("preparing");
 
     try {
       const published = await sharePost(pkg);
-      setCopyFailed(!published.copied);
       setFilesPartial(published.filesPartial);
 
       if (published.outcome === "shared") {
@@ -109,6 +127,11 @@ export function PublishAssistant({
       setStatus("files-partial");
     }
     setBusy(false);
+  }
+
+  function handleDianping() {
+    trackPlatformSelected("dianping");
+    setScreen("dianping");
   }
 
   async function saveImages() {
@@ -133,17 +156,23 @@ export function PublishAssistant({
     setBusy(false);
   }
 
+  if (screen === "dianping") {
+    return <DianpingManualPublish pkg={pkg} onBack={() => setScreen("choose")} />;
+  }
+
   return (
     <div className="flex flex-1 flex-col">
       <div className="flex-1 space-y-4 pb-4">
       <div className="space-y-2">
         <h1 className="font-display text-[1.85rem] leading-tight tracking-tight text-foreground">
-          {t.publish.title}
+          {screen === "choose" ? t.publish.choosePlatform : t.publish.title}
         </h1>
         <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-muted-foreground">
-          {status === "idle"
+          {screen === "choose"
             ? t.publish.subtitle
-            : statusMessage(status, openFailed, t)}
+            : status === "idle"
+              ? t.publish.subtitle
+              : statusMessage(status, openFailed, t)}
         </p>
       </div>
 
@@ -174,6 +203,24 @@ export function PublishAssistant({
           />
         </ul>
       </section>
+
+      {screen === "choose" ? (
+        <section className="space-y-3">
+          <Button className="h-auto w-full flex-col items-start gap-1 px-5 py-4" disabled={busy} onClick={() => void handleXiaohongshu()}>
+            <span className="text-base">{t.publish.platforms.xiaohongshu}</span>
+            <span className="text-sm font-normal text-primary-foreground/80">{t.publish.dianpingGuide.chooseXhs}</span>
+          </Button>
+          <Button
+            className="h-auto w-full flex-col items-start gap-1 px-5 py-4"
+            variant="outline"
+            disabled={busy}
+            onClick={handleDianping}
+          >
+            <span className="text-base">{t.publish.platforms.dianping}</span>
+            <span className="text-sm font-normal text-muted-foreground">{t.publish.dianpingGuide.chooseDp}</span>
+          </Button>
+        </section>
+      ) : null}
 
       {status === "shared" && fileShare ? (
         <section className="rounded-3xl border border-border bg-card p-4 shadow-sm">
@@ -212,30 +259,34 @@ export function PublishAssistant({
         </section>
       ) : null}
 
-      <Button className="w-full" variant="outline" onClick={() => void copyAll()}>
-        {t.publish.copyAll}
-      </Button>
-      {showSaveImages ? (
+      {screen === "home" ? (
+        <Button className="w-full" variant="outline" onClick={() => void copyAll()}>
+          {copiedAll ? t.common.copied : t.publish.copyAll}
+        </Button>
+      ) : null}
+      {screen === "home" && showSaveImages ? (
         <Button className="w-full" variant="outline" disabled={saving} onClick={() => void saveImages()}>
           {t.publish.saveImage}
         </Button>
       ) : null}
-      {mobile && (status === "fallback" || status === "files-partial") ? (
+      {mobile && screen !== "choose" && (status === "fallback" || status === "files-partial") ? (
         <Button className="w-full" variant="outline" disabled={busy} onClick={() => void openRednote()}>
           {t.publish.openXiaohongshu}
         </Button>
       ) : null}
 
-      <button
-        type="button"
-        className="flex w-full items-center justify-between gap-1 pt-1 text-xs font-semibold text-muted-foreground"
-        onClick={() => setShowMore((open) => !open)}
-      >
-        {t.publish.moreActions}
-        {showMore ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
-      </button>
+      {screen === "home" ? (
+        <button
+          type="button"
+          className="flex w-full items-center justify-between gap-1 pt-1 text-xs font-semibold text-muted-foreground"
+          onClick={() => setShowMore((open) => !open)}
+        >
+          {t.publish.moreActions}
+          {showMore ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
+        </button>
+      ) : null}
 
-      {showMore ? (
+      {screen === "home" && showMore ? (
         <div className="space-y-3">
           <PreviewBlock label={t.publish.titleLabel} copyLabel={t.publish.copyTitle} value={pkg.title} />
           <PreviewBlock label={t.publish.captionLabel} copyLabel={t.publish.copyCaption} value={pkg.caption} />
@@ -252,9 +303,15 @@ export function PublishAssistant({
       </div>
 
       <div className="sticky bottom-0 z-10 -mx-5 mt-auto bg-gradient-to-t from-background via-background/95 to-transparent px-5 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-        <Button className="w-full" disabled={busy} onClick={() => void handlePublish()}>
-          {t.publish.primaryCta}
-        </Button>
+        {screen === "home" ? (
+          <Button className="w-full" disabled={busy} onClick={() => setScreen("choose")}>
+            {t.publish.primaryCta}
+          </Button>
+        ) : (
+          <Button className="w-full" variant="outline" disabled={busy} onClick={() => setScreen("home")}>
+            {t.publish.closeSelector}
+          </Button>
+        )}
       </div>
     </div>
   );

@@ -11,6 +11,7 @@ export const ANALYTICS_EVENT_TYPES = [
   "generation_complete",
   "xhs_publish_click",
   "publish_click",
+  "publish_platform_selected",
 ] as const;
 
 export type AnalyticsEventType = (typeof ANALYTICS_EVENT_TYPES)[number];

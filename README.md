@@ -25,7 +25,7 @@
 3. PHOTOS：上传 1–5 张照片
 4. Generating：一次 OpenAI 请求写出标题 + 正文 + 5 个标签 + 封面 mainTitle / subTitle + 封面照片选择；系统追加 Location & Time，再调用 Cover Composer 自动生成封面
 5. POST：看封面、换封面模板（Template 1–10）、选正文标题、改正文、改动态标签
-6. SHARE：点「去发布」后打开手机系统分享，由用户自己选择小红书 / 大众点评或其他 App
+6. SHARE：点「去发布」后选择小红书（系统分享发图）或大众点评（复制文案后手动发布）
 
 生成目标口吻：
 
@@ -611,8 +611,9 @@ Cover Composer 失败时：「Cover generation failed」+ Retry Cover（只重�
 | `qr_scan` | `GET /qr/:qrCodeId` | 每次扫码一条 |
 | `form_submit` | 现有 `POST /api/generate` 真正发出时 | 每 session 一次 |
 | `generation_complete` | 现有 `/api/generate` 成功返回前 | 每 session 一次 |
-| `publish_click` | SHARE 点「去发布」后：系统分享成功，或用户手动打开小红书且确认 App 被打开 | 每 session + platform 一次。系统分享：`platform=unknown`，`method=web_share`（不知道用户选了哪个 App，不记成小红书/大众点评）。Deep Link：仅 `xhsdiscover://post` 且页面切到后台时 `platform=xiaohongshu`，`method=deep_link`。取消分享不记。`source=share_page` |
-| `xhs_publish_click` | 旧版 SHARE 点 Publish to Rednote | 历史数据保留读取。新的系统分享成功**不**再记此事件（用户可能选了大众点评或微信）。看板 XHS 数 = 旧事件 + `publish_click` 且 platform 为 rednote/xiaohongshu |
+| `publish_click` | 小红书系统分享成功，或确认打开 `xhsdiscover://post` | 每 session + platform 一次。系统分享：`platform=unknown`，`method=web_share`。Deep Link：`platform=xiaohongshu`，`method=deep_link`。取消不记 |
+| `publish_platform_selected` | SHARE 选择小红书或大众点评 | 每 session + platform 一次。大众点评只记选择，不记「已发布」 |
+| `xhs_publish_click` | 旧版 SHARE 点 Publish to Rednote | 历史数据保留读取。新的系统分享成功**不**再记此事件。看板 XHS 数 = 旧事件 + `publish_click` 且 platform 为 rednote/xiaohongshu |
 
 扫码后自动跳到 `/c/baan-ying/customer`（YOU 页）。也可以把 `https://aiugcpost.vercel.app/c/baan-ying/customer?qr=baan-ying` 直接印成码。访客 cookie：`ugc_sid`（httpOnly session）、`ugc_qr`（来源码）。不存 IP、姓名、电话、邮箱。
 
@@ -789,12 +790,12 @@ Version 1 和 Version 6 使用单换行，行与行之间没有空行。
 
 - 标题：**你的帖子已经准备好了** / `Your post is ready` / `โพสต์ของคุณพร้อมแล้ว`
 - 主按钮：**去发布** / `Publish` / `ไปโพสต์`
-- 点主按钮后**不再出现网页平台选择框**。手机上把已生成封面 + 用户照片转成 `File[]`（封面永远第一张），复制文案，再调用 `navigator.share({ files, text, title })`，由系统分享面板让用户自己选小红书 / 大众点评 / 微信等
-- `title` 只是 Web Share 元数据，不保证第三方 App 会填进标题框
-- 系统分享不可用时：提示手机发布体验更好，提供「复制全部文案」「保存全部图片」；小红书 fallback 可点「打开小红书」走 `xhsdiscover://post`（URL 不带图、不加参数）。不打开 `dianping.com`，也不在主流程调用 `dianping://home`
-- 电脑：不假装手机系统分享，提示用手机打开，并提供复制文案 / 保存图片
-- 成功文案是「已打开分享」，取消是「已取消发布」，**不显示「发布成功」**（网站不知道用户有没有在第三方 App 里点发布）
-- `publish_click`：系统分享成功记 `platform=unknown` + `method=web_share`；不把 Web Share 成功记成小红书或大众点评。取消不记。`xhs_publish_click` 保留读取，但 Web Share 成功不再写入
+- 点主按钮后选择 **小红书** 或 **大众点评**
+- **小红书：** 把已生成封面 + 用户照片转成 `File[]`（封面永远第一张），调用 `navigator.share({ files })`，由系统分享面板发图。文案需用户自己点「复制全部文案」
+- **大众点评：** 不走 `navigator.share()`，也不使用未经确认的 Dianping Deep Link。进入手动发布说明页：复制文案 → 保存图片 → 打开大众点评 App → 按步骤粘贴发布。不显示「发布成功」
+- 系统分享不可用时，小红书 fallback 可点「打开小红书」走 `xhsdiscover://post`（URL 不带图、不加参数）
+- `publish_platform_selected`：点选小红书或大众点评时写入，`platform` 为对应平台。不记 `dianping_published`
+- `publish_click`：小红书系统分享成功记 `platform=unknown` + `method=web_share`。取消不记
 - 发布不会调用 OpenAI / `/api/generate`，也不会上传图片
 
 ---
@@ -806,7 +807,8 @@ Version 1 和 Version 6 使用单换行，行与行之间没有空行。
 | `lib/i18n.ts` | UI 文案（EN / 中文 / ไทย）、隐私政策、Rednote / 小红书 / เสี่ยวหงชู 用词；Origins 占位 `Where are you from?` / `你来自哪里？` / `คุณมาจากประเทศไหน?` |
 | `lib/publish/types.ts` | `SharePostResult` / `PublishMethod` |
 | `lib/publish/share.ts` | `sharePost`、`downloadGeneratedImage`、`fallbackPublish` |
-| `components/publish/PublishAssistant.tsx` | SHARE 页：去发布 → 系统分享 |
+| `components/publish/PublishAssistant.tsx` | SHARE 页：去发布 → 选小红书或大众点评 |
+| `components/publish/DianpingManualPublish.tsx` | 大众点评手动发布说明：复制文案、保存图片 |
 | `lib/rednote-publish.ts` | `urlToFile`、`buildPublishFiles`、`buildPublishText`、`canShareFiles`、`xhsdiscover://post` fallback |
 | `components/campaign/LanguageSwitch.tsx` | 右上角 EN \| 中文 \| ไทย |
 | `types/customer.ts` | 客户资料类型（年龄 / 性别 / 国家；name / email / phone / consent 仍空置保留） |

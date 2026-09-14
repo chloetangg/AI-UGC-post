@@ -7,7 +7,7 @@ export const PUBLISH_PLATFORM_CONFIG: Record<
   {
     id: PublishPlatform;
     analyticsPlatform: "xiaohongshu" | "dianping";
-    canPassImagesViaShare: true;
+    canPassImagesViaShare: boolean;
     hasPublishDeepLink: boolean;
   }
 > = {
@@ -20,7 +20,7 @@ export const PUBLISH_PLATFORM_CONFIG: Record<
   dianping: {
     id: "dianping",
     analyticsPlatform: "dianping",
-    canPassImagesViaShare: true,
+    canPassImagesViaShare: false,
     hasPublishDeepLink: false,
   },
 };

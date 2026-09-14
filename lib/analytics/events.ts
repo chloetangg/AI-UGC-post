@@ -33,6 +33,10 @@ export function analyticsEventId(
     const key = platform?.trim() || "unknown";
     return `publish_click:${key}:${sessionId}`;
   }
+  if (eventType === "publish_platform_selected") {
+    const key = platform?.trim() || "unknown";
+    return `publish_platform_selected:${key}:${sessionId}`;
+  }
   if (ONCE_PER_SESSION.includes(eventType)) return `${eventType}:${sessionId}`;
   return `${eventType}:${sessionId}:${Date.now()}:${randomUUID()}`;
 }
