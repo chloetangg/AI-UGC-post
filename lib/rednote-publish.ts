@@ -123,6 +123,11 @@ export function formatRednotePasteText(pkg: Pick<RednotePublishPackage, "title" 
   return joinBlocks([pkg.title, pkg.caption, pkg.hashtags.filter(Boolean).join(" ")]);
 }
 
+/** Dianping paste: generated caption only. No title, no hashtags. */
+export function formatDianpingPasteText(pkg: Pick<RednotePublishPackage, "caption">) {
+  return pkg.caption.trim();
+}
+
 /**
  * Normalize the POST-page draft for publishing.
  * Local only — no OpenAI, no Cover Composer.

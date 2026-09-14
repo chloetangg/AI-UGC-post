@@ -242,7 +242,7 @@ Learn: start from a personal moment, not always the restaurant name; 我去吃�
 
 const MALL_MENTION_RULES = `Do NOT write Location & Time, 📍/⏰ blocks, mall floors as an address block, or opening hours. The system appends a locked Location & Time template after your caption.
 If you casually mention a shopping area in the story, use only these locked names:
-- centralwOrld → 尚泰世界购物中心（centralwOrld）3楼. Never CentralWorld / Central World / 尚泰世界 without 购物中心.
+- centralwOrld → 尚泰世界购物中心（centralwOrld）3楼. The ONLY approved Chinese name is 尚泰世界购物中心. Never CentralWorld / Central World / 中央世界 / 中央世界购物中心 / 尚泰中央世界 / 尚泰世界中心 / 尚泰世界 without 购物中心.
 - Siam Center → 暹罗中心（Siam Center）2楼
 - Terminal 21 stays English. Never 终端21 / 终点21 / Terminal 21购物中心
 - One Bangkok stays English. Never invent a Chinese name.

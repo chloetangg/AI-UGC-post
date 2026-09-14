@@ -8,7 +8,7 @@ import { interpolate } from "@/lib/i18n";
 import {
   collectRednoteDownloads,
   copyPublishText,
-  formatRednotePasteText,
+  formatDianpingPasteText,
   isMobileDevice,
   type RednotePublishPackage,
 } from "@/lib/rednote-publish";
@@ -24,7 +24,7 @@ export function DianpingManualPublish({
   const t = useT();
   const g = t.publish.dianpingGuide;
   const mobile = useSyncExternalStore(emptySubscribe, isMobileDevice, () => false);
-  const pasteText = useMemo(() => formatRednotePasteText(pkg), [pkg]);
+  const pasteText = useMemo(() => formatDianpingPasteText(pkg), [pkg]);
   const images = useMemo(() => collectRednoteDownloads(pkg), [pkg]);
 
   const [copied, setCopied] = useState(false);
@@ -91,8 +91,8 @@ export function DianpingManualPublish({
             {g.stepsTitle}
           </h2>
           <ol className="space-y-4">
-            <GuideStep title={g.step1Title} body={g.step1Body} />
-            <GuideStep title={g.step2Title} body={`${g.step2Body}\n${g.step2Order}`} />
+            <GuideStep title={g.step1Title} />
+            <GuideStep title={g.step2Title} />
             <GuideStep title={g.step4Title} body={`${g.step4Path}\n${g.step4Body}`} />
           </ol>
         </section>
@@ -176,11 +176,13 @@ export function DianpingManualPublish({
   );
 }
 
-function GuideStep({ title, body }: { title: string; body: string }) {
+function GuideStep({ title, body }: { title: string; body?: string }) {
   return (
     <li className="space-y-1">
       <p className="text-sm font-semibold text-foreground">{title}</p>
-      <p className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">{body}</p>
+      {body ? (
+        <p className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">{body}</p>
+      ) : null}
     </li>
   );
 }

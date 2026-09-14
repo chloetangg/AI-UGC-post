@@ -5,7 +5,7 @@ import {
   type GenerateContentResponse,
 } from "@/lib/generate-content/types";
 import { finalizeGeneratedHashtags, stripAllHashtagsFromCaption } from "@/lib/hashtags";
-import { resolveDiningBranch } from "@/lib/locations";
+import { resolveDiningBranch, sanitizeOfficialMallNames } from "@/lib/locations";
 
 export class GenerateContentError extends Error {
   constructor(
@@ -124,8 +124,10 @@ export function parseGenerateContentResponse(raw: unknown): GenerateContentRespo
     throw new GenerateContentError("invalid_ai_response", "AI response was not a JSON object", 502);
   }
 
-  const titles = asTitleList(body.titles);
-  const caption = stripAllHashtagsFromCaption(asTrimmedString(body.body ?? body.caption));
+  const titles = asTitleList(body.titles).map(sanitizeOfficialMallNames);
+  const caption = sanitizeOfficialMallNames(
+    stripAllHashtagsFromCaption(asTrimmedString(body.body ?? body.caption)),
+  );
   const hashtags = asStringArray(body.hashtags);
 
   if (titles.length < 3 || !caption) {

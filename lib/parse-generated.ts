@@ -6,6 +6,7 @@ import {
   parseRemainingPhotoIndexes,
 } from "@/lib/cover/post-layout";
 import { normalizeHashtags, stripAllHashtagsFromCaption } from "@/lib/hashtags";
+import { sanitizeOfficialMallNames } from "@/lib/locations";
 import { stripHashtagsFromTitle } from "@/lib/title-keywords";
 import type { GeneratedContent } from "@/types/content";
 
@@ -59,8 +60,12 @@ function parsePhotoIndexes(value: unknown, primary: number, photoCount: number) 
 }
 
 function asCoverOverlay(parsed: RawGenerated, postTitles: string[], context: CoverTitleContext = {}) {
-  const direct = rewriteFirstVisitWording(String(parsed.mainTitle ?? parsed.coverTitle ?? ""));
-  const subtitle = rewriteFirstVisitWording(String(parsed.subTitle ?? parsed.coverSubtitle ?? ""));
+  const direct = sanitizeOfficialMallNames(
+    rewriteFirstVisitWording(String(parsed.mainTitle ?? parsed.coverTitle ?? "")),
+  );
+  const subtitle = sanitizeOfficialMallNames(
+    rewriteFirstVisitWording(String(parsed.subTitle ?? parsed.coverSubtitle ?? "")),
+  );
   const source = direct.trim()
     ? direct
     : (asStringArray(parsed.coverTitles).find(Boolean) ?? "");
@@ -77,9 +82,12 @@ export function parseGeneratedContent(
   const parsed = JSON.parse(cleaned) as RawGenerated;
   const titles = asStringArray(parsed.titles)
     .map(stripHashtagsFromTitle)
-    .map(rewriteFirstVisitWording);
-  const caption = rewriteFirstVisitWording(
-    stripAllHashtagsFromCaption(String(parsed.caption ?? "").trim()),
+    .map(rewriteFirstVisitWording)
+    .map(sanitizeOfficialMallNames);
+  const caption = sanitizeOfficialMallNames(
+    rewriteFirstVisitWording(
+      stripAllHashtagsFromCaption(String(parsed.caption ?? "").trim()),
+    ),
   );
 
   if (titles.length < 3 || !caption) {

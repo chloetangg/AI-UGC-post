@@ -127,6 +127,8 @@ No Chinese name provided ≠ permission to translate.
 
 ONLY these Chinese mall names are approved (from fixed location data):
 - centralwOrld → 尚泰世界购物中心. Write 尚泰世界购物中心（centralwOrld）3楼
+  The ONLY approved Chinese name is 尚泰世界购物中心. Never invent another one.
+  PROHIBITED: 中央世界, 中央世界购物中心, 尚泰中央世界, 尚泰世界 (without 购物中心), 尚泰世界中心, or any other translation.
 - Siam Center → 暹罗中心. Write 暹罗中心（Siam Center）2楼
 
 For every other mall, if no Chinese name is explicitly provided: English mall name ONLY. Do not write any Chinese mall name.
@@ -149,7 +151,7 @@ export function locationFactsForPrompt() {
   const ob = OFFICIAL_LOCATIONS.onebangkok;
   return {
     chineseNameRules: STRICT_MALL_CHINESE_NAME_RULES,
-    branchRules: `- ${cw.englishName}: English MUST be spelled exactly "${cw.englishName}" (capital O only). Approved Chinese name: ${cw.chineseName}. Floor: ${cw.floorZh} / ${cw.floorEn}. In Chinese write ${cw.officialLine}. NEVER write CentralWorld, Central World, CENTRALWORLD, centralworld, or 尚泰世界 without 购物中心.
+    branchRules: `- ${cw.englishName}: English MUST be spelled exactly "${cw.englishName}" (capital O only). Approved Chinese name: ${cw.chineseName} ONLY. Floor: ${cw.floorZh} / ${cw.floorEn}. In Chinese write ${cw.officialLine}. NEVER write CentralWorld, Central World, CENTRALWORLD, centralworld, 中央世界, 中央世界购物中心, 尚泰中央世界, 尚泰世界中心, or 尚泰世界 without 购物中心.
 - ${siam.englishName}: English "${siam.englishName}". Approved Chinese name: ${siam.chineseName}. Floor: ${siam.floorZh} / ${siam.floorEn}. In Chinese write ${siam.officialLine}.
 - ${t21.englishName}: English "${t21.englishName}" only. chineseName is null — NO Chinese name provided. Floor: ${t21.floorZh} / ${t21.floorEn}. MUST write ${t21.officialLine}. NEVER 终端21 / 终点21 / Terminal 21购物中心 / any translation.
 - ${ob.englishName}: English "${ob.englishName}" only. chineseName is null — NO Chinese name provided. Floor: ${ob.floorZh} / ${ob.floorEn}. MUST write ${ob.officialLine}. NEVER invent a Chinese translation.`,
@@ -202,11 +204,39 @@ const FORBIDDEN_LOCATION_REWRITES = [
   "Centralworld",
   "Central World",
   "CENTRALWORLD",
+  "中央世界",
+  "尚泰中央世界",
+  "尚泰世界中心",
   "终端21",
   "终点21",
   "Terminal 21 Bangkok",
   "One Bangkok 曼谷",
 ] as const;
+
+const INVENTED_CENTRALWORLD_ZH = [
+  "尚泰中央世界购物中心",
+  "中央世界购物中心",
+  "中环世界购物中心",
+  "尚泰中央世界",
+  "中央世界广场",
+  "尚泰世界中心",
+  "中环世界",
+  "中央世界",
+] as const;
+
+/** Replace invented Chinese names for centralwOrld with 尚泰世界购物中心. */
+export function sanitizeOfficialMallNames(text: string) {
+  if (!text) return text;
+  const official = OFFICIAL_LOCATIONS.centralworld.chineseName;
+  if (!official) return text;
+  let next = text;
+  const invented = [...INVENTED_CENTRALWORLD_ZH].sort((a, b) => b.length - a.length);
+  for (const name of invented) {
+    next = next.split(name).join(official);
+  }
+  next = next.replace(/尚泰世界(?!购物中心)/g, official);
+  return next;
+}
 
 const ONE_BANGKOK_HOURS = "周一至周六 10:30–21:30｜周日 10:30–21:00";
 
@@ -412,7 +442,7 @@ export function attachOfficialLocationTime(
   previous: LocationTimeFormatId | "" = "",
   recent: LocationTimeFormatId[] = [],
 ) {
-  const story = stripGeneratedLocationTime(caption).trim();
+  const story = sanitizeOfficialMallNames(stripGeneratedLocationTime(caption)).trim();
   const locationLine = captionLocationLine(branch);
   const hoursDisplay = captionHoursForBranch(branch);
   const hasHours = Boolean(hoursDisplay);

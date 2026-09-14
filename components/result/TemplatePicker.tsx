@@ -13,13 +13,13 @@ export function TemplatePicker({
   disabled?: boolean;
   onSelect: (templateId: string) => void;
 }) {
-  const { language, t } = useLanguage();
+  const { t } = useLanguage();
 
   return (
     <section className="space-y-3">
       <h2 className="text-base font-semibold">{t.result.templateLabel}</h2>
       <div className="flex flex-wrap gap-2">
-        {COVER_TEMPLATE_OPTIONS.map((option) => {
+        {COVER_TEMPLATE_OPTIONS.map((option, index) => {
           const selected = option.id === selectedId;
           return (
             <button
@@ -35,7 +35,7 @@ export function TemplatePicker({
                 disabled && "opacity-50",
               )}
             >
-              {option[language]}
+              {`${t.result.templateLabel} ${index + 1}`}
             </button>
           );
         })}
