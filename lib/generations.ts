@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { getDb } from "@/lib/mongodb";
+import { persistGeneration } from "@/lib/analytics/persist";
 import type { GenerationCostReport } from "@/lib/openai-usage";
 import type { SavedCustomerInfo } from "@/lib/submissions";
 
@@ -9,7 +10,15 @@ export type GenerationDocument = {
   generationId: string;
   createdAt: Date;
   campaignId: string;
+  brandId: string;
   submissionId: string;
+  sessionId?: string;
+  branch?: string;
+  kspId?: string;
+  storylineId?: string;
+  contentAngleId?: string;
+  status: "success" | "failed";
+  durationMs?: number;
   customer: SavedCustomerInfo;
   customerType: string;
   visitFrequency: string;
@@ -19,6 +28,12 @@ export type GenerationDocument = {
   hashtags: [string, string, string, string, string];
   coverTitle: string;
   coverSubtitle: string;
+  enjoyMost?: string[];
+  recommendedDishes?: string[];
+  recommendedDishOther?: string;
+  recommendTo?: string[];
+  diningExperienceNote?: string;
+  searchKeyword?: string;
   aiUsage: {
     model: string;
     inputTokens: number;
@@ -26,12 +41,24 @@ export type GenerationDocument = {
     totalTokens: number;
     cost: number;
   };
+  businessMetrics?: {
+    revenueModel: string;
+    revenueRate: number | null;
+    estimatedRevenue: number;
+  };
 };
 
 export type InsertGenerationInput = {
   generationId?: string;
   campaignId?: string;
+  brandId?: string;
   submissionId?: string;
+  sessionId?: string;
+  branch?: string;
+  kspId?: string;
+  storylineId?: string;
+  contentAngleId?: string;
+  durationMs?: number;
   customer?: Partial<SavedCustomerInfo>;
   customerType?: string;
   visitFrequency?: string;
@@ -41,8 +68,19 @@ export type InsertGenerationInput = {
   hashtags: [string, string, string, string, string] | string[];
   coverTitle: string;
   coverSubtitle: string;
+  enjoyMost?: string[];
+  recommendedDishes?: string[];
+  recommendedDishOther?: string;
+  recommendTo?: string[];
+  diningExperienceNote?: string;
+  searchKeyword?: string;
   cost: GenerationCostReport;
 };
+
+function asList(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return value.map((item) => String(item).trim()).filter(Boolean);
+}
 
 function asTriple(titles: string[]): [string, string, string] {
   return [titles[0] ?? "", titles[1] ?? "", titles[2] ?? ""];
@@ -68,7 +106,15 @@ export async function insertGeneration(input: InsertGenerationInput) {
     generationId: input.generationId?.trim() || randomUUID(),
     createdAt: new Date(),
     campaignId: input.campaignId?.trim() || "baan-ying",
+    brandId: input.brandId?.trim() || "baan-ying",
     submissionId: input.submissionId?.trim() || "",
+    sessionId: input.sessionId?.trim() || "",
+    branch: input.branch?.trim() || "",
+    kspId: input.kspId?.trim() || "",
+    storylineId: input.storylineId?.trim() || "",
+    contentAngleId: input.contentAngleId?.trim() || "",
+    status: "success",
+    durationMs: input.durationMs,
     customer: {
       ageRange: input.customer?.ageRange?.trim() || "",
       gender: input.customer?.gender?.trim() || "",
@@ -84,6 +130,12 @@ export async function insertGeneration(input: InsertGenerationInput) {
     hashtags: asFive(input.hashtags),
     coverTitle: input.coverTitle.trim(),
     coverSubtitle: input.coverSubtitle.trim(),
+    enjoyMost: asList(input.enjoyMost),
+    recommendedDishes: asList(input.recommendedDishes),
+    recommendedDishOther: input.recommendedDishOther?.trim() || "",
+    recommendTo: asList(input.recommendTo),
+    diningExperienceNote: input.diningExperienceNote?.trim() || "",
+    searchKeyword: input.searchKeyword?.trim() || "",
     aiUsage: {
       model: input.cost.model || "unknown",
       inputTokens: input.cost.inputTokens,
@@ -94,5 +146,10 @@ export async function insertGeneration(input: InsertGenerationInput) {
   };
 
   await db.collection(GENERATIONS_COLLECTION).insertOne(document);
+  void persistGeneration({
+    brandId: document.brandId,
+    createdAt: document.createdAt,
+    document,
+  });
   return document.generationId;
 }

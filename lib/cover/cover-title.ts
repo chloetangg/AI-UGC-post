@@ -51,7 +51,7 @@ export const FALLBACK_COVER_PAIRS = [
   { title: "必吃泰式料理", subtitle: "味道很像泰式家常菜" },
   { title: "曼谷美食发现", subtitle: "这几道菜让人想再点" },
   { title: "曼谷泰餐新体验", subtitle: "第一次来尝试Baan Ying" },
-  { title: "centralwOrld泰餐推荐", subtitle: "逛街后舒服聚餐" },
+  { title: "centralwOrld泰餐推荐", subtitle: "逛街后的舒服泰式聚餐地" },
   { title: "centralwOrld必吃美食", subtitle: "环境舒服适合慢慢聊" },
 ] as const;
 
@@ -211,7 +211,7 @@ export function splitCoverTitleSemantically(title: string, subtitle = "") {
   const first = prepareCoverLine(title);
   const second = prepareCoverLine(subtitle);
   if (second) return { title: first, subtitle: second };
-  const split = splitTitleIntoLines(first, { oneLineMax: MAX_MAIN_TITLE_CHARS });
+  const split = splitTitleIntoLines(first, { oneLineMax: PREFERRED_MAIN_TITLE_CHARS });
   return { title: split.line1, subtitle: split.line2 };
 }
 

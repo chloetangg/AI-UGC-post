@@ -35,7 +35,7 @@ export function TemplatePicker({
                 disabled && "opacity-50",
               )}
             >
-              {language === "zh" ? option.zh : option.en}
+              {option[language]}
             </button>
           );
         })}

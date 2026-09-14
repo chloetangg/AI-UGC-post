@@ -18,12 +18,12 @@ export const COVER_MANDATORY_KEYWORDS = [
   ...COVER_LOCATION_KEYWORDS,
 ] as const;
 
-/** Latin mall names count as 1 Chinese-character-equivalent unit each. */
+/** Latin mall names count as compact CJK-equivalent units, not 1 unit per letter. */
 export const COVER_LOCATION_UNITS: Record<(typeof COVER_LOCATION_KEYWORDS)[number], number> = {
-  centralwOrld: 1,
-  "Terminal 21": 1,
-  "Siam Center": 1,
-  "One Bangkok": 1,
+  centralwOrld: 4,
+  "Terminal 21": 4,
+  "Siam Center": 4,
+  "One Bangkok": 4,
 };
 
 const LOCATION_ALIASES: Array<{ canonical: (typeof COVER_LOCATION_KEYWORDS)[number]; pattern: RegExp }> = [
@@ -72,11 +72,11 @@ const KSP_MARKERS = [
 ] as const;
 
 const DISH_SUBTITLES: Array<{ match: RegExp; subtitle: string }> = [
-  { match: /yellow curry|咖喱蟹|黄咖喱/i, subtitle: "招牌黄咖喱蟹" },
-  { match: /tom yum|冬阴功/i, subtitle: "必吃招牌冬阴功" },
+  { match: /yellow curry|咖喱蟹|黄咖喱/i, subtitle: "必点招牌咖喱蟹" },
+  { match: /tom yum|冬阴功/i, subtitle: "必点冬阴功虾汤" },
   { match: /sweet\s*&\s*sour|酸甜.*鱼|蒸鱼/i, subtitle: "招牌酸甜蒸鱼" },
   { match: /garlic|蒜蓉|炒虾/i, subtitle: "必点蒜蓉炒虾" },
-  { match: /mango|芒果糯米/i, subtitle: "必点芒果糯米饭" },
+  { match: /mango|芒果糯米/i, subtitle: "必点芒果糯米" },
 ];
 
 export type CoverTitleContext = {
@@ -151,7 +151,7 @@ export function coverKeywordPairKey(mainTitle: string, subTitle = "") {
 
 /**
  * Chinese-character-equivalent units for cover length rules.
- * Han = 1. Approved Latin mall names such as centralwOrld = 1. Other Latin/digits = 0.5, rounded up.
+ * Han = 1. Approved Latin mall names = 4. Other Latin/digits = 0.5, rounded up.
  */
 export function countCoverUnits(text: string) {
   let remaining = normalizeCoverLocations(sanitizeCoverLine(text));
@@ -265,7 +265,7 @@ export function subtitleFromCoverContext(context: CoverTitleContext = {}) {
   if (dish) return dish;
   const amount = context.mealAmount;
   if (typeof amount === "number" && Number.isFinite(amount) && amount > 0) {
-    return `这餐${Math.round(amount)}泰铢很满足`;
+    return `这餐${Math.round(amount)}泰铢吃得满足`;
   }
   if (/1st time|first/i.test(context.visitFrequency ?? "")) {
     return "第一次来尝试Baan Ying";
@@ -318,17 +318,17 @@ COVER TITLE (mainTitle)
 Must naturally include AT LEAST ONE keyword from: 曼谷 / centralwOrld / 泰餐 / 美食 / 必吃
 Pick the ONE keyword that best matches this post. Two keywords are allowed if they still read as a headline. Never stuff 3+ pool keywords plus 推荐 into a keyword list.
 Do NOT force every keyword into one title.
-GOOD: 曼谷隐藏泰餐 / centralwOrld泰餐推荐 / 曼谷泰餐推荐 / 必吃泰式料理 / 曼谷美食发现 / 曼谷泰餐新体验
-BAD: 曼谷centralwOrld泰餐美食必吃推荐 / 曼谷最好吃centralwOrld泰餐美食 / centralwOrld必吃
+GOOD: 曼谷隐藏泰餐 / centralwOrld必吃美食 / 曼谷泰餐推荐 / 必吃泰式料理 / 曼谷美食发现 / 曼谷泰餐新体验
+BAD: 曼谷centralwOrld泰餐美食必吃推荐 / 曼谷最好吃centralwOrld泰餐美食
 Style: short, eye-catching Xiaohongshu cover headline. Curiosity and click-through. Communicate what is special, why to click, and the strongest angle. Not a search-keyword list.
-Length: 4–7 Chinese-character-equivalent units. Count Han as 1. Count centralwOrld as 1 unit total. Never 3. Never 8+. Do not truncate. Do not pad.
+Length: about 4–10 Chinese-character-equivalent units. Count Han as 1. Count centralwOrld as about 4 units total. Never 3. Do not truncate. Do not pad.
 Previous coverTitle (do not copy): ${previousMain}
 
 COVER SUBTITLE (subTitle)
 Do NOT use a fixed template such as 招牌泰式料理 / 家常泰式料理.
 Analyze FEEL tags, the customer's own sentences, meal cost, restaurant traits, KSP, dining scenario, and unique points. Extract the strongest reason someone would save or click. Rewrite it concisely. Do not copy the original sentence. Do not repeat the coverTitle.
 Priority: 1 unique experience 2 food highlight 3 atmosphere 4 price/value 5 location convenience 6 emotional reaction.
-Length: 6–10 units. Never empty. Never 5 or shorter. Never 11+.
+Length: about 4–16 units. Never empty.
 
 Customer evidence for subtitle (INTERNAL):
 - Dining note: ${note}
@@ -340,11 +340,11 @@ ${locationHint}
 
 EXAMPLES (learn the method; do not copy unless the evidence matches):
 Dining note "第一次吃到可以自己DIY打抛饭，觉得很有趣，而且味道很像泰国家常菜"
-→ mainTitle 曼谷泰餐新体验 / subTitle DIY打抛饭很好玩
+→ mainTitle 曼谷泰餐新体验 / subTitle DIY打抛饭像在泰国家里吃饭
 "在centralwOrld逛街累了发现这家泰餐，环境很舒服，适合朋友聊天"
-→ mainTitle centralwOrld泰餐推荐 / subTitle 逛街后舒服聚餐
+→ mainTitle centralwOrld泰餐推荐 / subTitle 逛街后的舒服泰式聚餐地
 "两个人吃了600泰铢，点了很多菜，份量很足"
-→ mainTitle 曼谷必吃泰餐 / subTitle 两人600泰铢很满足
+→ mainTitle 曼谷必吃泰餐 / subTitle 两人600泰铢吃到超满足
 
 VALIDATE before return:
 1) mainTitle contains at least one pool keyword and is not keyword stuffing.

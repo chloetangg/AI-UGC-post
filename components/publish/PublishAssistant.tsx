@@ -9,15 +9,16 @@ import { useT } from "@/components/providers/language-provider";
 import { interpolate, type Dictionary } from "@/lib/i18n";
 import type { FinalSlide } from "@/lib/cover/post-layout";
 import {
+  buildPublishText,
   canShareFiles,
   collectRednoteDownloads,
-  copyRednoteText,
-  formatRednotePasteText,
+  copyPublishText,
   isMobileDevice,
-  shareToRednote,
+  openRednotePublish,
   type PublishStatus,
   type RednotePublishPackage,
 } from "@/lib/rednote-publish";
+import { downloadGeneratedImage, sharePost } from "@/lib/publish/share";
 import { trackAnalyticsEvent } from "@/lib/analytics/track-client";
 import { cn } from "@/lib/utils";
 
@@ -31,7 +32,7 @@ export function PublishAssistant({
   const t = useT();
   const mobile = useSyncExternalStore(emptySubscribe, isMobileDevice, () => false);
   const fileShare = useSyncExternalStore(emptySubscribe, canShareFiles, () => false);
-  const pasteText = useMemo(() => formatRednotePasteText(pkg), [pkg]);
+  const pasteText = useMemo(() => buildPublishText(pkg), [pkg]);
   const downloads = useMemo(() => collectRednoteDownloads(pkg), [pkg]);
   const hashtagsLine = pkg.hashtags.join(" ");
 
@@ -42,44 +43,92 @@ export function PublishAssistant({
   const [openFailed, setOpenFailed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [filesPartial, setFilesPartial] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  const heading =
-    status === "idle" || status === "preparing" || status === "cancelled"
-      ? t.publish.title
-      : t.publish.titleReady;
+  const showSaveImages = !mobile || status === "fallback" || status === "files-partial";
+  const showNativeHints = status === "shared";
 
   async function copyAll() {
-    const ok = await copyRednoteText(pasteText);
+    const ok = await copyPublishText(pasteText);
     setCopyFailed(!ok);
     if (ok) setStatus((current) => (current === "idle" ? "copied" : current));
     if (!ok) setShowPaste(true);
     return ok;
   }
 
-  async function publishToRednote() {
+  function trackWebShare() {
+    trackAnalyticsEvent({
+      eventType: "publish_click",
+      metadata: {
+        platform: "unknown",
+        method: "web_share",
+        source: "share_page",
+      },
+    });
+  }
+
+  function trackRednoteDeepLink() {
+    trackAnalyticsEvent({
+      eventType: "publish_click",
+      metadata: {
+        platform: "xiaohongshu",
+        method: "deep_link",
+        source: "share_page",
+      },
+    });
+  }
+
+  async function handlePublish() {
     if (busy) return;
     setBusy(true);
-    trackAnalyticsEvent({
-      eventType: "xhs_publish_click",
-      metadata: { platform: "xiaohongshu", action: "publish" },
-    });
     setOpenFailed(false);
     setFilesPartial(false);
     setCopyFailed(false);
     setStatus("preparing");
 
-    const result = await shareToRednote(pkg);
-    setFilesPartial(result.filesPartial);
+    try {
+      const published = await sharePost(pkg);
+      setCopyFailed(!published.copied);
+      setFilesPartial(published.filesPartial);
 
-    if (result.outcome === "shared") {
-      setStatus("shared");
-    } else if (result.outcome === "cancelled") {
-      setStatus("cancelled");
-    } else if (result.outcome === "fallback-opened") {
+      if (published.outcome === "shared") {
+        trackWebShare();
+        setStatus("shared");
+      } else if (published.outcome === "cancelled") {
+        setStatus("cancelled");
+      } else if (published.outcome === "desktop") {
+        setStatus("idle");
+      } else if (published.filesPartial) {
+        setStatus("files-partial");
+      } else {
+        setStatus("fallback");
+      }
+    } catch (error) {
+      console.error("Publish preparation failed", error);
+      setFilesPartial(true);
+      setStatus("files-partial");
+    }
+    setBusy(false);
+  }
+
+  async function saveImages() {
+    if (saving) return;
+    setSaving(true);
+    await downloadGeneratedImage(pkg);
+    setSaving(false);
+  }
+
+  async function openRednote() {
+    if (!mobile) return;
+    setBusy(true);
+    const opened = await openRednotePublish();
+    if (opened === "opened") {
+      trackRednoteDeepLink();
+      setOpenFailed(false);
       setStatus("completed");
     } else {
       setOpenFailed(true);
-      setStatus(result.filesPartial ? "files-partial" : "fallback");
+      setStatus("fallback");
     }
     setBusy(false);
   }
@@ -89,10 +138,12 @@ export function PublishAssistant({
       <div className="flex-1 space-y-4 pb-4">
       <div className="space-y-2">
         <h1 className="font-display text-[1.85rem] leading-tight tracking-tight text-foreground">
-          {heading}
+          {t.publish.title}
         </h1>
         <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-muted-foreground">
-          {status === "idle" ? t.publish.subtitle : statusMessage(status, openFailed, t)}
+          {status === "idle"
+            ? t.publish.subtitle
+            : statusMessage(status, openFailed, t)}
         </p>
       </div>
 
@@ -124,21 +175,22 @@ export function PublishAssistant({
         </ul>
       </section>
 
-      {status !== "idle" ? (
+      {status === "shared" && fileShare ? (
         <section className="rounded-3xl border border-border bg-card p-4 shadow-sm">
           <ul className="space-y-2.5 text-sm">
             <li className="text-foreground">{t.publish.stepPhotos}</li>
-            <li className="text-foreground">
-              {fileShare && (status === "shared" || status === "sharing" || status === "files-partial")
-                ? t.publish.stepShare
-                : t.publish.stepOpening}
-            </li>
+            <li className="text-foreground">{t.publish.stepShare}</li>
           </ul>
         </section>
       ) : null}
 
-      {filesPartial && status !== "cancelled" && status !== "files-partial" ? (
-        <p className="whitespace-pre-wrap text-sm leading-relaxed text-destructive">
+      {showNativeHints ? (
+        <p className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
+          {t.publish.statusAppMissing}
+        </p>
+      ) : null}
+      {filesPartial && status === "shared" ? (
+        <p className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
           {t.publish.statusFilesPartial}
         </p>
       ) : null}
@@ -160,15 +212,17 @@ export function PublishAssistant({
         </section>
       ) : null}
 
-      {status === "shared" || status === "fallback" || status === "files-partial" ? (
-        <p className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
-          {t.publish.statusAppMissing}
-        </p>
+      <Button className="w-full" variant="outline" onClick={() => void copyAll()}>
+        {t.publish.copyAll}
+      </Button>
+      {showSaveImages ? (
+        <Button className="w-full" variant="outline" disabled={saving} onClick={() => void saveImages()}>
+          {t.publish.saveImage}
+        </Button>
       ) : null}
-
-      {mobile ? (
-        <Button className="w-full" variant="outline" onClick={copyAll}>
-          {t.publish.copyAll}
+      {mobile && (status === "fallback" || status === "files-partial") ? (
+        <Button className="w-full" variant="outline" disabled={busy} onClick={() => void openRednote()}>
+          {t.publish.openXiaohongshu}
         </Button>
       ) : null}
 
@@ -198,15 +252,9 @@ export function PublishAssistant({
       </div>
 
       <div className="sticky bottom-0 z-10 -mx-5 mt-auto bg-gradient-to-t from-background via-background/95 to-transparent px-5 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-        {mobile ? (
-          <Button className="w-full" disabled={busy} onClick={publishToRednote}>
-            {t.publish.primaryCta}
-          </Button>
-        ) : (
-          <Button className="w-full" onClick={copyAll}>
-            {t.publish.copyAll}
-          </Button>
-        )}
+        <Button className="w-full" disabled={busy} onClick={() => void handlePublish()}>
+          {t.publish.primaryCta}
+        </Button>
       </div>
     </div>
   );
@@ -216,20 +264,16 @@ function emptySubscribe() {
   return () => undefined;
 }
 
-function statusMessage(
-  status: PublishStatus,
-  openFailed: boolean,
-  t: Dictionary,
-) {
+function statusMessage(status: PublishStatus, openFailed: boolean, t: Dictionary) {
   if (status === "preparing" || status === "sharing") return t.publish.statusPreparing;
   if (status === "ready" || status === "copied") return t.publish.statusReady;
   if (status === "cancelled") return t.publish.statusCancelled;
   if (status === "shared") return t.publish.statusShared;
   if (status === "files-partial") return t.publish.statusFilesPartial;
-  if (status === "opening-rednote") return t.publish.statusOpening;
   if (status === "completed") return t.publish.statusOpened;
   if (status === "fallback") {
-    return openFailed ? t.publish.statusDeepLinkBlocked : t.publish.statusFallback;
+    if (openFailed) return t.publish.statusDeepLinkBlocked;
+    return t.publish.fallbackReady;
   }
   return t.publish.subtitle;
 }

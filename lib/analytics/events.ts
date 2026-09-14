@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { getDb } from "@/lib/mongodb";
+import { persistAnalyticsEvent } from "@/lib/analytics/persist";
 import {
   ANALYTICS_CAMPAIGN,
   ANALYTICS_COLLECTION,
@@ -20,9 +21,18 @@ function isDuplicateKey(error: unknown) {
   return Boolean(error && typeof error === "object" && "code" in error && error.code === 11000);
 }
 
-export function analyticsEventId(eventType: AnalyticsEventType, sessionId: string, explicit?: string) {
+export function analyticsEventId(
+  eventType: AnalyticsEventType,
+  sessionId: string,
+  explicit?: string,
+  platform?: string,
+) {
   const custom = explicit?.trim();
   if (custom) return custom.slice(0, 120);
+  if (eventType === "publish_click") {
+    const key = platform?.trim() || "unknown";
+    return `publish_click:${key}:${sessionId}`;
+  }
   if (ONCE_PER_SESSION.includes(eventType)) return `${eventType}:${sessionId}`;
   return `${eventType}:${sessionId}:${Date.now()}:${randomUUID()}`;
 }
@@ -54,16 +64,28 @@ export async function recordAnalyticsEvent(input: RecordAnalyticsInput) {
     await ensureAnalyticsIndexes();
     const timestamp = new Date();
     const document: AnalyticsEventDocument = {
-      eventId: analyticsEventId(input.eventType, sessionId, input.eventId),
+      eventId: analyticsEventId(
+        input.eventType,
+        sessionId,
+        input.eventId,
+        input.metadata?.platform,
+      ),
       eventType: input.eventType,
       sessionId,
       qrCodeId: input.qrCodeId?.trim() || "",
       campaign: input.campaign?.trim() || ANALYTICS_CAMPAIGN,
+      brandId: "baan-ying",
       timestamp,
       metadata: input.metadata ?? {},
     };
     const db = await getDb();
     await db.collection(ANALYTICS_COLLECTION).insertOne(document);
+    void persistAnalyticsEvent({
+      brandId: document.brandId,
+      eventType: document.eventType,
+      timestamp,
+      document,
+    });
     return { recorded: true, duplicate: false };
   } catch (error) {
     if (isDuplicateKey(error)) return { recorded: false, duplicate: true };

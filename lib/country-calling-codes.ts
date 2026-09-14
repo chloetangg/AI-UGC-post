@@ -1,3 +1,5 @@
+import type { Language } from "@/lib/i18n";
+
 export type CountryCallingCode = {
   iso2: string;
   name: string;
@@ -163,8 +165,22 @@ export const COUNTRY_CALLING_CODES: CountryCallingCode[] = [
   country("ZW", "Zimbabwe", "津巴布韦", "+263", false, ["辛巴威"]),
 ];
 
-export function countryDisplayName(country: CountryCallingCode, language: "en" | "zh") {
-  return language === "zh" ? country.nameZh : country.name;
+const thaiRegionNames = (() => {
+  try {
+    return new Intl.DisplayNames(["th"], { type: "region" });
+  } catch {
+    return null;
+  }
+})();
+
+export function countryNameTh(iso2: string) {
+  return thaiRegionNames?.of(iso2.toUpperCase()) || "";
+}
+
+export function countryDisplayName(country: CountryCallingCode, language: Language) {
+  if (language === "zh") return country.nameZh;
+  if (language === "th") return countryNameTh(country.iso2) || country.name;
+  return country.name;
 }
 
 export function findCountryByIso2(iso2: string, dial?: string) {
@@ -201,7 +217,7 @@ export function filterCountries(query: string) {
   if (!q) return COUNTRY_CALLING_CODES;
   const compact = q.replace(/^00/, "+").replace(/^\+/, "");
   return COUNTRY_CALLING_CODES.filter((item) => {
-    const haystack = [item.name, item.nameZh, item.iso2, ...(item.aliases ?? [])]
+    const haystack = [item.name, item.nameZh, countryNameTh(item.iso2), item.iso2, ...(item.aliases ?? [])]
       .join(" ")
       .toLowerCase();
     return haystack.includes(q) || item.dial.includes(q) || item.dial.replace("+", "").includes(compact);
@@ -223,7 +239,9 @@ export function originCountryValue(item: CountryCallingCode) {
 }
 
 function originCountryHaystack(item: CountryCallingCode) {
-  return [item.name, item.nameZh, item.iso2, ...(item.aliases ?? [])].join(" ").toLowerCase();
+  return [item.name, item.nameZh, countryNameTh(item.iso2), item.iso2, ...(item.aliases ?? [])]
+    .join(" ")
+    .toLowerCase();
 }
 
 export function findOriginCountry(value: string) {
@@ -238,6 +256,8 @@ export function findOriginCountry(value: string) {
       item.name.toLowerCase() === countryLower ||
       item.nameZh === raw ||
       item.nameZh === countryPart ||
+      countryNameTh(item.iso2) === raw ||
+      countryNameTh(item.iso2) === countryPart ||
       item.iso2.toLowerCase() === lower ||
       (item.aliases ?? []).some((alias) => alias.toLowerCase() === lower || alias === countryPart)
     );

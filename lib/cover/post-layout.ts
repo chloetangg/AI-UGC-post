@@ -12,16 +12,16 @@ export function isFourPhotoGridCover(photoCount: number, templateId: string) {
 }
 
 export const COVER_TEMPLATE_OPTIONS = [
-  { id: "top-stroke", en: "Style 1", zh: "Style 1" },
-  { id: "badge-stack", en: "Style 2", zh: "Style 2" },
-  { id: "dual-line", en: "Style 3", zh: "Style 3" },
-  { id: "top-banner", en: "Style 4", zh: "Style 4" },
-  { id: "left-spine", en: "Style 5", zh: "Style 5" },
-  { id: "polaroid", en: "Style 6", zh: "Style 6" },
-  { id: "center-lower", en: "Style 7", zh: "Style 7" },
-  { id: "bottom-bar", en: "Style 8", zh: "Style 8" },
-  { id: "split-band", en: "Style 9", zh: "Style 9" },
-  { id: "bottom-card", en: "Style 10", zh: "Style 10" },
+  { id: "top-stroke", en: "Style 1", zh: "Style 1", th: "สไตล์ 1" },
+  { id: "badge-stack", en: "Style 2", zh: "Style 2", th: "สไตล์ 2" },
+  { id: "dual-line", en: "Style 3", zh: "Style 3", th: "สไตล์ 3" },
+  { id: "top-banner", en: "Style 4", zh: "Style 4", th: "สไตล์ 4" },
+  { id: "left-spine", en: "Style 5", zh: "Style 5", th: "สไตล์ 5" },
+  { id: "polaroid", en: "Style 6", zh: "Style 6", th: "สไตล์ 6" },
+  { id: "center-lower", en: "Style 7", zh: "Style 7", th: "สไตล์ 7" },
+  { id: "bottom-bar", en: "Style 8", zh: "Style 8", th: "สไตล์ 8" },
+  { id: "split-band", en: "Style 9", zh: "Style 9", th: "สไตล์ 9" },
+  { id: "bottom-card", en: "Style 10", zh: "Style 10", th: "สไตล์ 10" },
 ] as const;
 
 export type CoverTemplateOptionId = (typeof COVER_TEMPLATE_OPTIONS)[number]["id"];

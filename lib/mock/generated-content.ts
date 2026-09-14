@@ -216,7 +216,7 @@ function joinChinese(parts: string[]) {
  *
  * CONTENT LANGUAGE RULE:
  * Always return Simplified Chinese (zh-CN) titles, caption, and hashtags.
- * The website UI language ("en" | "zh") is ignored here on purpose.
+ * The website UI language ("en" | "zh" | "th") is ignored here on purpose.
  * Future OpenAI calls must use CONTENT_LANGUAGE and must not follow UI language.
  */
 export function getMockGeneratedContent(input: GeneratePostInput): GeneratedContent {

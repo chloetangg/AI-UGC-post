@@ -9,6 +9,7 @@ import {
 } from "@/lib/generate-prompt";
 import { insertGeneration } from "@/lib/generations";
 import { trackServerEvent } from "@/lib/analytics/server";
+import { readAnalyticsSession } from "@/lib/analytics/session";
 import { normalizeHashtags } from "@/lib/hashtags";
 import { attachOfficialLocationTime, resolveDiningBranch, stripGeneratedLocationTime } from "@/lib/locations";
 import { parseGeneratedContent } from "@/lib/parse-generated";
@@ -79,6 +80,7 @@ async function fileToImagePart(file: File) {
 
 export async function POST(request: Request) {
   let formSubmitTrack: Promise<void> | null = null;
+  const startedAt = Date.now();
   try {
     const form = await request.formData();
     const rawPayload = form.get("payload");
@@ -200,11 +202,19 @@ export async function POST(request: Request) {
     const hashtags = normalizeHashtags(compliant.hashtags, payload.previousHashtags ?? []);
 
     const generationId = randomUUID();
+    const session = await readAnalyticsSession();
     try {
       await insertGeneration({
         generationId,
         campaignId: payload.campaignId,
+        brandId: "baan-ying",
         submissionId: payload.submissionId,
+        sessionId: session.sessionId,
+        branch: payload.branch,
+        kspId: parsed.selectedKspId,
+        storylineId: parsed.selectedStorylineId,
+        contentAngleId: parsed.selectedContentAngleId,
+        durationMs: Date.now() - startedAt,
         customer: {
           ageRange: payload.dinerAgeRange,
           gender: payload.dinerGender,
@@ -220,6 +230,12 @@ export async function POST(request: Request) {
         hashtags,
         coverTitle: compliant.coverTitle,
         coverSubtitle: compliant.coverSubtitle,
+        enjoyMost: payload.enjoyMost,
+        recommendedDishes: payload.recommendedDishes,
+        recommendedDishOther: payload.recommendedDishOther,
+        recommendTo: payload.recommendTo,
+        diningExperienceNote: payload.diningExperienceNote,
+        searchKeyword: parsed.selectedSearchKeyword,
         cost,
       });
     } catch (error) {

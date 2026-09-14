@@ -73,7 +73,7 @@ export default function AnalyticsDashboardPage() {
           <p className="text-sm font-medium text-primary">Baan Ying UGC</p>
           <h1 className="font-display text-3xl text-foreground">Analytics</h1>
           <p className="text-sm text-muted-foreground">
-            QR scans, form submissions, generations, and XHS publish clicks. Dates use Asia/Bangkok.
+            QR scans, form submissions, generations, Rednote and Dianping publish clicks. Dates use Asia/Bangkok.
           </p>
         </header>
 
@@ -124,12 +124,13 @@ export default function AnalyticsDashboardPage() {
 
         {summary && conversion ? (
           <>
-            <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
               <Metric label="QR Scans" value={formatCount(summary.qrScans)} />
               <Metric label="Unique Visitors" value={formatCount(summary.uniqueVisitors)} />
               <Metric label="Form Submissions" value={formatCount(summary.formSubmissions)} />
               <Metric label="Generation Completed" value={formatCount(summary.generations)} />
               <Metric label="XHS Publish Clicks" value={formatCount(summary.xhsPublishClicks)} />
+              <Metric label="Dianping Publish Clicks" value={formatCount(summary.dianpingPublishClicks)} />
             </section>
 
             <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -149,16 +150,18 @@ export default function AnalyticsDashboardPage() {
                     <th className="pb-2 font-medium">Forms</th>
                     <th className="pb-2 font-medium">Generations</th>
                     <th className="pb-2 font-medium">XHS Clicks</th>
+                    <th className="pb-2 font-medium">Dianping Clicks</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {(report.daily.length ? report.daily : [{ date: "—", qrScans: 0, formSubmissions: 0, generations: 0, xhsPublishClicks: 0 }]).map((row) => (
+                  {(report.daily.length ? report.daily : [{ date: "—", qrScans: 0, formSubmissions: 0, generations: 0, xhsPublishClicks: 0, dianpingPublishClicks: 0 }]).map((row) => (
                     <tr key={row.date} className="border-t border-border/60">
                       <td className="py-2">{row.date}</td>
                       <td>{formatCount(row.qrScans)}</td>
                       <td>{formatCount(row.formSubmissions)}</td>
                       <td>{formatCount(row.generations)}</td>
                       <td>{formatCount(row.xhsPublishClicks)}</td>
+                      <td>{formatCount(row.dianpingPublishClicks)}</td>
                     </tr>
                   ))}
                 </tbody>

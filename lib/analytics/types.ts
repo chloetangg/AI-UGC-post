@@ -10,6 +10,7 @@ export const ANALYTICS_EVENT_TYPES = [
   "form_submit",
   "generation_complete",
   "xhs_publish_click",
+  "publish_click",
 ] as const;
 
 export type AnalyticsEventType = (typeof ANALYTICS_EVENT_TYPES)[number];
@@ -32,6 +33,7 @@ export type AnalyticsEventDocument = {
   sessionId: string;
   qrCodeId: string;
   campaign: string;
+  brandId?: string;
   timestamp: Date;
   metadata: Record<string, string>;
 };
@@ -51,6 +53,7 @@ export type AnalyticsSummary = {
   formSubmissions: number;
   generations: number;
   xhsPublishClicks: number;
+  dianpingPublishClicks: number;
 };
 
 export type AnalyticsConversion = {
@@ -66,6 +69,7 @@ export type AnalyticsDailyRow = {
   formSubmissions: number;
   generations: number;
   xhsPublishClicks: number;
+  dianpingPublishClicks: number;
 };
 
 export type AnalyticsQrRow = {

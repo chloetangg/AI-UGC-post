@@ -105,6 +105,15 @@ export function buildRednoteText(pkg: Pick<RednotePublishPackage, "caption" | "h
   return formatRednoteFullText(pkg.caption, pkg.hashtags);
 }
 
+/** Existing POST caption + hashtags. Never calls OpenAI. */
+export function buildPublishText(pkg: Pick<RednotePublishPackage, "caption" | "hashtags">) {
+  return buildRednoteText(pkg);
+}
+
+export function preparePublishPackage(source: RednotePublishSource) {
+  return prepareRednotePublishPackage(source);
+}
+
 export function finalTitle(pkg: Pick<RednotePublishPackage, "title">) {
   return pkg.title;
 }
@@ -175,7 +184,6 @@ export function collectRednoteDownloads(pkg: RednotePublishPackage): RednoteDown
     });
   }
   for (const photo of pkg.photos) {
-    if (pkg.coverImageUrl && photo.isCover) continue;
     pushItem({
       key: `photo-${photo.index}`,
       url: photo.url,
@@ -222,6 +230,11 @@ export async function copyRednoteText(text: string) {
   return copyWithFallback(text);
 }
 
+/** Clipboard is helpful but optional. Failure must not block sharing. */
+export async function copyPublishText(text: string): Promise<boolean> {
+  return copyRednoteText(text);
+}
+
 export type SaveImagesResult = "shared" | "downloaded" | "long-press" | "cancelled" | "failed";
 
 function imageMime(fileName: string, blobType: string) {
@@ -243,16 +256,25 @@ function imageFileName(fileName: string, mime: string) {
 }
 
 async function urlToBlob(url: string) {
-  const response = await fetch(url);
+  let response: Response;
+  try {
+    response = await fetch(url);
+  } catch {
+    throw new Error("Failed to fetch image");
+  }
   if (!response.ok && !url.startsWith("data:") && !url.startsWith("blob:")) {
-    throw new Error("Could not read image");
+    throw new Error(`Failed to fetch image: ${response.status}`);
   }
   return response.blob();
 }
 
 export async function urlToFile(url: string, fileName: string, mimeType?: string): Promise<File> {
   const blob = await urlToBlob(url);
-  const mime = mimeType || imageMime(fileName, blob.type);
+  let mime = mimeType?.trim() || "";
+  if (!mime && url.startsWith("data:")) {
+    mime = url.slice(5).split(/[;,]/)[0] || "";
+  }
+  mime = mime || imageMime(fileName, blob.type);
   const named = imageFileName(fileName, mime);
   return new File([blob], named, { type: mime });
 }
@@ -282,12 +304,18 @@ function canShareData(data: ShareData) {
   }
 }
 
-export function canShareFiles() {
+export function canShareFiles(files?: File[]) {
   if (typeof navigator === "undefined") return false;
   if (typeof navigator.share !== "function") return false;
   if (typeof navigator.canShare !== "function") return false;
   if (typeof window !== "undefined" && !window.isSecureContext) return false;
-  return canShareData({ files: [probeShareFile()] });
+  if (files && files.length === 0) return false;
+  const payload = files && files.length > 0 ? files : [probeShareFile()];
+  try {
+    return navigator.canShare({ files: payload });
+  } catch {
+    return false;
+  }
 }
 
 export function canShareImagesToPhotos() {
@@ -303,7 +331,7 @@ export async function buildPublishFiles(pkg: RednotePublishPackage): Promise<Fil
   return files;
 }
 
-async function buildPublishFilesLenient(pkg: RednotePublishPackage) {
+export async function buildPublishFilesLenient(pkg: RednotePublishPackage) {
   const items = collectRednoteDownloads(pkg);
   const files: File[] = [];
   let failed = 0;
@@ -317,8 +345,10 @@ async function buildPublishFilesLenient(pkg: RednotePublishPackage) {
   return { files, items, failed };
 }
 
-function isShareAbort(error: unknown) {
-  return error instanceof DOMException && error.name === "AbortError";
+export function isUserCancellation(error: unknown) {
+  if (!error || typeof error !== "object") return false;
+  const name = "name" in error ? String(error.name) : "";
+  return name === "AbortError";
 }
 
 async function sharePublishFiles(files: File[]): Promise<"shared" | "cancelled" | "failed"> {
@@ -328,7 +358,7 @@ async function sharePublishFiles(files: File[]): Promise<"shared" | "cancelled" 
     await navigator.share({ files });
     return "shared";
   } catch (error) {
-    if (isShareAbort(error)) return "cancelled";
+    if (isUserCancellation(error)) return "cancelled";
     return "failed";
   }
 }
@@ -470,35 +500,4 @@ export function openRednotePublish(): Promise<OpenRednoteResult> {
       finish("failed");
     }, 1600);
   });
-}
-
-export async function fallbackRednotePublish(pkg: RednotePublishPackage): Promise<ShareToRednoteOutcome> {
-  await saveRednoteImages(pkg);
-  const opened = await openRednotePublish();
-  return opened === "opened" ? "fallback-opened" : "fallback-failed";
-}
-
-/**
- * Primary: Web Share image files only — never title or caption.
- * Fallback: save images, then open xhsdiscover://post.
- */
-export async function shareToRednote(pkg: RednotePublishPackage): Promise<ShareToRednoteResult> {
-  const { files, items, failed } = await buildPublishFilesLenient(pkg);
-  const filesPartial = failed > 0 || (items.length > 0 && files.length === 0);
-
-  if (canShareFiles() && files.length > 0) {
-    const shared = await sharePublishFiles(files);
-    if (shared === "shared" || shared === "cancelled") {
-      return { outcome: shared, filesPartial, copied: false };
-    }
-    const opened = await openRednotePublish();
-    return {
-      outcome: opened === "opened" ? "fallback-opened" : "fallback-failed",
-      filesPartial,
-      copied: false,
-    };
-  }
-
-  const outcome = await fallbackRednotePublish(pkg);
-  return { outcome, filesPartial, copied: false };
 }

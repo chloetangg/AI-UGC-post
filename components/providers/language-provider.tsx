@@ -11,6 +11,7 @@ import {
 } from "react";
 import {
   DEFAULT_LANGUAGE,
+  HTML_LANG,
   translations,
   type Dictionary,
   type Language,
@@ -30,7 +31,7 @@ type LanguageContextValue = {
 const LanguageContext = createContext<LanguageContextValue | null>(null);
 
 function isLanguage(value: string | null): value is Language {
-  return value === "en" || value === "zh";
+  return value === "en" || value === "zh" || value === "th";
 }
 
 function readStoredLanguage(): Language {
@@ -77,7 +78,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   const language = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
   useEffect(() => {
-    document.documentElement.lang = language === "zh" ? "zh-CN" : "en";
+    document.documentElement.lang = HTML_LANG[language];
   }, [language]);
 
   const setLanguage = useCallback((next: Language) => {

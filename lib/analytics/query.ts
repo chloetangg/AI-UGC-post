@@ -43,12 +43,15 @@ export async function queryAnalyticsReport(input: {
     .aggregate<{
       counts?: Array<{ _id: AnalyticsEventType; count: number }>;
       uniqueVisitors?: Array<{ count: number }>;
+      rednoteClicks?: Array<{ count: number }>;
+      dianpingClicks?: Array<{ count: number }>;
       daily?: Array<{
         _id: string;
         qrScans: number;
         formSubmissions: number;
         generations: number;
         xhsPublishClicks: number;
+        dianpingPublishClicks: number;
       }>;
       byQrCode?: Array<{ _id: string; scans: number }>;
     }>([
@@ -58,6 +61,22 @@ export async function queryAnalyticsReport(input: {
           counts: [{ $group: { _id: "$eventType", count: { $sum: 1 } } }],
           uniqueVisitors: [
             { $group: { _id: "$sessionId" } },
+            { $count: "count" },
+          ],
+          rednoteClicks: [
+            {
+              $match: {
+                $or: [
+                  { eventType: "xhs_publish_click" },
+                  { eventType: "publish_click", "metadata.platform": "rednote" },
+                  { eventType: "publish_click", "metadata.platform": "xiaohongshu" },
+                ],
+              },
+            },
+            { $count: "count" },
+          ],
+          dianpingClicks: [
+            { $match: { eventType: "publish_click", "metadata.platform": "dianping" } },
             { $count: "count" },
           ],
           daily: [
@@ -80,7 +99,37 @@ export async function queryAnalyticsReport(input: {
                   $sum: { $cond: [{ $eq: ["$eventType", "generation_complete"] }, 1, 0] },
                 },
                 xhsPublishClicks: {
-                  $sum: { $cond: [{ $eq: ["$eventType", "xhs_publish_click"] }, 1, 0] },
+                  $sum: {
+                    $cond: [
+                      {
+                        $or: [
+                          { $eq: ["$eventType", "xhs_publish_click"] },
+                          {
+                            $and: [
+                              { $eq: ["$eventType", "publish_click"] },
+                              { $in: ["$metadata.platform", ["rednote", "xiaohongshu"]] },
+                            ],
+                          },
+                        ],
+                      },
+                      1,
+                      0,
+                    ],
+                  },
+                },
+                dianpingPublishClicks: {
+                  $sum: {
+                    $cond: [
+                      {
+                        $and: [
+                          { $eq: ["$eventType", "publish_click"] },
+                          { $eq: ["$metadata.platform", "dianping"] },
+                        ],
+                      },
+                      1,
+                      0,
+                    ],
+                  },
                 },
               },
             },
@@ -102,7 +151,8 @@ export async function queryAnalyticsReport(input: {
     uniqueVisitors: asCount(facet?.uniqueVisitors?.[0]?.count),
     formSubmissions: counts.get("form_submit") ?? 0,
     generations: counts.get("generation_complete") ?? 0,
-    xhsPublishClicks: counts.get("xhs_publish_click") ?? 0,
+    xhsPublishClicks: asCount(facet?.rednoteClicks?.[0]?.count),
+    dianpingPublishClicks: asCount(facet?.dianpingClicks?.[0]?.count),
   };
 
   const daily: AnalyticsDailyRow[] = (facet?.daily ?? []).map((row) => ({
@@ -111,6 +161,7 @@ export async function queryAnalyticsReport(input: {
     formSubmissions: asCount(row.formSubmissions),
     generations: asCount(row.generations),
     xhsPublishClicks: asCount(row.xhsPublishClicks),
+    dianpingPublishClicks: asCount(row.dianpingPublishClicks),
   }));
 
   const byQrCode: AnalyticsQrRow[] = (facet?.byQrCode ?? [])

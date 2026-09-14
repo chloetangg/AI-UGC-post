@@ -209,7 +209,7 @@ export type GeneratePostInput = {
   variantIndex: number;
   /**
    * Generated Xiaohongshu language. Must always be Simplified Chinese.
-   * Never pass the website UI language ("en" | "zh") here.
+   * Never pass the website UI language ("en" | "zh" | "th") here.
    */
   contentLanguage: "zh-CN";
   dinerOrigin?: string;

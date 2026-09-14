@@ -313,7 +313,7 @@ export function cityValue(item: WorldCity) {
   return `${item.name}, ${item.country}`;
 }
 
-export function cityDisplayName(item: WorldCity, language: "en" | "zh") {
+export function cityDisplayName(item: WorldCity, language: "en" | "zh" | "th") {
   return language === "zh" ? item.nameZh : item.name;
 }
 
