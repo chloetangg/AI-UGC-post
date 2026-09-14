@@ -1,3 +1,4 @@
+import type { Document, UpdateFilter } from "mongodb";
 import { getDb } from "@/lib/mongodb";
 import { ANALYTICS_TIMEZONE } from "@/lib/analytics/types";
 import { ymdInTimeZone } from "@/lib/analytics/dates";
@@ -57,14 +58,16 @@ async function upsertMonthlyItem(
   await db.collection(MONTHLY_COLLECTION).updateOne(
     { brandId, month },
     {
-      $push: { [arrayField]: document },
+      $push: { [arrayField]: document as Document },
       $set: { updatedAt: new Date(), slug: brandId },
       $setOnInsert: {
         brandId,
         month,
-        ...(arrayField === "generations" ? { analyticsEvents: [] } : { generations: [] }),
+        ...(arrayField === "generations"
+          ? { analyticsEvents: [] as Document[] }
+          : { generations: [] as Document[] }),
       },
-    },
+    } as unknown as UpdateFilter<Document>,
     { upsert: true },
   );
 }
