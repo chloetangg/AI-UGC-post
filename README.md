@@ -792,7 +792,7 @@ Version 1 和 Version 6 使用单换行，行与行之间没有空行。
 - 主按钮：**去发布** / `Publish` / `ไปโพสต์`
 - 点主按钮后选择 **小红书** 或 **大众点评**
 - **小红书：** 把已生成封面 + 用户照片转成 `File[]`（封面永远第一张），调用 `navigator.share({ files })`，由系统分享面板发图。文案需用户自己点「复制全部文案」
-- **大众点评：** 不走 `navigator.share()`，也不使用未经确认的 Dianping Deep Link。进入手动发布说明页：复制文案 → 保存图片 → 打开大众点评 App → 按步骤粘贴发布。不显示「发布成功」
+- **大众点评：** 不走 `navigator.share()`，也不使用未经确认的 Dianping Deep Link。进入手动发布说明页：复制文案 → 保存图片 → 按步骤在大众点评粘贴发布。不显示「发布成功」
 - 系统分享不可用时，小红书 fallback 可点「打开小红书」走 `xhsdiscover://post`（URL 不带图、不加参数）
 - `publish_platform_selected`：点选小红书或大众点评时写入，`platform` 为对应平台。不记 `dianping_published`
 - `publish_click`：小红书系统分享成功记 `platform=unknown` + `method=web_share`。取消不记

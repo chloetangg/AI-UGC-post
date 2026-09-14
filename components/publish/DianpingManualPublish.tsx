@@ -32,7 +32,6 @@ export function DianpingManualPublish({
   const [showCaption, setShowCaption] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveEach, setSaveEach] = useState(false);
-  const [openHint, setOpenHint] = useState(false);
 
   async function copyAll() {
     const ok = await copyPublishText(pasteText);
@@ -94,7 +93,6 @@ export function DianpingManualPublish({
           <ol className="space-y-4">
             <GuideStep title={g.step1Title} body={g.step1Body} />
             <GuideStep title={g.step2Title} body={`${g.step2Body}\n${g.step2Order}`} />
-            <GuideStep title={g.step3Title} body={g.step3Body} />
             <GuideStep title={g.step4Title} body={`${g.step4Path}\n${g.step4Body}`} />
           </ol>
         </section>
@@ -168,24 +166,6 @@ export function DianpingManualPublish({
           <Button className="w-full" size="lg" variant="outline" disabled={saving} onClick={() => void saveAll()}>
             {g.saveAll}
           </Button>
-        </section>
-
-        <section className="space-y-3 rounded-3xl border border-border bg-card p-4 shadow-sm">
-          <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-            {g.step3Title}
-          </h2>
-          <p className="text-sm leading-relaxed text-muted-foreground">{g.step3Body}</p>
-          <Button
-            className="w-full"
-            size="lg"
-            variant="outline"
-            onClick={() => setOpenHint(true)}
-          >
-            {g.openApp}
-          </Button>
-          {openHint ? (
-            <p className="text-sm font-semibold text-foreground">{g.openAppHint}</p>
-          ) : null}
         </section>
 
         <div className="rounded-3xl bg-primary/10 p-4 text-sm font-semibold leading-relaxed text-foreground">
