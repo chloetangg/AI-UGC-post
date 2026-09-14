@@ -179,7 +179,7 @@ const en = {
   },
   publish: {
     title: "Your post is ready",
-    subtitle: "Tap Publish to share photos. Copy the text separately if you need it.",
+    subtitle: "Choose Rednote or Dianping.",
     titleReady: "Your post is ready ✓",
     copyTitle: "Copy Title",
     copyCaption: "Copy Caption",
@@ -294,8 +294,8 @@ const en = {
       coverLabel: "AI cover",
       photoLabel: "Your photo {index}",
       back: "Back to platforms",
-      chooseXhs: "Share photos with the system share sheet",
-      chooseDp: "Copy text and save photos, then post in the app",
+      chooseXhs: "Copy the text and share in one tap",
+      chooseDp: "Copy the text, then download photos to share",
     },
   },
   privacy: {
@@ -529,7 +529,7 @@ const zh: typeof en = {
   },
   publish: {
     title: "你的帖子已经准备好了",
-    subtitle: "点击「去发布」，选择小红书或大众点评。",
+    subtitle: "选择小红书或大众点评。",
     titleReady: "你的帖子已经准备好了 ✓",
     copyTitle: "复制标题",
     copyCaption: "复制正文",
@@ -640,8 +640,8 @@ const zh: typeof en = {
       coverLabel: "AI生成封面",
       photoLabel: "用户图片 {index}",
       back: "返回选择平台",
-      chooseXhs: "用系统分享发送图片",
-      chooseDp: "复制文案、保存图片后手动发布",
+      chooseXhs: "复制文案一键分享",
+      chooseDp: "复制文案，下载图片进行分享",
     },
   },
   privacy: {
@@ -876,7 +876,7 @@ const th: typeof en = {
   },
   publish: {
     title: "โพสต์ของคุณพร้อมแล้ว",
-    subtitle: "แตะไปโพสต์ แล้วเลือกเสี่ยวหงชูหรือ Dianping",
+    subtitle: "เลือกเสี่ยวหงชูหรือ Dianping",
     titleReady: "โพสต์ของคุณพร้อมแล้ว ✓",
     copyTitle: "คัดลอกหัวข้อ",
     copyCaption: "คัดลอกแคปชัน",
@@ -991,8 +991,8 @@ const th: typeof en = {
       coverLabel: "ปก AI",
       photoLabel: "รูปของคุณ {index}",
       back: "กลับไปเลือกแพลตฟอร์ม",
-      chooseXhs: "แชร์รูปผ่านเมนูของระบบ",
-      chooseDp: "คัดลอกข้อความและบันทึกรูป แล้วไปโพสต์ในแอป",
+      chooseXhs: "คัดลอกข้อความแล้วแชร์ได้ทันที",
+      chooseDp: "คัดลอกข้อความ แล้วดาวน์โหลดรูปเพื่อแชร์",
     },
   },
   privacy: {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useSyncExternalStore } from "react";
-import { Check, ChevronDown, ChevronUp } from "lucide-react";
+import { Check } from "lucide-react";
 import { CopyButton } from "@/components/publish/CopyButton";
 import { DianpingManualPublish } from "@/components/publish/DianpingManualPublish";
 import { PostSlideshow } from "@/components/result/PostSlideshow";
@@ -19,7 +19,7 @@ import {
   type PublishStatus,
   type RednotePublishPackage,
 } from "@/lib/rednote-publish";
-import { downloadGeneratedImage, sharePost } from "@/lib/publish/share";
+import { sharePost } from "@/lib/publish/share";
 import type { PublishPlatform } from "@/lib/publish/types";
 import { trackAnalyticsEvent } from "@/lib/analytics/track-client";
 import { cn } from "@/lib/utils";
@@ -36,21 +36,15 @@ export function PublishAssistant({
   const fileShare = useSyncExternalStore(emptySubscribe, canShareFiles, () => false);
   const pasteText = useMemo(() => formatRednotePasteText(pkg), [pkg]);
   const downloads = useMemo(() => collectRednoteDownloads(pkg), [pkg]);
-  const hashtagsLine = pkg.hashtags.join(" ");
 
-  const [screen, setScreen] = useState<"home" | "choose" | "dianping">("home");
+  const [screen, setScreen] = useState<"choose" | "dianping">("choose");
   const [status, setStatus] = useState<PublishStatus>("idle");
   const [copyFailed, setCopyFailed] = useState(false);
   const [copiedAll, setCopiedAll] = useState(false);
   const [showPaste, setShowPaste] = useState(false);
-  const [showMore, setShowMore] = useState(false);
   const [openFailed, setOpenFailed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [filesPartial, setFilesPartial] = useState(false);
-  const [saving, setSaving] = useState(false);
-
-  const showSaveImages = !mobile || status === "fallback" || status === "files-partial";
-  const showNativeHints = status === "shared";
 
   async function copyAll() {
     const ok = await copyPublishText(pasteText);
@@ -134,13 +128,6 @@ export function PublishAssistant({
     setScreen("dianping");
   }
 
-  async function saveImages() {
-    if (saving) return;
-    setSaving(true);
-    await downloadGeneratedImage(pkg);
-    setSaving(false);
-  }
-
   async function openRednote() {
     if (!mobile) return;
     setBusy(true);
@@ -163,157 +150,139 @@ export function PublishAssistant({
   return (
     <div className="flex flex-1 flex-col">
       <div className="flex-1 space-y-4 pb-4">
-      <div className="space-y-2">
-        <h1 className="font-display text-[1.85rem] leading-tight tracking-tight text-foreground">
-          {screen === "choose" ? t.publish.choosePlatform : t.publish.title}
-        </h1>
-        <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-muted-foreground">
-          {screen === "choose"
-            ? t.publish.subtitle
-            : status === "idle"
+        <div className="space-y-2">
+          <h1 className="font-display text-[1.85rem] leading-tight tracking-tight text-foreground">
+            {t.publish.choosePlatform}
+          </h1>
+          <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-muted-foreground">
+            {status === "idle" || status === "copied"
               ? t.publish.subtitle
               : statusMessage(status, openFailed, t)}
-        </p>
-      </div>
-
-      {!mobile ? (
-        <div className="rounded-3xl bg-accent/70 p-4 text-sm leading-relaxed whitespace-pre-wrap text-accent-foreground">
-          {t.publish.desktopHint}
+          </p>
         </div>
-      ) : null}
 
-      {slides.length > 0 ? (
+        {!mobile ? (
+          <div className="rounded-3xl bg-accent/70 p-4 text-sm leading-relaxed whitespace-pre-wrap text-accent-foreground">
+            {t.publish.desktopHint}
+          </div>
+        ) : null}
+
+        {slides.length > 0 ? (
+          <section className="rounded-3xl border border-border bg-card p-4 shadow-sm">
+            <h2 className="mb-3 text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+              {t.publish.coverLabel}
+            </h2>
+            <PostSlideshow
+              slides={slides}
+              resetKey={slides.map((slide) => `${slide.id}:${slide.src}`).join("|")}
+            />
+          </section>
+        ) : null}
+
         <section className="rounded-3xl border border-border bg-card p-4 shadow-sm">
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-            {t.publish.coverLabel}
-          </h2>
-          <PostSlideshow
-            slides={slides}
-            resetKey={slides.map((slide) => `${slide.id}:${slide.src}`).join("|")}
-          />
-        </section>
-      ) : null}
-
-      <section className="rounded-3xl border border-border bg-card p-4 shadow-sm">
-        <ul className="space-y-2.5">
-          <CheckRow done={Boolean(pkg.coverImageUrl)} label={t.publish.checkCover} />
-          <CheckRow
-            done={downloads.length > 0}
-            label={interpolate(t.publish.checkImageCount, { count: downloads.length })}
-          />
-        </ul>
-      </section>
-
-      {screen === "choose" ? (
-        <section className="space-y-3">
-          <Button className="h-auto w-full flex-col items-start gap-1 px-5 py-4" disabled={busy} onClick={() => void handleXiaohongshu()}>
-            <span className="text-base">{t.publish.platforms.xiaohongshu}</span>
-            <span className="text-sm font-normal text-primary-foreground/80">{t.publish.dianpingGuide.chooseXhs}</span>
-          </Button>
-          <Button
-            className="h-auto w-full flex-col items-start gap-1 px-5 py-4"
-            variant="outline"
-            disabled={busy}
-            onClick={handleDianping}
-          >
-            <span className="text-base">{t.publish.platforms.dianping}</span>
-            <span className="text-sm font-normal text-muted-foreground">{t.publish.dianpingGuide.chooseDp}</span>
-          </Button>
-        </section>
-      ) : null}
-
-      {status === "shared" && fileShare ? (
-        <section className="rounded-3xl border border-border bg-card p-4 shadow-sm">
-          <ul className="space-y-2.5 text-sm">
-            <li className="text-foreground">{t.publish.stepPhotos}</li>
-            <li className="text-foreground">{t.publish.stepShare}</li>
+          <ul className="space-y-2.5">
+            <CheckRow done={Boolean(pkg.coverImageUrl)} label={t.publish.checkCover} />
+            <CheckRow
+              done={downloads.length > 0}
+              label={interpolate(t.publish.checkImageCount, { count: downloads.length })}
+            />
           </ul>
         </section>
-      ) : null}
 
-      {showNativeHints ? (
-        <p className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
-          {t.publish.statusAppMissing}
-        </p>
-      ) : null}
-      {filesPartial && status === "shared" ? (
-        <p className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
-          {t.publish.statusFilesPartial}
-        </p>
-      ) : null}
-
-      {copyFailed || showPaste ? (
-        <section className="rounded-3xl border border-border bg-card p-4 shadow-sm">
-          {copyFailed ? (
-            <p className="mb-3 text-sm text-destructive">{t.publish.statusCopyFailed}</p>
-          ) : null}
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-              {t.publish.captionLabel}
-            </h2>
-            <CopyButton label={t.publish.copyAll} value={pasteText} />
-          </div>
-          <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-foreground select-text">
-            {pasteText}
-          </p>
-        </section>
-      ) : null}
-
-      {screen === "home" ? (
-        <Button className="w-full" variant="outline" onClick={() => void copyAll()}>
-          {copiedAll ? t.common.copied : t.publish.copyAll}
+        <Button className="w-full" size="lg" variant="outline" onClick={() => void copyAll()}>
+          {copiedAll ? t.publish.checkCopied : t.publish.copyAll}
         </Button>
-      ) : null}
-      {screen === "home" && showSaveImages ? (
-        <Button className="w-full" variant="outline" disabled={saving} onClick={() => void saveImages()}>
-          {t.publish.saveImage}
-        </Button>
-      ) : null}
-      {mobile && screen !== "choose" && (status === "fallback" || status === "files-partial") ? (
-        <Button className="w-full" variant="outline" disabled={busy} onClick={() => void openRednote()}>
-          {t.publish.openXiaohongshu}
-        </Button>
-      ) : null}
 
-      {screen === "home" ? (
-        <button
-          type="button"
-          className="flex w-full items-center justify-between gap-1 pt-1 text-xs font-semibold text-muted-foreground"
-          onClick={() => setShowMore((open) => !open)}
-        >
-          {t.publish.moreActions}
-          {showMore ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
-        </button>
-      ) : null}
+        {copyFailed || showPaste ? (
+          <section className="rounded-3xl border border-border bg-card p-4 shadow-sm">
+            {copyFailed ? (
+              <p className="mb-3 text-sm text-destructive">{t.publish.statusCopyFailed}</p>
+            ) : null}
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                {t.publish.captionLabel}
+              </h2>
+              <CopyButton label={t.publish.copyAll} value={pasteText} />
+            </div>
+            <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-foreground select-text">
+              {pasteText}
+            </p>
+          </section>
+        ) : null}
 
-      {screen === "home" && showMore ? (
-        <div className="space-y-3">
-          <PreviewBlock label={t.publish.titleLabel} copyLabel={t.publish.copyTitle} value={pkg.title} />
-          <PreviewBlock label={t.publish.captionLabel} copyLabel={t.publish.copyCaption} value={pkg.caption} />
-          <PreviewBlock
-            label={t.publish.hashtagsLabel}
-            copyLabel={t.publish.copyHashtags}
-            value={hashtagsLine}
+        <section className="space-y-3">
+          <PlatformCard
+            name={t.publish.platforms.xiaohongshu}
+            description={t.publish.dianpingGuide.chooseXhs}
+            logoSrc="/publish/xiaohongshu.png"
+            disabled={busy}
+            onClick={() => void handleXiaohongshu()}
           />
-        </div>
-      ) : null}
+          <PlatformCard
+            name={t.publish.platforms.dianping}
+            description={t.publish.dianpingGuide.chooseDp}
+            logoSrc="/publish/dianping.png"
+            disabled={busy}
+            onClick={handleDianping}
+          />
+        </section>
 
-      <p className="text-sm leading-relaxed text-muted-foreground">{t.publish.photoNote}</p>
-      <p className="text-sm leading-relaxed text-muted-foreground">{t.publish.rednoteLimit}</p>
-      </div>
+        {status === "shared" && fileShare ? (
+          <section className="rounded-3xl border border-border bg-card p-4 shadow-sm">
+            <ul className="space-y-2.5 text-sm">
+              <li className="text-foreground">{t.publish.stepPhotos}</li>
+              <li className="text-foreground">{t.publish.stepShare}</li>
+            </ul>
+          </section>
+        ) : null}
 
-      <div className="sticky bottom-0 z-10 -mx-5 mt-auto bg-gradient-to-t from-background via-background/95 to-transparent px-5 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-        {screen === "home" ? (
-          <Button className="w-full" disabled={busy} onClick={() => setScreen("choose")}>
-            {t.publish.primaryCta}
+        {status === "shared" ? (
+          <p className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
+            {t.publish.statusAppMissing}
+          </p>
+        ) : null}
+        {filesPartial && status === "shared" ? (
+          <p className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
+            {t.publish.statusFilesPartial}
+          </p>
+        ) : null}
+
+        {mobile && (status === "fallback" || status === "files-partial") ? (
+          <Button className="w-full" variant="outline" disabled={busy} onClick={() => void openRednote()}>
+            {t.publish.openXiaohongshu}
           </Button>
-        ) : (
-          <Button className="w-full" variant="outline" disabled={busy} onClick={() => setScreen("home")}>
-            {t.publish.closeSelector}
-          </Button>
-        )}
+        ) : null}
       </div>
     </div>
+  );
+}
+
+function PlatformCard({
+  name,
+  description,
+  logoSrc,
+  disabled,
+  onClick,
+}: {
+  name: string;
+  description: string;
+  logoSrc: string;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className="flex w-full items-center gap-4 rounded-3xl border border-border bg-card px-4 py-3.5 text-left shadow-sm transition-all duration-200 disabled:opacity-40 active:scale-[0.98]"
+    >
+      <img src={logoSrc} alt="" className="size-14 shrink-0 rounded-[14px]" />
+      <span className="min-w-0">
+        <span className="block text-base font-semibold text-foreground">{name}</span>
+        <span className="mt-0.5 block text-sm text-muted-foreground">{description}</span>
+      </span>
+    </button>
   );
 }
 
@@ -348,27 +317,5 @@ function CheckRow({ done, label }: { done: boolean; label: string }) {
       </span>
       <span className={done ? "text-foreground" : "text-muted-foreground"}>{label}</span>
     </li>
-  );
-}
-
-function PreviewBlock({
-  label,
-  copyLabel,
-  value,
-}: {
-  label: string;
-  copyLabel: string;
-  value: string;
-}) {
-  return (
-    <section className="rounded-3xl border border-border bg-card p-4 shadow-sm">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-          {label}
-        </h2>
-        <CopyButton label={copyLabel} value={value} />
-      </div>
-      <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-foreground">{value}</p>
-    </section>
   );
 }
