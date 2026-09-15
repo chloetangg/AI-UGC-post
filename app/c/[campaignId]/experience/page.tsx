@@ -8,7 +8,7 @@ import { FlowGuard } from "@/components/flow/FlowGuard";
 import { ChoiceChip } from "@/components/preferences/ChoiceChip";
 import { useCampaignFlow } from "@/components/providers/campaign-flow-provider";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { ExperienceNoteField } from "@/components/experience/ExperienceNoteField";
 import { MealExpenseField } from "@/components/experience/MealExpenseField";
 import { campaignPath } from "@/lib/flow";
 import { interpolate } from "@/lib/i18n";
@@ -228,11 +228,11 @@ export default function ExperiencePage() {
         </section>
         <section className="space-y-3">
           <h2 className="text-base font-semibold">{t.experience.q7Title}</h2>
-          <Textarea
+          <ExperienceNoteField
             value={feedback.diningExperienceNote}
             placeholder={t.experience.q7Placeholder}
-            aria-invalid={touched && !noteReady}
-            onChange={(event) => setDiningExperienceNote(event.target.value)}
+            invalid={touched && !noteReady}
+            onChange={setDiningExperienceNote}
           />
           <p className="text-sm text-muted-foreground">
             {interpolate(t.experience.q7Hint, { count: noteCount })}
