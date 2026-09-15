@@ -14,6 +14,7 @@ const EVENT_FIELDS: Record<string, string> = {
 };
 
 function persistCounterField(eventType: string, document: unknown) {
+  if (eventType === "publish_dianping_click") return "dianpingPublishClicks";
   if (eventType === "publish_click") {
     const platform = (document as { metadata?: { platform?: string } })?.metadata?.platform;
     if (platform === "rednote" || platform === "xiaohongshu") return "xhsPublishClicks";

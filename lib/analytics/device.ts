@@ -6,3 +6,8 @@ export function deviceTypeFromUserAgent(userAgent: string): AnalyticsDeviceType 
   if (/Mobile|Android|iPhone|iPod|webOS|BlackBerry/i.test(ua)) return "mobile";
   return "desktop";
 }
+
+export function currentDeviceType(): AnalyticsDeviceType {
+  if (typeof navigator === "undefined") return "desktop";
+  return deviceTypeFromUserAgent(navigator.userAgent || "");
+}

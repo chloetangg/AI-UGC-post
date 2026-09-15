@@ -92,6 +92,7 @@ type CampaignFlowContextValue = {
   cover: CoverState | null;
   coverComposing: boolean;
   selectedCoverTemplateId: string;
+  generationId: string;
   setCustomer: (customer: CustomerInfo) => void;
   setProductFeedback: (productFeedback: ProductFeedback) => void;
   saveYouPage: () => Promise<void>;
@@ -867,6 +868,7 @@ export function CampaignFlowProvider({
       coverComposing,
       selectedCoverTemplateId:
         persisted.selectedCoverTemplateId || DEFAULT_COVER_TEMPLATE_ID,
+      generationId: persisted.generationId,
       setCustomer,
       setProductFeedback,
       saveYouPage,
@@ -889,6 +891,7 @@ export function CampaignFlowProvider({
       persisted.draft,
       persisted.cover,
       persisted.selectedCoverTemplateId,
+      persisted.generationId,
       coverComposing,
       photos,
       setCustomer,

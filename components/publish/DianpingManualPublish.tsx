@@ -4,15 +4,12 @@ import { useMemo, useState, useSyncExternalStore } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useT } from "@/components/providers/language-provider";
-import { interpolate } from "@/lib/i18n";
 import {
-  collectRednoteDownloads,
   copyPublishText,
   formatDianpingPasteText,
   isMobileDevice,
   type RednotePublishPackage,
 } from "@/lib/rednote-publish";
-import { saveImagesWithoutShare, saveOneImageWithoutShare } from "@/lib/publish/share";
 
 export function DianpingManualPublish({
   pkg,
@@ -25,13 +22,10 @@ export function DianpingManualPublish({
   const g = t.publish.dianpingGuide;
   const mobile = useSyncExternalStore(emptySubscribe, isMobileDevice, () => false);
   const pasteText = useMemo(() => formatDianpingPasteText(pkg), [pkg]);
-  const images = useMemo(() => collectRednoteDownloads(pkg), [pkg]);
 
   const [copied, setCopied] = useState(false);
   const [copyFailed, setCopyFailed] = useState(false);
   const [showCaption, setShowCaption] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [saveEach, setSaveEach] = useState(false);
 
   async function copyAll() {
     const ok = await copyPublishText(pasteText);
@@ -42,24 +36,6 @@ export function DianpingManualPublish({
       return;
     }
     setShowCaption(true);
-  }
-
-  async function saveAll() {
-    if (saving) return;
-    setSaving(true);
-    const results = await saveImagesWithoutShare(pkg);
-    const failed = results.some((item) => !item.ok);
-    if (mobile || failed || results.length > 1) setSaveEach(true);
-    setSaving(false);
-  }
-
-  async function saveOne(index: number) {
-    const item = images[index];
-    if (!item || saving) return;
-    setSaving(true);
-    const ok = await saveOneImageWithoutShare(item);
-    if (!ok) setSaveEach(true);
-    setSaving(false);
   }
 
   return (
@@ -92,8 +68,7 @@ export function DianpingManualPublish({
           </h2>
           <ol className="space-y-4">
             <GuideStep title={g.step1Title} />
-            <GuideStep title={g.step2Title} />
-            <GuideStep title={g.step4Title} body={`${g.step4Path}\n${g.step4Body}`} />
+            <GuideStep title={g.step4Title} body={g.step4Path} />
           </ol>
         </section>
 
@@ -121,50 +96,6 @@ export function DianpingManualPublish({
           ) : null}
           <Button className="w-full" size="lg" onClick={() => void copyAll()}>
             {copied ? g.copied : g.copyAll}
-          </Button>
-        </section>
-
-        <section className="space-y-3 rounded-3xl border border-border bg-card p-4 shadow-sm">
-          <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-            {g.imagesLabel}
-          </h2>
-          <p className="text-sm leading-relaxed text-muted-foreground">{g.step2Order}</p>
-          <div className="grid grid-cols-3 gap-2">
-            {images.map((item, index) => {
-              const photoIndex = images.slice(0, index + 1).filter((image) => image.kind === "photo").length;
-              const label =
-                item.kind === "cover" ? g.coverLabel : interpolate(g.photoLabel, { index: photoIndex });
-              return (
-                <figure key={item.key} className="space-y-1.5">
-                  <img
-                    src={item.url}
-                    alt={label}
-                    className="aspect-square w-full rounded-2xl object-cover"
-                  />
-                  <figcaption className="text-center text-[11px] leading-tight text-muted-foreground">
-                    {label}
-                  </figcaption>
-                  <Button
-                    className="w-full"
-                    size="sm"
-                    variant="outline"
-                    disabled={saving}
-                    onClick={() => void saveOne(index)}
-                  >
-                    {g.saveOne}
-                  </Button>
-                </figure>
-              );
-            })}
-          </div>
-          {saveEach ? (
-            <p className="text-sm font-semibold text-foreground">{g.saveEach}</p>
-          ) : null}
-          {saveEach && mobile ? (
-            <p className="text-sm leading-relaxed text-muted-foreground">{t.publish.longPressHint}</p>
-          ) : null}
-          <Button className="w-full" size="lg" variant="outline" disabled={saving} onClick={() => void saveAll()}>
-            {g.saveAll}
           </Button>
         </section>
 

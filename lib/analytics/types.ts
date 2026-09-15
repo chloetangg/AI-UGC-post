@@ -12,6 +12,9 @@ export const ANALYTICS_EVENT_TYPES = [
   "xhs_publish_click",
   "publish_click",
   "publish_platform_selected",
+  "publish_dianping_click",
+  "dianping_open_attempt",
+  "dianping_fallback",
 ] as const;
 
 export type AnalyticsEventType = (typeof ANALYTICS_EVENT_TYPES)[number];

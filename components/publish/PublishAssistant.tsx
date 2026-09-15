@@ -3,10 +3,10 @@
 import { useMemo, useState, useSyncExternalStore } from "react";
 import { Check } from "lucide-react";
 import { CopyButton } from "@/components/publish/CopyButton";
-import { DianpingManualPublish } from "@/components/publish/DianpingManualPublish";
 import { PostSlideshow } from "@/components/result/PostSlideshow";
 import { Button } from "@/components/ui/button";
 import { useT } from "@/components/providers/language-provider";
+import { useCampaignFlow } from "@/components/providers/campaign-flow-provider";
 import { interpolate, type Dictionary } from "@/lib/i18n";
 import type { FinalSlide } from "@/lib/cover/post-layout";
 import {
@@ -20,6 +20,8 @@ import {
   type RednotePublishPackage,
 } from "@/lib/rednote-publish";
 import { sharePost } from "@/lib/publish/share";
+import { DIANPING_SHOP_WEB_URL } from "@/lib/publish/dianping-shop";
+import { openTrackedDianpingShop } from "@/lib/publish/track-dianping";
 import type { PublishPlatform } from "@/lib/publish/types";
 import { trackAnalyticsEvent } from "@/lib/analytics/track-client";
 import { cn } from "@/lib/utils";
@@ -32,13 +34,14 @@ export function PublishAssistant({
   slides: FinalSlide[];
 }) {
   const t = useT();
+  const { generationId } = useCampaignFlow();
   const mobile = useSyncExternalStore(emptySubscribe, isMobileDevice, () => false);
   const fileShare = useSyncExternalStore(emptySubscribe, canShareFiles, () => false);
   const pasteText = useMemo(() => formatRednotePasteText(pkg), [pkg]);
   const downloads = useMemo(() => collectRednoteDownloads(pkg), [pkg]);
 
-  const [screen, setScreen] = useState<"choose" | "dianping">("choose");
   const [status, setStatus] = useState<PublishStatus>("idle");
+  const [dianpingFallback, setDianpingFallback] = useState(false);
   const [copyFailed, setCopyFailed] = useState(false);
   const [copiedAll, setCopiedAll] = useState(false);
   const [showPaste, setShowPaste] = useState(false);
@@ -123,9 +126,14 @@ export function PublishAssistant({
     setBusy(false);
   }
 
-  function handleDianping() {
+  async function handleDianping() {
+    if (busy) return;
     trackPlatformSelected("dianping");
-    setScreen("dianping");
+    setBusy(true);
+    setDianpingFallback(false);
+    const result = await openTrackedDianpingShop(generationId);
+    if (result === "fallback" || result === "desktop") setDianpingFallback(true);
+    setBusy(false);
   }
 
   async function openRednote() {
@@ -141,10 +149,6 @@ export function PublishAssistant({
       setStatus("fallback");
     }
     setBusy(false);
-  }
-
-  if (screen === "dianping") {
-    return <DianpingManualPublish pkg={pkg} onBack={() => setScreen("choose")} />;
   }
 
   return (
@@ -223,9 +227,20 @@ export function PublishAssistant({
             description={t.publish.dianpingGuide.chooseDp}
             logoSrc="/publish/dianping.png"
             disabled={busy}
-            onClick={handleDianping}
+            onClick={() => void handleDianping()}
           />
         </section>
+
+        {dianpingFallback ? (
+          <a
+            href={DIANPING_SHOP_WEB_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="block text-center text-sm font-semibold text-primary underline-offset-2 hover:underline"
+          >
+            {t.publish.dianpingShopFallback}
+          </a>
+        ) : null}
 
         {status === "shared" && fileShare ? (
           <section className="rounded-3xl border border-border bg-card p-4 shadow-sm">

@@ -76,7 +76,14 @@ export async function queryAnalyticsReport(input: {
             { $count: "count" },
           ],
           dianpingClicks: [
-            { $match: { eventType: "publish_click", "metadata.platform": "dianping" } },
+            {
+              $match: {
+                $or: [
+                  { eventType: "publish_dianping_click" },
+                  { eventType: "publish_click", "metadata.platform": "dianping" },
+                ],
+              },
+            },
             { $count: "count" },
           ],
           daily: [
@@ -121,9 +128,14 @@ export async function queryAnalyticsReport(input: {
                   $sum: {
                     $cond: [
                       {
-                        $and: [
-                          { $eq: ["$eventType", "publish_click"] },
-                          { $eq: ["$metadata.platform", "dianping"] },
+                        $or: [
+                          { $eq: ["$eventType", "publish_dianping_click"] },
+                          {
+                            $and: [
+                              { $eq: ["$eventType", "publish_click"] },
+                              { $eq: ["$metadata.platform", "dianping"] },
+                            ],
+                          },
                         ],
                       },
                       1,
