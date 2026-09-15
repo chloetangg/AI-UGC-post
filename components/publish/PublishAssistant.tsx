@@ -3,6 +3,7 @@
 import { useMemo, useState, useSyncExternalStore } from "react";
 import { Check } from "lucide-react";
 import { CopyButton } from "@/components/publish/CopyButton";
+import { DianpingCopyModal } from "@/components/publish/DianpingManualPublish";
 import { PostSlideshow } from "@/components/result/PostSlideshow";
 import { Button } from "@/components/ui/button";
 import { useT } from "@/components/providers/language-provider";
@@ -41,6 +42,7 @@ export function PublishAssistant({
   const downloads = useMemo(() => collectRednoteDownloads(pkg), [pkg]);
 
   const [status, setStatus] = useState<PublishStatus>("idle");
+  const [dianpingOpen, setDianpingOpen] = useState(false);
   const [dianpingFallback, setDianpingFallback] = useState(false);
   const [copyFailed, setCopyFailed] = useState(false);
   const [copiedAll, setCopiedAll] = useState(false);
@@ -126,9 +128,15 @@ export function PublishAssistant({
     setBusy(false);
   }
 
-  async function handleDianping() {
+  function handleDianping() {
     if (busy) return;
     trackPlatformSelected("dianping");
+    setDianpingFallback(false);
+    setDianpingOpen(true);
+  }
+
+  async function publishDianping() {
+    if (busy) return;
     setBusy(true);
     setDianpingFallback(false);
     const result = await openTrackedDianpingShop(generationId);
@@ -227,11 +235,11 @@ export function PublishAssistant({
             description={t.publish.dianpingGuide.chooseDp}
             logoSrc="/publish/dianping.png"
             disabled={busy}
-            onClick={() => void handleDianping()}
+            onClick={handleDianping}
           />
         </section>
 
-        {dianpingFallback ? (
+        {dianpingFallback && !dianpingOpen ? (
           <a
             href={DIANPING_SHOP_WEB_URL}
             target="_blank"
@@ -268,6 +276,15 @@ export function PublishAssistant({
           </Button>
         ) : null}
       </div>
+      {dianpingOpen ? (
+        <DianpingCopyModal
+          pkg={pkg}
+          busy={busy}
+          showFallback={dianpingFallback}
+          onClose={() => setDianpingOpen(false)}
+          onPublish={() => void publishDianping()}
+        />
+      ) : null}
     </div>
   );
 }

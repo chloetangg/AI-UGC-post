@@ -1,123 +1,92 @@
 "use client";
 
-import { useMemo, useState, useSyncExternalStore } from "react";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { useMemo, useState } from "react";
+import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useT } from "@/components/providers/language-provider";
-import {
-  copyPublishText,
-  formatDianpingPasteText,
-  isMobileDevice,
-  type RednotePublishPackage,
-} from "@/lib/rednote-publish";
+import { copyPublishText, formatDianpingPasteText, type RednotePublishPackage } from "@/lib/rednote-publish";
+import { DIANPING_SHOP_WEB_URL } from "@/lib/publish/dianping-shop";
 
-export function DianpingManualPublish({
+export function DianpingCopyModal({
   pkg,
-  onBack,
+  busy,
+  showFallback,
+  onClose,
+  onPublish,
 }: {
   pkg: RednotePublishPackage;
-  onBack: () => void;
+  busy?: boolean;
+  showFallback?: boolean;
+  onClose: () => void;
+  onPublish: () => void;
 }) {
   const t = useT();
   const g = t.publish.dianpingGuide;
-  const mobile = useSyncExternalStore(emptySubscribe, isMobileDevice, () => false);
   const pasteText = useMemo(() => formatDianpingPasteText(pkg), [pkg]);
-
   const [copied, setCopied] = useState(false);
   const [copyFailed, setCopyFailed] = useState(false);
-  const [showCaption, setShowCaption] = useState(false);
 
-  async function copyAll() {
+  async function copyBody() {
     const ok = await copyPublishText(pasteText);
     setCopyFailed(!ok);
-    if (ok) {
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1800);
-      return;
-    }
-    setShowCaption(true);
+    if (!ok) return;
+    setCopied(true);
   }
 
   return (
-    <div className="flex flex-1 flex-col">
-      <div className="flex-1 space-y-4 pb-4">
-        <button
-          type="button"
-          className="text-sm font-semibold text-muted-foreground"
-          onClick={onBack}
-        >
-          ← {g.back}
-        </button>
-
-        <div className="space-y-2">
-          <h1 className="font-display text-[1.85rem] leading-tight tracking-tight text-foreground">
-            {g.title}
-          </h1>
-          <p className="text-[15px] leading-relaxed text-muted-foreground">{g.subtitle}</p>
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center">
+      <button type="button" className="absolute inset-0" aria-label={g.back} onClick={onClose} />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="dianping-copy-title"
+        className="relative z-10 w-full max-w-[400px] rounded-3xl border border-border bg-card p-5 shadow-lg"
+      >
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <div className="min-w-0 space-y-1">
+            <h2 id="dianping-copy-title" className="text-lg font-semibold text-foreground">
+              {g.copyBodyTitle}
+            </h2>
+            <p className="text-sm leading-relaxed text-muted-foreground">{g.copyFirst}</p>
+          </div>
+          <button
+            type="button"
+            className="flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted"
+            aria-label={t.publish.closeSelector}
+            onClick={onClose}
+          >
+            <X className="size-4" />
+          </button>
         </div>
 
-        {!mobile ? (
-          <div className="rounded-3xl bg-accent/70 p-4 text-sm leading-relaxed text-accent-foreground">
-            {g.desktopHint}
-          </div>
+        <p className="mb-4 max-h-48 overflow-y-auto whitespace-pre-wrap rounded-2xl bg-muted/60 p-3 text-[15px] leading-relaxed text-foreground select-text">
+          {pasteText}
+        </p>
+
+        {copyFailed ? (
+          <p className="mb-3 text-sm text-destructive">{t.publish.statusCopyFailed}</p>
         ) : null}
 
-        <section className="rounded-3xl border border-border bg-card p-4 shadow-sm">
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-            {g.stepsTitle}
-          </h2>
-          <ol className="space-y-4">
-            <GuideStep title={g.step1Title} />
-            <GuideStep title={g.step4Title} body={g.step4Path} />
-          </ol>
-        </section>
-
-        <section className="space-y-3 rounded-3xl border border-border bg-card p-4 shadow-sm">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-              {g.captionLabel}
-            </h2>
-            <button
-              type="button"
-              className="flex items-center gap-1 text-xs font-semibold text-muted-foreground"
-              onClick={() => setShowCaption((open) => !open)}
-            >
-              {showCaption ? g.hideCaption : g.viewCaption}
-              {showCaption ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
-            </button>
-          </div>
-          {showCaption || copyFailed ? (
-            <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-foreground select-text">
-              {pasteText}
-            </p>
-          ) : null}
-          {copyFailed ? (
-            <p className="text-sm text-destructive">{t.publish.statusCopyFailed}</p>
-          ) : null}
-          <Button className="w-full" size="lg" onClick={() => void copyAll()}>
+        <div className="space-y-2.5">
+          <Button className="w-full" size="lg" variant={copied ? "outline" : "default"} onClick={() => void copyBody()}>
             {copied ? g.copied : g.copyAll}
           </Button>
-        </section>
-
-        <div className="rounded-3xl bg-primary/10 p-4 text-sm font-semibold leading-relaxed text-foreground">
-          {g.warning}
+          <Button className="w-full" size="lg" disabled={!copied || busy} onClick={onPublish}>
+            {t.publish.publishAction.dianping}
+          </Button>
         </div>
+
+        {showFallback ? (
+          <a
+            href={DIANPING_SHOP_WEB_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-3 block text-center text-sm font-semibold text-primary underline-offset-2 hover:underline"
+          >
+            {t.publish.dianpingShopFallback}
+          </a>
+        ) : null}
       </div>
     </div>
   );
-}
-
-function GuideStep({ title, body }: { title: string; body?: string }) {
-  return (
-    <li className="space-y-1">
-      <p className="text-sm font-semibold text-foreground">{title}</p>
-      {body ? (
-        <p className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">{body}</p>
-      ) : null}
-    </li>
-  );
-}
-
-function emptySubscribe() {
-  return () => undefined;
 }
