@@ -26,12 +26,18 @@ export function campaignPath(campaignId: string, step: FlowStep = "landing") {
 }
 
 export const PROGRESS_STEPS = [
-  { key: "customer", label: "You" },
-  { key: "experience", label: "Feel" },
-  { key: "upload", label: "Photos" },
-  { key: "result", label: "Post" },
-  { key: "publish", label: "Share" },
+  { key: "rate", steps: ["customer", "experience"] },
+  { key: "post", steps: ["upload", "generating", "result"] },
+  { key: "share", steps: ["publish"] },
 ] as const;
+
+export type ProgressStepKey = (typeof PROGRESS_STEPS)[number]["key"];
+
+export function progressIndexForStep(step: FlowStep) {
+  return PROGRESS_STEPS.findIndex((item) =>
+    (item.steps as readonly string[]).includes(step),
+  );
+}
 
 export const NEXT_FLOW_STEP: Partial<Record<FlowStep, FlowStep>> = {
   customer: "experience",

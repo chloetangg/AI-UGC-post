@@ -5,7 +5,7 @@ import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
-import { campaignPath, NEXT_FLOW_STEP, PROGRESS_STEPS, type FlowStep } from "@/lib/flow";
+import { campaignPath, NEXT_FLOW_STEP, PROGRESS_STEPS, progressIndexForStep, type FlowStep } from "@/lib/flow";
 import { getCampaign } from "@/lib/mock/campaign";
 import { cn } from "@/lib/utils";
 import { CampaignHeader } from "@/components/campaign/CampaignHeader";
@@ -55,8 +55,8 @@ export function CampaignShell({
   }, [campaignId, currentStep, router]);
 
   return (
-    <div className="min-h-dvh bg-[radial-gradient(circle_at_top,#e8f3ec_0%,#f5f8f5_38%,#eef4ef_100%)]">
-      <div className="mx-auto flex min-h-dvh w-full max-w-[430px] flex-col px-5 pb-8 pt-[max(1rem,env(safe-area-inset-top))]">
+    <div className="flex min-h-full flex-1 flex-col">
+      <div className="mx-auto flex min-h-full w-full max-w-[430px] flex-1 flex-col px-5 pb-4 pt-[max(1rem,env(safe-area-inset-top))]">
         {isLanding || isPrivacy ? (
           <div className="mb-2 flex justify-end">
             <LanguageSwitch />
@@ -89,15 +89,11 @@ export function CampaignShell({
 function StepProgress({ current }: { current: FlowStep }) {
   const t = useT();
   const labels = {
-    customer: t.nav.you,
-    experience: t.nav.feel,
-    upload: t.nav.photos,
-    result: t.nav.post,
-    publish: t.nav.share,
+    rate: t.nav.rate,
+    post: t.nav.post,
+    share: t.nav.share,
   } as const;
-  const activeIndex = PROGRESS_STEPS.findIndex((step) => step.key === current);
-  const uploadIndex = PROGRESS_STEPS.findIndex((step) => step.key === "upload");
-  const visualIndex = current === "generating" ? uploadIndex : activeIndex;
+  const visualIndex = progressIndexForStep(current);
 
   return (
     <ol className="mb-6 flex items-center justify-between gap-1">

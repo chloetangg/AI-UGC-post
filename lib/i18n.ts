@@ -32,9 +32,7 @@ export type ContentLanguage = typeof CONTENT_LANGUAGE;
 
 const en = {
   nav: {
-    you: "YOU",
-    feel: "FEEL",
-    photos: "PHOTOS",
+    rate: "RATE",
     post: "POST",
     share: "SHARE",
   },
@@ -60,7 +58,7 @@ const en = {
   },
   customer: {
     title: "Tell us a little about you",
-    subtitle: "We’ll only use this for the campaign. No account needed.",
+    subtitle: "We’ll only use this for the campaign. It takes about 30 seconds.",
     name: "Name / Nickname",
     namePlaceholder: "Your name",
     email: "Email",
@@ -94,10 +92,9 @@ const en = {
       location: "Please select your country.",
     },
     genders: {
-      female: "Female",
       male: "Male",
-      "non-binary": "Non-binary",
-      "prefer-not-to-say": "Prefer not to say",
+      female: "Female",
+      other: "Other",
     },
   },
   experience: {
@@ -400,9 +397,7 @@ const en = {
 
 const zh: typeof en = {
   nav: {
-    you: "YOU",
-    feel: "FEEL",
-    photos: "PHOTOS",
+    rate: "RATE",
     post: "POST",
     share: "SHARE",
   },
@@ -428,7 +423,7 @@ const zh: typeof en = {
   },
   customer: {
     title: "先告诉我们一点关于你的信息",
-    subtitle: "仅用于本次活动，不需要注册账号。",
+    subtitle: "仅用于本次活动，30秒便可完成。",
     name: "姓名 / 昵称",
     namePlaceholder: "你的名字",
     email: "邮箱",
@@ -461,10 +456,9 @@ const zh: typeof en = {
       location: "请选择你来自的国家。",
     },
     genders: {
-      female: "女",
       male: "男",
-      "non-binary": "非二元",
-      "prefer-not-to-say": "不愿透露",
+      female: "女",
+      other: "其他",
     },
   },
   experience: {
@@ -763,9 +757,7 @@ const zh: typeof en = {
 
 const th: typeof en = {
   nav: {
-    you: "YOU",
-    feel: "FEEL",
-    photos: "PHOTOS",
+    rate: "RATE",
     post: "POST",
     share: "SHARE",
   },
@@ -791,7 +783,7 @@ const th: typeof en = {
   },
   customer: {
     title: "บอกเราเกี่ยวกับตัวคุณสักนิด",
-    subtitle: "ใช้สำหรับแคมเปญนี้เท่านั้น ไม่ต้องสมัครบัญชี",
+    subtitle: "ใช้สำหรับแคมเปญนี้เท่านั้น ใช้เวลาประมาณ 30 วินาที",
     name: "ชื่อ / ชื่อเล่น",
     namePlaceholder: "ชื่อของคุณ",
     email: "อีเมล",
@@ -825,10 +817,9 @@ const th: typeof en = {
       location: "กรุณาเลือกประเทศที่คุณมาจาก",
     },
     genders: {
-      female: "หญิง",
       male: "ชาย",
-      "non-binary": "ไม่ระบุเป็นหญิงหรือชาย",
-      "prefer-not-to-say": "ไม่ต้องการระบุ",
+      female: "หญิง",
+      other: "อื่นๆ",
     },
   },
   experience: {

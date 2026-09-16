@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import { Instrument_Serif, Plus_Jakarta_Sans } from "next/font/google";
+import { Footer } from "@/components/Footer";
 import "./globals.css";
 
 const plusJakarta = Plus_Jakarta_Sans({
@@ -34,9 +35,12 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${plusJakarta.variable} ${instrumentSerif.variable} h-full antialiased`}
+      className={`${plusJakarta.variable} ${instrumentSerif.variable} min-h-dvh antialiased`}
     >
-      <body className="min-h-full bg-background font-sans text-foreground">{children}</body>
+      <body className="flex min-h-dvh flex-col bg-[radial-gradient(circle_at_top,#e8f3ec_0%,#f5f8f5_38%,#eef4ef_100%)] font-sans text-foreground">
+        <div className="flex flex-1 flex-col">{children}</div>
+        <Footer />
+      </body>
     </html>
   );
 }

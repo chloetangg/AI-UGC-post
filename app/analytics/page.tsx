@@ -67,7 +67,7 @@ export default function AnalyticsDashboardPage() {
   const conversion = report?.conversion;
 
   return (
-    <div className="min-h-dvh bg-[radial-gradient(circle_at_top,#e8f3ec_0%,#f5f8f5_38%,#eef4ef_100%)] px-5 py-8">
+    <div className="flex min-h-full flex-1 flex-col px-5 py-8">
       <div className="mx-auto max-w-5xl space-y-6">
         <header className="space-y-1">
           <p className="text-sm font-medium text-primary">Baan Ying UGC</p>
