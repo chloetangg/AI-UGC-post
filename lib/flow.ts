@@ -26,8 +26,8 @@ export function campaignPath(campaignId: string, step: FlowStep = "landing") {
 }
 
 export const PROGRESS_STEPS = [
-  { key: "rate", steps: ["customer", "experience"] },
-  { key: "post", steps: ["upload", "generating", "result"] },
+  { key: "you", steps: ["customer"] },
+  { key: "rate", steps: ["experience", "upload", "generating", "result"] },
   { key: "share", steps: ["publish"] },
 ] as const;
 
@@ -41,7 +41,7 @@ export function progressIndexForStep(step: FlowStep) {
 
 export const NEXT_FLOW_STEP: Partial<Record<FlowStep, FlowStep>> = {
   customer: "experience",
-  experience: "upload",
+  experience: "generating",
   upload: "generating",
   generating: "result",
   result: "publish",

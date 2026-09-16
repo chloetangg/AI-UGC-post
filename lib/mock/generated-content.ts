@@ -39,8 +39,8 @@ export const mockGeneratedContent: GeneratedContent = {
   selectedPhotoIndex: 0,
   selectedPhotoIndexes: [0],
   photoSelectionReason: "食物主体清晰、构图完整，适合叠加标题。",
-  selectedTemplateId: "bottom-card",
-  suitableTemplateIds: ["bottom-card", "top-banner", "polaroid", "center-lower"],
+  selectedTemplateId: "top-stroke",
+  suitableTemplateIds: ["top-stroke", "dual-line", "top-banner", "polaroid"],
   remainingPhotoIndexes: [],
   remainingOrderPattern: "6",
 };
@@ -95,39 +95,39 @@ type CoverOverlay = { title: string; subtitle: string };
 
 const DISH_COVER_OVERLAYS: Record<RecommendedDish, CoverOverlay[]> = {
   "Yellow Curry Crab Meat": [
-    { title: "曼谷必吃", subtitle: "必点黄咖喱蟹肉" },
-    { title: "泰餐必吃", subtitle: "必点黄咖喱蟹肉" },
-    { title: "曼谷泰餐", subtitle: "必点黄咖喱蟹肉" },
+    { title: "曼谷必吃", subtitle: "这口咖喱蟹肉像家的味道" },
+    { title: "泰餐必吃", subtitle: "没想到最喜欢这道" },
+    { title: "曼谷泰餐", subtitle: "这口咖喱蟹肉有点特别" },
   ],
   "Tom Yum Goong": [
-    { title: "曼谷必吃", subtitle: "必点冬阴功虾汤" },
-    { title: "泰餐必吃", subtitle: "必点冬阴功虾汤" },
-    { title: "曼谷泰餐", subtitle: "必点冬阴功虾汤" },
+    { title: "曼谷必吃", subtitle: "这口冬阴功有点特别" },
+    { title: "泰餐必吃", subtitle: "没想到最喜欢这道" },
+    { title: "曼谷泰餐", subtitle: "这口冬阴功有点特别" },
   ],
   "Thai Sweet & Sour Steamed Fish": [
-    { title: "曼谷必吃", subtitle: "招牌泰式酸甜蒸鱼" },
-    { title: "泰餐必吃", subtitle: "招牌泰式酸甜蒸鱼" },
-    { title: "曼谷泰餐", subtitle: "招牌泰式酸甜蒸鱼" },
+    { title: "曼谷必吃", subtitle: "这口泰式蒸鱼有点特别" },
+    { title: "泰餐必吃", subtitle: "没想到最喜欢这道" },
+    { title: "曼谷泰餐", subtitle: "这口泰式蒸鱼有点特别" },
   ],
   "Stir-Fried Shrimp with Garlic": [
-    { title: "曼谷必吃", subtitle: "蒜蓉炒虾" },
-    { title: "泰餐必吃", subtitle: "蒜蓉炒虾" },
-    { title: "曼谷泰餐", subtitle: "蒜蓉炒虾" },
+    { title: "曼谷必吃", subtitle: "这口蒜蓉炒虾有点特别" },
+    { title: "泰餐必吃", subtitle: "没想到最喜欢这道" },
+    { title: "曼谷泰餐", subtitle: "这口蒜蓉炒虾有点特别" },
   ],
   "Mango Sticky Rice": [
-    { title: "曼谷必吃", subtitle: "芒果糯米饭" },
-    { title: "泰餐必吃", subtitle: "芒果糯米饭" },
-    { title: "曼谷美食", subtitle: "芒果糯米饭" },
+    { title: "曼谷必吃", subtitle: "没想到最喜欢这道" },
+    { title: "泰餐必吃", subtitle: "这口芒果糯米饭有点特别" },
+    { title: "曼谷美食", subtitle: "没想到最喜欢这道" },
   ],
   Others: [],
 };
 
 const GENERIC_COVER_OVERLAYS: CoverOverlay[] = [
-  { title: "曼谷必吃", subtitle: "家常泰式料理" },
-  { title: "泰餐必吃", subtitle: "招牌菜值得试" },
-  { title: "曼谷泰餐", subtitle: "超人气招牌菜" },
-  { title: "美食必吃", subtitle: "家常泰式料理" },
-  { title: "曼谷美食", subtitle: "泰式家常料理" },
+  { title: "曼谷必吃", subtitle: "这顿吃下来很满足" },
+  { title: "泰餐必吃", subtitle: "逛完街来吃刚刚好" },
+  { title: "曼谷泰餐", subtitle: "这几道菜还想再点" },
+  { title: "美食必吃", subtitle: "这顿吃下来很满足" },
+  { title: "曼谷美食", subtitle: "逛完街来吃刚刚好" },
 ];
 
 function mockCoverOverlay(input: GeneratePostInput): CoverOverlay {
@@ -149,16 +149,16 @@ function mockCoverOverlay(input: GeneratePostInput): CoverOverlay {
     const pairs = coverFallbackPairs(context);
     return layoutCoverOverlay(
       pairs[variant % pairs.length]?.title ?? "曼谷必吃",
-      pairs[variant % pairs.length]?.subtitle ?? "家常泰式料理",
+      pairs[variant % pairs.length]?.subtitle ?? "这顿吃下来很满足",
       [],
       context,
     );
   }
   if (/温馨|家常|家里|家的感觉/.test(note)) {
     const atmosphere: CoverOverlay[] = [
-      { title: "曼谷必吃", subtitle: "家常温馨料理" },
-      { title: "曼谷美食", subtitle: "温馨家常味道" },
-      { title: "必吃泰餐", subtitle: "温馨家常味道" },
+      { title: "曼谷必吃", subtitle: "这口味道有点像家常" },
+      { title: "曼谷美食", subtitle: "这口味道有点像家常" },
+      { title: "必吃泰餐", subtitle: "这口味道有点像家常" },
     ];
     return layoutCoverOverlay(
       atmosphere[variant % atmosphere.length].title,

@@ -206,7 +206,7 @@ export const TEMPLATES: CoverTemplate[] = [
   },
   {
     id: "top-banner",
-    name: "Style 4",
+    name: "Style 3",
     layout: "single",
     overlay: {
       position: "top",
@@ -341,7 +341,7 @@ export const TEMPLATES: CoverTemplate[] = [
   },
   {
     id: "polaroid",
-    name: "Style 6",
+    name: "Style 4",
     layout: "single",
     overlay: null,
     safeArea: SAFE,
@@ -414,7 +414,7 @@ export const TEMPLATES: CoverTemplate[] = [
   },
   {
     id: "center-lower",
-    name: "Style 7",
+    name: "Style 5",
     layout: "single",
     overlay: {
       position: "bottom",
@@ -564,7 +564,7 @@ export const TEMPLATES: CoverTemplate[] = [
   },
   {
     id: "dual-line",
-    name: "Style 3",
+    name: "Style 2",
     layout: "single",
     overlay: {
       position: "top",
@@ -623,6 +623,49 @@ export const TEMPLATES: CoverTemplate[] = [
         lineHeight: 1.1,
         maxHeight: 180,
         minSize: 104,
+      },
+      badge: {
+        x: SAFE,
+        y: 40,
+        maxWidth: 240,
+        font: "jiangchengheiti",
+        size: 22,
+        fill: COLORS.white,
+        align: "center",
+      },
+    },
+  },
+  {
+    id: "photo-only",
+    name: "Style 6",
+    layout: "single",
+    overlay: null,
+    hideText: true,
+    safeArea: SAFE,
+    badgeStyle: "plain",
+    decoration: [],
+    slots: {
+      title: {
+        x: SAFE,
+        y: 108,
+        maxWidth: W - SAFE * 2,
+        font: "jiangchengheiti",
+        size: 88,
+        fill: COLORS.white,
+        align: "center",
+        lineHeight: 1.1,
+        maxHeight: 160,
+      },
+      subtitle: {
+        x: SAFE,
+        y: 280,
+        maxWidth: W - SAFE * 2,
+        font: "jiangchengheiti",
+        size: 56,
+        fill: COLORS.white,
+        align: "center",
+        lineHeight: 1.1,
+        maxHeight: 80,
       },
       badge: {
         x: SAFE,

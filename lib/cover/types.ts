@@ -7,7 +7,7 @@ export const EMPHASIS_TEMPLATE_IDS = ["badge-stack", "split-band"] as const;
 export const LEFT_ALIGN_TEMPLATE_IDS = ["bottom-card"] as const;
 export const EMPHASIS_SIZE_SCALE = 1.38;
 export const EMPHASIS_PACK_SCALE = 1.35;
-/** Style 1–3 four-photo grid; 1–3 photos on those styles stay single-photo. */
+/** Style 1–2 four-photo grid; 1–3 photos on those styles stay single-photo. */
 export const COLLAGE_TITLE_SCALE = 0.8;
 /** Slightly restrain designed main-title size so the subtitle can stay a strong secondary headline. */
 export const MAIN_TITLE_RESTRAINT = 0.9;
@@ -176,6 +176,7 @@ export type CoverTemplate = {
   safeArea: number;
   badgeStyle?: BadgeStyle;
   badgeBackground?: string;
+  hideText?: boolean;
   textStyle?: CoverTextStyle;
   slots: {
     title: TextSlot;

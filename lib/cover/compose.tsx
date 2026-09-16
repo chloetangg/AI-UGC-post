@@ -15,7 +15,7 @@ import { countCoverUnits, sanitizeCoverLine } from "./cover-title";
 import { COLORS, getTemplate } from "./templates";
 import { applyFontMatch } from "./font-match";
 import { COLLAGE_BACKGROUND, COLLAGE_TILES, collageGridBounds, planCollageTiles } from "./collage";
-import { isFourGridTemplateId } from "./post-layout";
+import { isFourGridTemplateId, isPhotoOnlyTemplate } from "./post-layout";
 import {
   CANVAS_HEIGHT,
   CANVAS_WIDTH,
@@ -1554,7 +1554,7 @@ function CoverMarkup(props: {
         renderDecoration(decoration, index),
       )}
 
-      {renderCoverText(props.template, props.title, props.subtitle)}
+      {props.template.hideText ? null : renderCoverText(props.template, props.title, props.subtitle)}
     </div>
   );
 }
@@ -1594,7 +1594,8 @@ function asSinglePhotoTemplate(template: CoverTemplate): CoverTemplate {
 }
 
 export async function composeCover(request: ComposeRequest): Promise<ComposeResult> {
-  if (!request.title.trim()) {
+  const hideText = isPhotoOnlyTemplate(request.templateId);
+  if (!hideText && !request.title.trim()) {
     throw new CoverComposeError("title is required", 400);
   }
   if (!request.image?.length) {
@@ -1636,6 +1637,53 @@ export async function composeCover(request: ComposeRequest): Promise<ComposeResu
 
   if (!coverFont || !subtitleFont) {
     throw new CoverComposeError("Chinese font failed to load", 500);
+  }
+
+  if (hideText) {
+    const emptyMeasured = {
+      lines: [] as string[],
+      lineWidths: [] as number[],
+      fontSize: MIN_TITLE_SIZE,
+      lineHeight: 1,
+      width: 0,
+      height: 0,
+      truncated: false,
+    };
+    const emptyTitle: LaidOutSlot = {
+      slot: template.slots.title,
+      text: "",
+      measured: emptyMeasured,
+    };
+    const svg = await satori(
+      <CoverMarkup
+        photoDataUrl={photo.dataUrl}
+        template={template}
+        overlayEnabled={false}
+        title={emptyTitle}
+        subtitle={null}
+      />,
+      {
+        width: CANVAS_WIDTH,
+        height: CANVAS_HEIGHT,
+        fonts: toSatoriFonts(fonts),
+      },
+    );
+    const resvg = new Resvg(svg, {
+      fitTo: { mode: "width", value: CANVAS_WIDTH },
+      font: { loadSystemFonts: false },
+    });
+    const png = resvg.render().asPng();
+    const format = request.format ?? "png";
+    const encoded = await encodeOutput(Buffer.from(png), format);
+    return {
+      buffer: encoded.buffer,
+      contentType: encoded.contentType,
+      templateId: template.id,
+      usedFontSize: 0,
+      usedFont: toUsedFont(coverFont),
+      width: CANVAS_WIDTH,
+      height: CANVAS_HEIGHT,
+    };
   }
 
   const title = keepRenderableCoverText(

@@ -10,15 +10,14 @@ import { useCampaignFlow } from "@/components/providers/campaign-flow-provider";
 import { Input } from "@/components/ui/input";
 import { ExperienceNoteField } from "@/components/experience/ExperienceNoteField";
 import { MealExpenseField } from "@/components/experience/MealExpenseField";
+import { PhotoUploader } from "@/components/upload/PhotoUploader";
 import { campaignPath } from "@/lib/flow";
 import { interpolate } from "@/lib/i18n";
 import { useT } from "@/components/providers/language-provider";
 import {
-  CUSTOMER_TYPES,
   ENJOY_MOST,
   RECOMMEND_TO,
   RECOMMENDED_DISHES,
-  VISIT_FREQUENCIES,
   emptyProductFeedback,
   isDiningExperienceNoteComplete,
   countDiningExperienceUnits,
@@ -26,26 +25,29 @@ import {
   type EnjoyMost,
   type RecommendTo,
   type RecommendedDish,
-  type VisitFrequency,
 } from "@/types/content";
 import { isMealExpenseComplete } from "@/lib/meal-expense";
 
 export default function ExperiencePage() {
   const router = useRouter();
   const { campaignId } = useParams<{ campaignId: string }>();
-  const { productFeedback, setProductFeedback, saveFeelExpense } = useCampaignFlow();
+  const {
+    productFeedback,
+    setProductFeedback,
+    saveFeelExpense,
+    photos,
+    addPhotos,
+    removePhoto,
+  } = useCampaignFlow();
   const t = useT();
   const [touched, setTouched] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const feedback = withDefaultBranch({ ...emptyProductFeedback, ...productFeedback });
-  const visitFrequency = VISIT_FREQUENCIES.includes(feedback.visitFrequency as VisitFrequency)
-    ? feedback.visitFrequency
-    : "";
 
-  const requiredChoicesReady = Boolean(feedback.customerType && visitFrequency);
   const expenseReady = isMealExpenseComplete(feedback.totalMealExpense);
   const noteReady = isDiningExperienceNoteComplete(feedback.diningExperienceNote);
-  const ready = requiredChoicesReady && expenseReady && noteReady;
+  const photosReady = photos.length > 0;
+  const ready = expenseReady && noteReady && photosReady;
   const noteCount = countDiningExperienceUnits(feedback.diningExperienceNote);
 
   function continueNext() {
@@ -55,7 +57,7 @@ export default function ExperiencePage() {
     setProductFeedback(withDefaultBranch(feedback));
     void saveFeelExpense();
     startTransition(() => {
-      router.push(campaignPath(campaignId, "upload"));
+      router.push(campaignPath(campaignId, "generating"));
     });
   }
 
@@ -122,38 +124,6 @@ export default function ExperiencePage() {
         subtitle={t.campaign.subtitle}
       />
       <div className="space-y-7 pb-28">
-        <section className="space-y-3">
-          <div>
-            <h2 className="text-base font-semibold">{t.experience.q2Title}</h2>
-            <p className="text-sm text-muted-foreground">{t.experience.q2Description}</p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {CUSTOMER_TYPES.map((option) => (
-              <ChoiceChip
-                key={option}
-                label={t.options.customerTypes[option]}
-                selected={feedback.customerType === option}
-                onClick={() => setProductFeedback({ ...feedback, customerType: option })}
-              />
-            ))}
-          </div>
-        </section>
-        <section className="space-y-3">
-          <div>
-            <h2 className="text-base font-semibold">{t.experience.q3Title}</h2>
-            <p className="text-sm text-muted-foreground">{t.experience.q3Description}</p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {VISIT_FREQUENCIES.map((option) => (
-              <ChoiceChip
-                key={option}
-                label={t.options.visitFrequencies[option]}
-                selected={visitFrequency === option}
-                onClick={() => setProductFeedback({ ...feedback, visitFrequency: option })}
-              />
-            ))}
-          </div>
-        </section>
         <section className="space-y-3">
           <div>
             <h2 className="text-base font-semibold">{t.experience.qExpenseTitle}</h2>
@@ -241,16 +211,18 @@ export default function ExperiencePage() {
             <p className="text-sm text-destructive">{t.experience.q7Error}</p>
           ) : null}
         </section>
-        {touched && !requiredChoicesReady ? (
-          <p className="text-sm text-destructive">
-            {t.experience.requiredError}
-          </p>
-        ) : null}
-        {touched && !expenseReady ? (
-          <p className="text-sm text-destructive">{t.experience.qExpenseError}</p>
-        ) : null}
+        <section className="space-y-3">
+          <div>
+            <h2 className="text-base font-semibold">{t.upload.title}</h2>
+            <p className="text-sm text-muted-foreground">{t.upload.subtitle}</p>
+          </div>
+          <PhotoUploader photos={photos} onAdd={addPhotos} onRemove={removePhoto} />
+          {touched && !photosReady ? (
+            <p className="text-sm text-destructive">{t.upload.requiredError}</p>
+          ) : null}
+        </section>
       </div>
-      <StickyAction disabled={leaving} onClick={continueNext}>{t.common.continue}</StickyAction>
+      <StickyAction disabled={leaving} onClick={continueNext}>{t.upload.generate}</StickyAction>
     </>
   );
 }

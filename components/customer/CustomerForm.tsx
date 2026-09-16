@@ -17,10 +17,16 @@ export function CustomerForm({
   value,
   onChange,
   onContinue,
+  extraValid = true,
+  extraError,
+  children,
 }: {
   value: CustomerInfo;
   onChange: (value: CustomerInfo) => void;
   onContinue: () => void;
+  extraValid?: boolean;
+  extraError?: string;
+  children?: ReactNode;
 }) {
   const t = useT();
   const [touched, setTouched] = useState(false);
@@ -28,6 +34,7 @@ export function CustomerForm({
 
   const errors = useMemo(() => validateCustomer(value, t), [value, t]);
   const show = (field: CustomerFields) => (touched ? errors[field] : undefined);
+  const hasErrors = Object.keys(errors).length > 0 || !extraValid;
 
   function update<K extends CustomerFields>(field: K, next: CustomerInfo[K]) {
     onChange({ ...value, [field]: next });
@@ -36,14 +43,14 @@ export function CustomerForm({
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setTouched(true);
-    if (Object.keys(errors).length > 0) return;
+    if (hasErrors) return;
     setLeaving(true);
     onContinue();
   }
 
   return (
     <form className="flex flex-1 flex-col" onSubmit={handleSubmit} noValidate>
-      <div className="space-y-4">
+      <div className="space-y-4 pb-28">
         <Field label={t.customer.ageRange} htmlFor="ageRange" required error={show("ageRange")} optionalLabel={t.common.optional}>
           <MenuSelect
             id="ageRange"
@@ -81,13 +88,15 @@ export function CustomerForm({
             onChange={(location) => update("location", location)}
           />
         </Field>
-      </div>
 
-      {touched && Object.keys(errors).length > 0 ? (
-        <p className="mt-4 text-sm text-destructive">
-          {t.customer.formError}
-        </p>
-      ) : null}
+        {children ? <div className="space-y-7 pt-3">{children}</div> : null}
+
+        {touched && hasErrors ? (
+          <p className="text-sm text-destructive">
+            {Object.keys(errors).length > 0 ? t.customer.formError : extraError}
+          </p>
+        ) : null}
+      </div>
 
       <StickyAction type="submit" disabled={leaving}>{t.common.continue}</StickyAction>
     </form>
@@ -121,7 +130,7 @@ function Field({
 }) {
   return (
     <div className="space-y-2">
-      <Label htmlFor={htmlFor} className="flex items-center gap-1">
+      <Label htmlFor={htmlFor} className="flex items-center gap-1 text-base font-semibold leading-snug">
         {label}
         {required ? <span className="text-primary">*</span> : null}
         {optional ? (

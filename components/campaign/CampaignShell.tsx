@@ -25,7 +25,7 @@ const STEP_FROM_PATH: Record<string, FlowStep> = {
 const BACK_STEP: Partial<Record<FlowStep, FlowStep>> = {
   experience: "customer",
   upload: "experience",
-  result: "upload",
+  result: "experience",
   publish: "result",
 };
 
@@ -89,8 +89,8 @@ export function CampaignShell({
 function StepProgress({ current }: { current: FlowStep }) {
   const t = useT();
   const labels = {
+    you: t.nav.you,
     rate: t.nav.rate,
-    post: t.nav.post,
     share: t.nav.share,
   } as const;
   const visualIndex = progressIndexForStep(current);

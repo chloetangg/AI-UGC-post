@@ -1,13 +1,16 @@
 import {
   isAcceptableCoverOverlay,
   isAcceptableMainTitle,
+  isAcceptableSubtitle,
   layoutCoverOverlay,
   looksIncompleteCover,
 } from "../lib/cover/cover-title";
 import {
   countCoverUnits,
   hasCoverTitleKeyword,
+  inventsUnsupportedCoverClaim,
 } from "../lib/cover/cover-rules";
+import { applyCoverDishShortNames, hasIllegalCoverDishShort } from "../lib/cover/dish-names";
 
 if (countCoverUnits("centralwOrld") !== 1) {
   throw new Error(`centralwOrld must count as 1 unit, got ${countCoverUnits("centralwOrld")}`);
@@ -59,3 +62,43 @@ for (let index = 0; index < 10; index += 1) {
   }
 }
 console.log(`titles in 10: ${[...titles].join(" / ")}`);
+
+if (applyCoverDishShortNames("最喜欢黄咖喱蟹肉", ["黄咖喱蟹肉"]) !== "最喜欢咖喱蟹肉") {
+  throw new Error("cover must shorten 黄咖喱蟹肉 to 咖喱蟹肉");
+}
+if (applyCoverDishShortNames("冬阴功虾汤很好喝", ["冬阴功虾汤"]) !== "冬阴功很好喝") {
+  throw new Error("cover must shorten 冬阴功虾汤 to 冬阴功");
+}
+if (applyCoverDishShortNames("泰式酸甜蒸鱼", ["泰式酸甜蒸鱼"]) !== "泰式蒸鱼") {
+  throw new Error("cover must shorten 泰式酸甜蒸鱼 to 泰式蒸鱼");
+}
+if (hasIllegalCoverDishShort("黄咖喱真的香", ["黄咖喱蟹肉"])) {
+  /* expected */
+} else {
+  throw new Error("黄咖喱 must be illegal on the cover");
+}
+if (isAcceptableSubtitle("咖喱蟹肉很有家常味", "曼谷隐藏泰餐", { dishes: ["黄咖喱蟹肉"] })) {
+  /* level-5 info line is allowed */
+} else {
+  throw new Error("flat but accurate dish line should still pass");
+}
+if (isAcceptableSubtitle("绝绝子太好吃了", "曼谷隐藏泰餐")) {
+  throw new Error("slang subtitle must fail");
+}
+if (inventsUnsupportedCoverClaim("这口咖喱蟹肉像家的味道", { dishes: ["黄咖喱蟹肉"] })) {
+  /* expected: no homestyle evidence */
+} else {
+  throw new Error("homestyle claim needs evidence");
+}
+if (inventsUnsupportedCoverClaim("咖喱蟹肉像家的味道", { dishes: ["黄咖喱蟹肉"], diningNote: "味道很像家里做的" })) {
+  throw new Error("homestyle claim with evidence must pass");
+}
+
+const repaired = layoutCoverOverlay("曼谷隐藏泰餐", "黄咖喱蟹肉很有家常味", [], {
+  dishes: ["黄咖喱蟹肉"],
+  diningNote: "黄咖喱蟹肉味道很像家里做的",
+});
+if (repaired.subtitle.includes("黄咖喱蟹肉") || repaired.subtitle.includes("黄咖喱")) {
+  throw new Error(`cover subtitle still has full/illegal dish name: ${repaired.subtitle}`);
+}
+console.log(`repaired dish cover: ${repaired.title} | ${repaired.subtitle}`);

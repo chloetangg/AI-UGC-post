@@ -152,12 +152,18 @@ function isCustomerComplete(customer: CustomerInfo) {
   );
 }
 
-function isProductFeedbackComplete(productFeedback: ProductFeedback) {
-  return Boolean(
-    productFeedback.customerType &&
-      productFeedback.visitFrequency &&
-      isMealExpenseComplete(productFeedback.totalMealExpense) &&
-      isDiningExperienceNoteComplete(productFeedback.diningExperienceNote ?? ""),
+function isIdentityComplete(productFeedback: ProductFeedback) {
+  return Boolean(productFeedback.customerType && productFeedback.visitFrequency);
+}
+
+function isYouComplete(customer: CustomerInfo, productFeedback: ProductFeedback) {
+  return isCustomerComplete(customer) && isIdentityComplete(productFeedback);
+}
+
+function isRateFeedbackComplete(productFeedback: ProductFeedback) {
+  return (
+    isMealExpenseComplete(productFeedback.totalMealExpense) &&
+    isDiningExperienceNoteComplete(productFeedback.diningExperienceNote ?? "")
   );
 }
 
@@ -232,7 +238,9 @@ function draftFromGenerated(generated: GeneratedContent): ResultDraft {
 }
 
 async function composeCoverFromState(cover: CoverState, files: File[]) {
-  const templateId = cover.selectedCoverTemplateId || DEFAULT_COVER_TEMPLATE_ID;
+  const templateId = isCoverTemplateId(cover.selectedCoverTemplateId)
+    ? cover.selectedCoverTemplateId
+    : DEFAULT_COVER_TEMPLATE_ID;
   const sourceIndex = cover.selectedPhotoIndex;
   const fourGrid = isFourPhotoGridCover(files.length, templateId);
   const chosen = fourGrid
@@ -826,18 +834,14 @@ export function CampaignFlowProvider({
         case "customer":
           return true;
         case "experience":
-          return isCustomerComplete(persisted.customer);
         case "upload":
-          return (
-            isCustomerComplete(persisted.customer) &&
-            isProductFeedbackComplete(persisted.productFeedback)
-          );
+          return isYouComplete(persisted.customer, persisted.productFeedback);
         case "generating":
         case "result":
         case "publish":
           return (
-            isCustomerComplete(persisted.customer) &&
-            isProductFeedbackComplete(persisted.productFeedback) &&
+            isYouComplete(persisted.customer, persisted.productFeedback) &&
+            isRateFeedbackComplete(persisted.productFeedback) &&
             photoReady
           );
         default:
@@ -850,9 +854,8 @@ export function CampaignFlowProvider({
   const firstBlockedStep = useCallback(
     (step: FlowStep): FlowStep | null => {
       if (canAccess(step)) return null;
-      if (!isCustomerComplete(persisted.customer)) return "customer";
-      if (!isProductFeedbackComplete(persisted.productFeedback)) return "experience";
-      if (!photoReady) return "upload";
+      if (!isYouComplete(persisted.customer, persisted.productFeedback)) return "customer";
+      if (!isRateFeedbackComplete(persisted.productFeedback) || !photoReady) return "experience";
       return "customer";
     },
     [canAccess, persisted.customer, persisted.productFeedback, photoReady],
@@ -869,8 +872,9 @@ export function CampaignFlowProvider({
       draft: persisted.draft,
       cover: persisted.cover,
       coverComposing,
-      selectedCoverTemplateId:
-        persisted.selectedCoverTemplateId || DEFAULT_COVER_TEMPLATE_ID,
+      selectedCoverTemplateId: isCoverTemplateId(persisted.selectedCoverTemplateId)
+        ? persisted.selectedCoverTemplateId
+        : DEFAULT_COVER_TEMPLATE_ID,
       generationId: persisted.generationId,
       setCustomer,
       setProductFeedback,

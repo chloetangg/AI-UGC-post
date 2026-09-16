@@ -5,9 +5,9 @@ export function Footer() {
         <p className="text-[11px] font-medium tracking-[0.08em] text-muted-foreground">Powered by</p>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="/assets/seedi-logo.png"
+          src="/assets/seedi-logo.png?v=2"
           alt="seedai"
-          className="h-auto w-[168px] max-w-[70vw] object-contain object-center"
+          className="h-auto w-[130px] max-w-[70vw] object-contain object-center"
         />
       </div>
     </footer>

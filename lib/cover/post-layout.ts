@@ -1,5 +1,11 @@
 import { DEFAULT_COVER_TEMPLATE_ID } from "@/types/content";
 
+export const PHOTO_ONLY_TEMPLATE_ID = "photo-only";
+
+export function isPhotoOnlyTemplate(templateId: string) {
+  return templateId === PHOTO_ONLY_TEMPLATE_ID;
+}
+
 export const FOUR_PHOTO_GRID_TEMPLATE_ID = "top-stroke";
 export const FOUR_PHOTO_GRID_TEMPLATE_IDS = ["top-stroke", "badge-stack", "dual-line"] as const;
 
@@ -13,15 +19,11 @@ export function isFourPhotoGridCover(photoCount: number, templateId: string) {
 
 export const COVER_TEMPLATE_OPTIONS = [
   { id: "top-stroke", en: "Style 1", zh: "风格 1", th: "สไตล์ 1" },
-  { id: "badge-stack", en: "Style 2", zh: "风格 2", th: "สไตล์ 2" },
-  { id: "dual-line", en: "Style 3", zh: "风格 3", th: "สไตล์ 3" },
-  { id: "top-banner", en: "Style 4", zh: "风格 4", th: "สไตล์ 4" },
-  { id: "left-spine", en: "Style 5", zh: "风格 5", th: "สไตล์ 5" },
-  { id: "polaroid", en: "Style 6", zh: "风格 6", th: "สไตล์ 6" },
-  { id: "center-lower", en: "Style 7", zh: "风格 7", th: "สไตล์ 7" },
-  { id: "bottom-bar", en: "Style 8", zh: "风格 8", th: "สไตล์ 8" },
-  { id: "split-band", en: "Style 9", zh: "风格 9", th: "สไตล์ 9" },
-  { id: "bottom-card", en: "Style 10", zh: "风格 10", th: "สไตล์ 10" },
+  { id: "dual-line", en: "Style 2", zh: "风格 2", th: "สไตล์ 2" },
+  { id: "top-banner", en: "Style 3", zh: "风格 3", th: "สไตล์ 3" },
+  { id: "polaroid", en: "Style 4", zh: "风格 4", th: "สไตล์ 4" },
+  { id: "center-lower", en: "Style 5", zh: "风格 5", th: "สไตล์ 5" },
+  { id: "photo-only", en: "Style 6", zh: "风格 6", th: "สไตล์ 6" },
 ] as const;
 
 export type CoverTemplateOptionId = (typeof COVER_TEMPLATE_OPTIONS)[number]["id"];
@@ -62,9 +64,22 @@ function pickRandomTemplate(ids: CoverTemplateOptionId[]): CoverTemplateOptionId
   return ids[Math.floor(Math.random() * ids.length)];
 }
 
+function uniqueCoverTemplateIds(raw: Array<string | null | undefined> | null | undefined): CoverTemplateOptionId[] {
+  const seen = new Set<CoverTemplateOptionId>();
+  const ids: CoverTemplateOptionId[] = [];
+  for (const item of raw ?? []) {
+    if (!item || !isCoverTemplateId(item) || seen.has(item)) continue;
+    seen.add(item);
+    ids.push(item);
+  }
+  return ids;
+}
+
 /**
- * Website assigns the visible cover style.
- * The model copies prompt samples (especially left-spine / Style 5), so `selected` is ignored.
+ * Two-phase Style pick:
+ * 1) composition pool = AI suitableTemplateIds (photo-only if none fit)
+ * 2) history avoidance + random inside that pool
+ * `selected` is ignored. Manual Style taps do not call this.
  */
 export function autoMatchTemplate(input: {
   selected?: string | null;
@@ -72,16 +87,30 @@ export function autoMatchTemplate(input: {
   previousTemplateId?: string | null;
   recentTemplateIds?: string[] | null;
 }): CoverTemplateOptionId {
-  const all = COVER_TEMPLATE_OPTIONS.map((item) => item.id);
+  void input.selected;
+  const suitable = uniqueCoverTemplateIds(input.suitable);
+  const compositionPool =
+    suitable.length > 0 ? suitable : ([PHOTO_ONLY_TEMPLATE_ID] as CoverTemplateOptionId[]);
+
+  if (compositionPool.length === 1) {
+    return compositionPool[0];
+  }
+
   const previous =
     input.previousTemplateId && isCoverTemplateId(input.previousTemplateId)
       ? input.previousTemplateId
       : "";
-  const recent = (input.recentTemplateIds ?? []).filter(isCoverTemplateId);
+  const recent = uniqueCoverTemplateIds(input.recentTemplateIds ?? []);
   const avoid = new Set<string>([previous, ...recent].filter(Boolean));
-  const unused = all.filter((id) => !avoid.has(id));
-  const pool = unused.length > 0 ? unused : all.filter((id) => id !== previous);
-  return pickRandomTemplate(pool.length > 0 ? pool : all) ?? DEFAULT_COVER_TEMPLATE_ID;
+  const unused = compositionPool.filter((id) => !avoid.has(id));
+  if (unused.length > 0) {
+    return pickRandomTemplate(unused) ?? compositionPool[0];
+  }
+  const notPrevious = compositionPool.filter((id) => id !== previous);
+  if (notPrevious.length > 0) {
+    return pickRandomTemplate(notPrevious) ?? compositionPool[0];
+  }
+  return pickRandomTemplate(compositionPool) ?? DEFAULT_COVER_TEMPLATE_ID;
 }
 
 export function parseRemainingPhotoIndexes(

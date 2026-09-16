@@ -32,8 +32,8 @@ export type ContentLanguage = typeof CONTENT_LANGUAGE;
 
 const en = {
   nav: {
+    you: "YOU",
     rate: "RATE",
-    post: "POST",
     share: "SHARE",
   },
   common: {
@@ -57,7 +57,7 @@ const en = {
     customQuestion: "What did you enjoy most about your Baan Ying experience?",
   },
   customer: {
-    title: "Tell us a little about you",
+    title: "Your info",
     subtitle: "We’ll only use this for the campaign. It takes about 30 seconds.",
     name: "Name / Nickname",
     namePlaceholder: "Your name",
@@ -397,8 +397,8 @@ const en = {
 
 const zh: typeof en = {
   nav: {
+    you: "YOU",
     rate: "RATE",
-    post: "POST",
     share: "SHARE",
   },
   language: {
@@ -422,7 +422,7 @@ const zh: typeof en = {
     customQuestion: "这次 Baan Ying 用餐体验你最喜欢什么？",
   },
   customer: {
-    title: "先告诉我们一点关于你的信息",
+    title: "你的信息",
     subtitle: "仅用于本次活动，30秒便可完成。",
     name: "姓名 / 昵称",
     namePlaceholder: "你的名字",
@@ -757,8 +757,8 @@ const zh: typeof en = {
 
 const th: typeof en = {
   nav: {
+    you: "YOU",
     rate: "RATE",
-    post: "POST",
     share: "SHARE",
   },
   language: {
@@ -782,7 +782,7 @@ const th: typeof en = {
     customQuestion: "คุณชอบอะไรมากที่สุดจากประสบการณ์ที่ Baan Ying?",
   },
   customer: {
-    title: "บอกเราเกี่ยวกับตัวคุณสักนิด",
+    title: "ข้อมูลของคุณ",
     subtitle: "ใช้สำหรับแคมเปญนี้เท่านั้น ใช้เวลาประมาณ 30 วินาที",
     name: "ชื่อ / ชื่อเล่น",
     namePlaceholder: "ชื่อของคุณ",

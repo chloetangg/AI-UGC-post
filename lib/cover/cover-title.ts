@@ -13,13 +13,16 @@ import {
   hasCoverTitleKeyword,
   hasMandatoryCoverKeyword,
   isCoverKeywordStuffing,
+  looksLikeCoverTemplateSpeak,
   normalizeCoverLocations,
+  packsMultipleCoverEvidence,
+  inventsUnsupportedCoverClaim,
   subtitleFromCoverContext,
   uniqueCoverPoolKeywords,
   usesUnselectedCoverLocation,
   type CoverTitleContext,
 } from "./cover-rules";
-import { collectFullDishNames, expandShortDishNames } from "./dish-names";
+import { collectFullDishNames, applyCoverDishShortNames, coverDishShortName, hasIllegalCoverDishShort } from "./dish-names";
 
 export {
   countCoverChars,
@@ -31,6 +34,7 @@ export {
   formatCoverTitleRules,
   hasCoverTitleKeyword,
   hasMandatoryCoverKeyword,
+  inventsUnsupportedCoverClaim,
   type CoverTitleContext,
 } from "./cover-rules";
 
@@ -48,13 +52,13 @@ export const PREFERRED_COVER_TITLE_HAN = PREFERRED_MAIN_TITLE_CHARS;
 export const MAX_COVER_TITLE_HAN = MAX_MAIN_TITLE_CHARS;
 
 export const FALLBACK_COVER_PAIRS = [
-  { title: "曼谷隐藏泰餐", subtitle: "这顿泰餐让人想收藏" },
-  { title: "曼谷泰餐推荐", subtitle: "逛街后也能坐下慢慢吃" },
-  { title: "必吃泰式料理", subtitle: "味道很像泰式家常菜" },
-  { title: "曼谷美食发现", subtitle: "这几道菜让人想再点" },
+  { title: "曼谷隐藏泰餐", subtitle: "这顿吃下来很满足" },
+  { title: "曼谷泰餐推荐", subtitle: "逛完街来吃刚刚好" },
+  { title: "必吃泰式料理", subtitle: "这几道菜还想再点" },
+  { title: "曼谷美食发现", subtitle: "这几道菜还想再点" },
   { title: "曼谷泰餐新体验", subtitle: "第一次来尝试Baan Ying" },
-  { title: "centralwOrld泰餐推荐", subtitle: "逛街后的舒服泰式聚餐地" },
-  { title: "centralwOrld必吃美食", subtitle: "环境舒服适合慢慢聊" },
+  { title: "centralwOrld泰餐推荐", subtitle: "逛完街来吃刚刚好" },
+  { title: "centralwOrld必吃美食", subtitle: "坐下来刚好能慢慢聊" },
 ] as const;
 
 export const FALLBACK_COVER_TITLES = FALLBACK_COVER_PAIRS.map((item) => item.title);
@@ -71,21 +75,14 @@ const DANGLING_TAILS = [
   "这家一定",
   "一口就",
   "一定要",
-  "有点",
-  "特别",
   "非常",
   "真的",
-  "很好",
   "太好",
   "超好",
   "很惊",
   "终于",
   "一定",
   "不能",
-  "这碗",
-  "这口",
-  "这顿",
-  "值得",
   "很",
   "太",
   "超",
@@ -135,7 +132,7 @@ function prepareCoverLine(raw: string) {
 }
 
 const GENERIC_SUBTITLE =
-  /^(招牌泰式料理|家常泰式料理|特色泰式料理|人气招牌料理|招牌菜值得试|泰餐招牌味道|曼谷招牌料理|必吃招牌料理|特色招牌好味道|整体体验非常不错)$/;
+  /^(招牌泰式料理|家常泰式料理|特色泰式料理|人气招牌料理|招牌菜值得试|泰餐招牌味道|曼谷招牌料理|必吃招牌料理|特色招牌好味道|整体体验非常不错|精选泰式家常料理|品尝正宗泰式美食)$/;
 
 export function isAcceptableMainTitle(
   title: string,
@@ -157,6 +154,16 @@ export function isAcceptableMainTitle(
   return true;
 }
 
+function maxSubtitleUnits(text: string, context: CoverTitleContext) {
+  const names = collectFullDishNames({
+    dishes: context.dishes,
+    sourceTexts: [...(context.sourceTexts ?? []), context.diningNote ?? ""],
+  });
+  const used = names.filter((name) => text.includes(name) || text.includes(coverDishShortName(name)));
+  if (used.length > 0) return 12;
+  return MAX_SUB_TITLE_CHARS;
+}
+
 export function isAcceptableSubtitle(
   subtitle: string,
   mainTitle = "",
@@ -165,14 +172,18 @@ export function isAcceptableSubtitle(
   const cleaned = prepareCoverLine(subtitle);
   const units = countCoverUnits(cleaned);
   if (!cleaned) return false;
-  if (units < MIN_SUB_TITLE_CHARS || units > MAX_SUB_TITLE_CHARS) return false;
+  if (units < MIN_SUB_TITLE_CHARS || units > maxSubtitleUnits(cleaned, context)) return false;
   if (looksIncompleteCover(cleaned)) return false;
   if (FORBIDDEN_COVER_CLAIMS.test(cleaned)) return false;
   if (containsHarshNegative(cleaned)) return false;
+  if (looksLikeCoverTemplateSpeak(cleaned)) return false;
+  if (packsMultipleCoverEvidence(cleaned, context)) return false;
   if (/#|📍|⏰|http|www\.|\+\d/.test(cleaned)) return false;
   if (usesUnselectedCoverLocation(cleaned, context.branch)) return false;
   if (mainTitle && repeatsMain(mainTitle, cleaned)) return false;
   if (GENERIC_SUBTITLE.test(cleaned)) return false;
+  if (hasIllegalCoverDishShort(cleaned, context.dishes)) return false;
+  if (inventsUnsupportedCoverClaim(cleaned, context)) return false;
   return true;
 }
 
@@ -226,18 +237,23 @@ function firstPoolKeyword(title: string) {
 }
 
 function fitSubtitleAroundDish(dish: string, current: string) {
-  if (current.includes(dish)) {
+  const short = coverDishShortName(dish);
+  const max = maxSubtitleUnits(current.includes(short) ? current : short, { dishes: [dish] });
+  if (current.includes(short) || current.includes(dish)) {
     const units = countCoverUnits(current);
-    if (units >= MIN_SUB_TITLE_CHARS && units <= MAX_SUB_TITLE_CHARS) return current;
+    if (units >= MIN_SUB_TITLE_CHARS && units <= max) {
+      return applyCoverDishShortNames(current, [dish]);
+    }
   }
-  const dishUnits = countCoverUnits(dish);
-  if (dishUnits >= MIN_SUB_TITLE_CHARS && dishUnits <= MAX_SUB_TITLE_CHARS) return dish;
-  const padded = `必点${dish}`;
-  if (countCoverUnits(padded) <= MAX_SUB_TITLE_CHARS) return padded;
-  return dish;
+  const named = `没想到最喜欢${short}`;
+  if (countCoverUnits(named) >= MIN_SUB_TITLE_CHARS && countCoverUnits(named) <= max) return named;
+  const special = `这口${short}有点特别`;
+  if (countCoverUnits(special) >= MIN_SUB_TITLE_CHARS && countCoverUnits(special) <= max) return special;
+  if (countCoverUnits("没想到最喜欢这道") <= MAX_SUB_TITLE_CHARS) return "没想到最喜欢这道";
+  return short;
 }
 
-function applyFullDishNames(
+function applyCoverDishNames(
   title: string,
   subtitle: string,
   postTitles: string[],
@@ -249,17 +265,20 @@ function applyFullDishNames(
   });
   if (fullNames.length === 0) return { title, subtitle };
 
-  let nextTitle = expandShortDishNames(title, fullNames);
-  let nextSubtitle = expandShortDishNames(subtitle, fullNames);
+  let nextTitle = applyCoverDishShortNames(title, fullNames);
+  let nextSubtitle = applyCoverDishShortNames(subtitle, fullNames);
   if (isAcceptableCoverOverlay(nextTitle, nextSubtitle, postTitles, context)) {
     return { title: nextTitle, subtitle: nextSubtitle };
   }
 
-  const dishesInTitle = fullNames.filter((name) => nextTitle.includes(name));
+  const dishesInTitle = fullNames.filter(
+    (name) => nextTitle.includes(name) || nextTitle.includes(coverDishShortName(name)),
+  );
   if (dishesInTitle.length > 0 && countCoverUnits(nextTitle) > MAX_MAIN_TITLE_CHARS) {
     const dish = dishesInTitle[0];
+    const short = coverDishShortName(dish);
     const keyword = firstPoolKeyword(nextTitle) || "曼谷";
-    const compact = `${keyword}${dish}`;
+    const compact = `${keyword}${short}`;
     if (
       countCoverUnits(compact) >= MIN_MAIN_TITLE_CHARS &&
       countCoverUnits(compact) <= MAX_MAIN_TITLE_CHARS &&
@@ -268,19 +287,25 @@ function applyFullDishNames(
       nextTitle = compact;
     } else {
       let withoutDish = nextTitle;
-      for (const name of dishesInTitle) withoutDish = withoutDish.split(name).join("");
+      for (const name of dishesInTitle) {
+        withoutDish = withoutDish.split(name).join("").split(coverDishShortName(name)).join("");
+      }
       withoutDish = prepareCoverLine(withoutDish);
       if (!isAcceptableMainTitle(withoutDish, postTitles, context)) {
         const fallbackMain = countCoverUnits(`${keyword}泰餐`) <= MAX_MAIN_TITLE_CHARS ? `${keyword}泰餐` : keyword;
         withoutDish = isAcceptableMainTitle(fallbackMain, postTitles, context) ? fallbackMain : withoutDish;
       }
       nextTitle = withoutDish;
-      if (!nextSubtitle.includes(dish)) nextSubtitle = fitSubtitleAroundDish(dish, nextSubtitle);
+      if (!nextSubtitle.includes(short) && !nextSubtitle.includes(dish)) {
+        nextSubtitle = fitSubtitleAroundDish(dish, nextSubtitle);
+      }
     }
   }
 
-  if (countCoverUnits(nextSubtitle) > MAX_SUB_TITLE_CHARS) {
-    const dishesInSub = fullNames.filter((name) => nextSubtitle.includes(name));
+  if (countCoverUnits(nextSubtitle) > maxSubtitleUnits(nextSubtitle, context)) {
+    const dishesInSub = fullNames.filter(
+      (name) => nextSubtitle.includes(name) || nextSubtitle.includes(coverDishShortName(name)),
+    );
     if (dishesInSub.length > 0) nextSubtitle = fitSubtitleAroundDish(dishesInSub[0], nextSubtitle);
   }
 
@@ -293,7 +318,7 @@ export function layoutCoverOverlay(
   postTitles: string[] = [],
   context: CoverTitleContext = {},
 ) {
-  const expanded = applyFullDishNames(
+  const expanded = applyCoverDishNames(
     prepareCoverLine(rawTitle),
     prepareCoverLine(rawSubtitle),
     postTitles,
@@ -301,6 +326,15 @@ export function layoutCoverOverlay(
   );
   const first = expanded.title;
   const second = expanded.subtitle;
+  const hooked = subtitleFromCoverContext(context);
+  const preferHook =
+    /^(这口)?[\u4e00-\u9fff]{2,8}(很好吃|很有家常味)$/.test(second) &&
+    hooked !== second &&
+    isAcceptableCoverOverlay(first, hooked, postTitles, context);
+
+  if (preferHook) {
+    return { title: first, subtitle: hooked };
+  }
 
   if (isAcceptableCoverOverlay(first, second, postTitles, context)) {
     return { title: first, subtitle: second };

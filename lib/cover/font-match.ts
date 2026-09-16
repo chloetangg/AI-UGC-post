@@ -20,7 +20,7 @@ function pickFont(pool: readonly FontId[]) {
 }
 
 /**
- * One generation-level assignment for all 10 templates.
+ * One generation-level assignment for all visible templates.
  * Fonts may repeat. At least two distinct fonts. Prefer breaking long identical runs.
  */
 export function generateRandomFontAssignments(): TemplateFontAssignments {

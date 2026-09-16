@@ -1,5 +1,10 @@
 import { branchKey, OFFICIAL_LOCATIONS, type BaanYingLocationId } from "@/lib/locations";
-import { formatFullDishNameRules } from "./dish-names";
+import {
+  collectFullDishNames,
+  coverDishShortName,
+  formatCoverDishNameRules,
+  mentionsCoverDishName,
+} from "./dish-names";
 import { sanitizeCoverLine, toCoverGraphemes } from "./cover-title-text";
 
 export const COVER_LOCATION_KEYWORDS = [
@@ -19,12 +24,12 @@ export const COVER_MANDATORY_KEYWORDS = [
   ...COVER_LOCATION_KEYWORDS,
 ] as const;
 
-/** Latin mall names count as compact CJK-equivalent units, not 1 unit per letter. */
+/** Compact CJK-equivalent units for approved Latin proper nouns. */
 export const COVER_LOCATION_UNITS: Record<(typeof COVER_LOCATION_KEYWORDS)[number], number> = {
-  centralwOrld: 4,
-  "Terminal 21": 4,
-  "Siam Center": 4,
-  "One Bangkok": 4,
+  centralwOrld: 1,
+  "Terminal 21": 2,
+  "Siam Center": 2,
+  "One Bangkok": 2,
 };
 
 const LOCATION_ALIASES: Array<{ canonical: (typeof COVER_LOCATION_KEYWORDS)[number]; pattern: RegExp }> = [
@@ -71,14 +76,6 @@ const KSP_MARKERS = [
   "温馨",
   "好拍",
 ] as const;
-
-const DISH_SUBTITLES: Array<{ match: RegExp; subtitle: string }> = [
-  { match: /yellow curry|咖喱蟹|黄咖喱/i, subtitle: "必点黄咖喱蟹肉" },
-  { match: /tom yum|冬阴功/i, subtitle: "必点冬阴功虾汤" },
-  { match: /sweet\s*&\s*sour|酸甜.*鱼|蒸鱼/i, subtitle: "招牌泰式酸甜蒸鱼" },
-  { match: /garlic|蒜蓉|炒虾/i, subtitle: "必点蒜蓉炒虾" },
-  { match: /mango|芒果糯米/i, subtitle: "必点芒果糯米饭" },
-];
 
 export type CoverTitleContext = {
   branch?: string;
@@ -151,9 +148,14 @@ export function coverKeywordPairKey(mainTitle: string, subTitle = "") {
   return uniqueCoverPoolKeywords(mainTitle, subTitle).slice().sort().join("+");
 }
 
+const COVER_PROPER_NOUN_UNITS: Array<{ pattern: RegExp; units: number }> = [
+  { pattern: /baan\s*ying/gi, units: 2 },
+];
+
 /**
  * Chinese-character-equivalent units for cover length rules.
- * Han = 1. Approved Latin mall names = 4. Other Latin/digits = 0.5, rounded up.
+ * Han = 1. centralwOrld = 1. Terminal 21 / Siam Center / One Bangkok = 2.
+ * Baan Ying = 2. Other Latin/digits = 0.5, rounded up.
  */
 export function countCoverUnits(text: string) {
   let remaining = normalizeCoverLocations(sanitizeCoverLine(text));
@@ -162,6 +164,12 @@ export function countCoverUnits(text: string) {
     const pattern = new RegExp(escapeRegExp(keyword), "gi");
     remaining = remaining.replace(pattern, () => {
       units += COVER_LOCATION_UNITS[keyword];
+      return "\0";
+    });
+  }
+  for (const noun of COVER_PROPER_NOUN_UNITS) {
+    remaining = remaining.replace(noun.pattern, () => {
+      units += noun.units;
       return "\0";
     });
   }
@@ -206,7 +214,7 @@ export function hasCoverKsp(mainTitle: string, subTitle = "") {
 
 export function isCoverKeywordStuffing(mainTitle: string, _subTitle = "") {
   const unique = uniqueCoverPoolKeywords(mainTitle);
-  if (unique.length >= 4) return true;
+  if (unique.length >= 3) return true;
   return unique.some((keyword) => {
     const pattern = new RegExp(escapeRegExp(keyword), "gi");
     const matches = mainTitle.match(pattern) ?? [];
@@ -245,29 +253,118 @@ export function preferredCoverKeyword(context: CoverTitleContext | string = {}) 
   return "曼谷";
 }
 
-function dishSubtitle(dishes: string[] = []) {
-  for (const dish of dishes) {
-    const hit = DISH_SUBTITLES.find((item) => item.match.test(dish));
-    if (hit) return hit.subtitle;
+const TEMPLATE_COVER_SPEAK =
+  /让人(惊艳|上头|念念不忘|欲罢不能|直呼好吃)|超好吃|太绝了|真的很惊艳|第一次来就被圈粉|第一次来就爱上|第一次来就彻底爱上|第一次美食冒险|美食冒险|惊艳到不行|狠狠圈粉|彻底爱上/;
+
+const COVER_SLANG =
+  /绝绝子|yyds|YYDS|狠狠爱了|直接封神|太太太好吃|真的会谢|谁懂啊|^救命$|救命啊|不允许有人没吃过|吃到撑/;
+
+const COVER_BRAND_PROMO =
+  /精选泰式|品尝正宗|满足味蕾|带来温暖舒适|独特风味|丰富菜品搭配|正宗泰式美食/;
+
+export function looksLikeCoverTemplateSpeak(text: string) {
+  const hay = sanitizeCoverLine(text);
+  return TEMPLATE_COVER_SPEAK.test(hay) || COVER_SLANG.test(hay) || COVER_BRAND_PROMO.test(hay);
+}
+
+/** Subtitle may carry only ONE evidence. Dish + price + first-visit concatenations fail. */
+export function packsMultipleCoverEvidence(text: string, context: CoverTitleContext = {}) {
+  const hay = sanitizeCoverLine(text);
+  if (!hay) return false;
+  const dishes = collectFullDishNames({
+    dishes: context.dishes,
+    sourceTexts: [...(context.sourceTexts ?? []), context.diningNote ?? "", hay],
+  });
+  const hasDish =
+    mentionsCoverDishName(hay, dishes) ||
+    /黄咖喱蟹肉|咖喱蟹肉|冬阴功虾汤|泰式酸甜蒸鱼|泰式蒸鱼|蒜蓉炒虾|芒果糯米饭/.test(hay);
+  const hasPrice = /\d+\s*(泰铢|THB)/i.test(hay);
+  const hasFirst = /第一次/.test(hay);
+  const hasMall = findCoverLocationKeywords(hay).length > 0;
+  const hits = [hasDish, hasPrice, hasFirst, hasMall].filter(Boolean).length;
+  if (hits >= 2) return true;
+  return /[，、].+[，、]/.test(hay);
+}
+
+function hasCustomerEvidence(context: CoverTitleContext) {
+  return Boolean(
+    context.diningNote?.trim() ||
+      (context.dishes?.length ?? 0) > 0 ||
+      (context.enjoyMost?.length ?? 0) > 0 ||
+      context.visitFrequency ||
+      (typeof context.mealAmount === "number" && context.mealAmount > 0),
+  );
+}
+
+export function inventsUnsupportedCoverClaim(text: string, context: CoverTitleContext) {
+  if (!hasCustomerEvidence(context)) return false;
+  const evidence = [
+    context.diningNote ?? "",
+    ...(context.dishes ?? []),
+    ...(context.enjoyMost ?? []),
+    ...(context.sourceTexts ?? []),
+    context.visitFrequency ?? "",
+    context.customerType ?? "",
+  ].join(" ");
+  if (/打抛|DIY/i.test(text) && !/打抛|DIY|pad\s*kra|pad\s*ga/i.test(evidence)) return true;
+  if (/家的味道|像家里|家里做的|家常感/.test(text) && !/家|家常|家里|home/i.test(evidence)) return true;
+  if (/逛完街|逛街后/.test(text) && !/逛街|方便|mall|central/i.test(evidence) && !shouldUseCoverLocation(context)) {
+    return true;
   }
-  return "";
+  return false;
+}
+
+function firstCoverDishName(context: CoverTitleContext) {
+  const names = collectFullDishNames({
+    dishes: context.dishes,
+    sourceTexts: [...(context.sourceTexts ?? []), context.diningNote ?? ""],
+  });
+  return names[0] ?? "";
 }
 
 const ENJOY_SUBTITLES: Array<{ match: RegExp; subtitle: string }> = [
-  { match: /atmosphere|环境/i, subtitle: "环境舒服适合慢慢聊" },
-  { match: /service|服务/i, subtitle: "用餐气氛让人放松" },
+  { match: /atmosphere|环境/i, subtitle: "坐下来刚好能慢慢聊" },
+  { match: /service|服务/i, subtitle: "用餐气氛比较放松" },
   { match: /presentation|摆盘/i, subtitle: "摆盘好看很想拍照" },
   { match: /variety|菜品多|variety of dishes/i, subtitle: "一次能点到很多菜" },
-  { match: /flavor|口味/i, subtitle: "味道很像泰式家常菜" },
-  { match: /food|the food/i, subtitle: "这几道菜让人想再点" },
+  { match: /flavor|口味/i, subtitle: "这口味道有点像家常" },
+  { match: /food|the food/i, subtitle: "这几道菜还想再点" },
 ];
 
+function fitsSubtitleUnits(text: string) {
+  const units = countCoverUnits(text);
+  return units >= 6 && units <= 10;
+}
+
 export function subtitleFromCoverContext(context: CoverTitleContext = {}) {
-  const dish = dishSubtitle(context.dishes);
-  if (dish) return dish;
+  const note = context.diningNote?.trim() ?? "";
+  const dish = firstCoverDishName(context);
+  const short = dish ? coverDishShortName(dish) : "";
+
+  if (/DIY|自己动手|打抛/.test(note)) {
+    if (fitsSubtitleUnits("原来打抛饭也可以DIY")) return "原来打抛饭也可以DIY";
+    if (fitsSubtitleUnits("自己动手拌打抛饭")) return "自己动手拌打抛饭";
+  }
+  if (short && /家里|家的味道|家常/.test(note)) {
+    const likeHome = `${short}像家的味道`;
+    if (fitsSubtitleUnits(likeHome)) return likeHome;
+    if (fitsSubtitleUnits(`这口${short}像家的味道`)) return `这口${short}像家的味道`;
+  }
+  if (/逛街|逛完|方便/.test(note)) {
+    if (fitsSubtitleUnits("逛完街来吃刚刚好")) return "逛完街来吃刚刚好";
+  }
+  if (short) {
+    const named = `没想到最喜欢${short}`;
+    if (fitsSubtitleUnits(named)) return named;
+    const special = `这口${short}有点特别`;
+    if (fitsSubtitleUnits(special)) return special;
+    if (fitsSubtitleUnits("没想到最喜欢这道")) return "没想到最喜欢这道";
+  }
   const amount = context.mealAmount;
   if (typeof amount === "number" && Number.isFinite(amount) && amount > 0) {
-    return `这餐${Math.round(amount)}泰铢吃得满足`;
+    const withAmount = `两人${Math.round(amount)}泰铢很满足`;
+    if (fitsSubtitleUnits(withAmount)) return withAmount;
+    if (fitsSubtitleUnits("两个人吃下来很满足")) return "两个人吃下来很满足";
   }
   if (/1st time|first/i.test(context.visitFrequency ?? "")) {
     return "第一次来尝试Baan Ying";
@@ -276,8 +373,8 @@ export function subtitleFromCoverContext(context: CoverTitleContext = {}) {
     const hit = ENJOY_SUBTITLES.find((item) => item.match.test(tag));
     if (hit) return hit.subtitle;
   }
-  if (shouldUseCoverLocation(context)) return "逛街后也能坐下慢慢吃";
-  return "这顿泰餐让人想收藏";
+  if (shouldUseCoverLocation(context)) return "逛完街来吃刚刚好";
+  return "这顿吃下来很满足";
 }
 
 export function coverFallbackPairs(context: CoverTitleContext = {}) {
@@ -311,28 +408,51 @@ export function formatCoverTitleRules(context: CoverTitleContext = {}) {
   const enjoy = (context.enjoyMost ?? []).filter(Boolean).join(", ") || "none";
   const dishes = (context.dishes ?? []).filter(Boolean).join(", ") || "none";
   const locationHint = location
-    ? `Dining location (system-provided): ${location}. Use it in the coverTitle only when it is the strongest hook. Do NOT invent Terminal 21 / Siam Center / One Bangkok.`
+    ? `Dining location (system-provided): ${location}. Use it in mainTitle only when the mall itself is the hook. Never invent Terminal 21 / Siam Center / One Bangkok.`
     : "No dining mall keyword is available. Do NOT invent centralwOrld, Terminal 21, Siam Center, or One Bangkok.";
 
-  return `COVER OVERLAY — JSON "mainTitle" (= coverTitle) + "subTitle" (= subtitle). Independent from titles[]. Never shorten titles[]. Never extra API calls. Generate both in THIS same JSON.
+  return `COVER OVERLAY — JSON "mainTitle" (= coverTitle) + "subTitle" (= coverSubtitle). Independent from titles[]. Never shorten titles[] into the cover. Generate both in THIS same JSON. No extra API call.
 
-COVER TITLE (mainTitle)
-Must naturally include AT LEAST ONE keyword from: 曼谷 / centralwOrld / 泰餐 / 美食 / 必吃
-Pick the ONE keyword that best matches this post. Two keywords are allowed if they still read as a headline. Never stuff 3+ pool keywords plus 推荐 into a keyword list.
-Do NOT force every keyword into one title.
-GOOD: 曼谷隐藏泰餐 / centralwOrld必吃美食 / 曼谷泰餐推荐 / 必吃泰式料理 / 曼谷美食发现 / 曼谷泰餐新体验
-BAD: 曼谷centralwOrld泰餐美食必吃推荐 / 曼谷最好吃centralwOrld泰餐美食
-Style: short, eye-catching Xiaohongshu cover headline. Curiosity and click-through. Communicate what is special, why to click, and the strongest angle. Not a search-keyword list.
-Length: about 4–10 Chinese-character-equivalent units. Count Han as 1. Count centralwOrld as about 4 units total. Never 3. Do not truncate. Do not pad.
+CORE PRIORITY: natural Chinese > evidence accuracy > one clear selling point > click/save value > length.
+Never satisfy “must have dish + keyword + evidence + length” by gluing words into a strange sentence.
+The cover must feel rewritten from THIS visit, not like AI concatenated keywords.
+
+MAIN TITLE (mainTitle)
+Write a real Xiaohongshu cover headline: short, clickable, natural, one clear topic. Not a keyword list. Not SEO stuffing.
+Must include AT LEAST ONE pool keyword: 曼谷 / centralwOrld / 泰餐 / 美食 / 必吃
+Pick the ONE keyword that best fits this post. Two are allowed only if it still reads as a headline. MAX 2 pool keywords. Never 3+.
+GOOD: 曼谷隐藏泰餐 / 曼谷美食发现 / 必吃泰式料理 / 曼谷泰餐新体验
+BAD: 曼谷泰餐美食必吃 / 曼谷泰国好吃泰餐 / centralwOrld泰餐美食推荐 / 曼谷centralwOrld泰餐美食必吃推荐
+Length: 4–7 units. Han=1. centralwOrld=1. Terminal 21 / Siam Center / One Bangkok=2. Baan Ying=2. Other Latin/digits=0.5 rounded up.
+Do not copy titles[]. Do not shorten a post title. Do not copy the previous cover formula (changing only 推荐/泰菜 is NOT a new title).
+Mall names only when location is the hook (mall KSP / shopping route). Food-led posts must not force a mall name. Never name a place the customer did not visit.
 Previous coverTitle (do not copy): ${previousMain}
 
-COVER SUBTITLE (subTitle)
-Do NOT use a fixed template such as 招牌泰式料理 / 家常泰式料理.
-Analyze FEEL tags, the customer's own sentences, meal cost, restaurant traits, KSP, dining scenario, and unique points. Extract the strongest reason someone would save or click. Rewrite it concisely. Do not copy the original sentence. Do not repeat the coverTitle.
-Priority: 1 unique experience 2 food highlight 3 atmosphere 4 price/value 5 location convenience 6 emotional reaction.
-Length: about 4–16 units. Never empty.
+SUBTITLE (subTitle)
+Do not only describe the dish. Find the hook: what detail from THIS visit makes someone tap in.
+Need: real evidence + Xiaohongshu voice + light emotion + modest curiosity. Never invent a feeling, fact, or review the customer did not give.
+Accuracy > clickiness. Natural ≠ bland. Clicky ≠ exaggerated. Spoken ≠ slang. Emotion ≠ fake praise. Hook ≠ made-up facts. Short ≠ keyword dump.
 
-Customer evidence for subtitle (INTERNAL):
+Voice: a friend sharing this meal on Xiaohongshu, not restaurant advertising.
+FORBIDDEN brand speak: 精选泰式家常料理 / 品尝正宗泰式美食 / 丰富菜品搭配，满足味蕾需求 / 招牌泰式料理 / 家常泰式料理
+FORBIDDEN slang unless the customer asked for it: 绝绝子 / yyds / 狠狠爱了 / 直接封神 / 太太太好吃了 / 真的会谢 / 谁懂啊 / 救命 / 不允许有人没吃过
+Spoken texture is allowed as a method, not a template: 没想到 / 原来 / 这口 / 这一道 / 居然 / 真的有点 / 吃出了 / 有点像 / 刚好 / 意外地 / 最喜欢的反而是 / 逛完刚好来吃. Do not paste these if the evidence does not support them.
+
+Pick ONE core evidence only. Then choose the highest style the evidence actually supports:
+1 curiosity (没想到最喜欢的是这道 / 这口咖喱蟹肉有点特别)
+2 contrast/surprise ONLY if the customer said something unexpected
+3 scene (逛完街来吃刚刚好 / 自己动手拌打抛饭)
+4 emotion already in the evidence (这顿吃下来很满足)
+5 information last (两人600泰铢吃得满足 / 咖喱蟹肉很有家常味)
+Never glue dish + price + first-visit. Never 咖喱蟹肉味道很像泰式家常菜而且两个人吃600泰铢.
+Do not default to 菜名+很好吃 / 菜名+很有家常味 when a supported hook exists.
+Do not inflate: 不错 ≠ 惊艳到不行; 价格还可以 ≠ 吃到撑; 第一次来 ≠ 狠狠圈粉 / 彻底爱上; 喜欢 ≠ 直接封神.
+
+GOOD: 这口咖喱蟹肉像家的味道 / 没想到最喜欢的是这道 / 原来打抛饭也可以DIY / 逛完街来吃刚刚好 / 两个人吃下来很满足
+BAD: 咖喱蟹肉很有家常味 (too flat if a hook exists) / 咖喱蟹肉很好吃 / 第一次来黄咖喱蟹肉很好吃 / 第一次来就被狠狠圈粉 / 精选泰式家常料理
+Length: 6–10 units, never empty, never a broken sentence. Do not copy the dining note verbatim. Do not repeat mainTitle.
+
+Customer evidence for subtitle (INTERNAL — pick ONE, then rewrite):
 - Dining note: ${note}
 - Meal spend: ${amount}
 - Enjoy-most tags: ${enjoy}
@@ -340,22 +460,19 @@ Customer evidence for subtitle (INTERNAL):
 - Visit: ${context.visitFrequency || "none"} / ${context.customerType || "none"}
 ${locationHint}
 
-EXAMPLES (learn the method; do not copy unless the evidence matches):
-Dining note "第一次吃到可以自己DIY打抛饭，觉得很有趣，而且味道很像泰国家常菜"
-→ mainTitle 曼谷泰餐新体验 / subTitle DIY打抛饭像在泰国家里吃饭
-"在centralwOrld逛街累了发现这家泰餐，环境很舒服，适合朋友聊天"
-→ mainTitle centralwOrld泰餐推荐 / subTitle 逛街后的舒服泰式聚餐地
-"两个人吃了600泰铢，点了很多菜，份量很足"
-→ mainTitle 曼谷必吃泰餐 / subTitle 两人600泰铢吃到超满足
+If first-visit is the ONLY chosen evidence: 第一次来尝试Baan Ying. Never 第一次美食冒险 / 第一次来就被圈粉 / 第一次来就爱上. If they also said a favorite dish, prefer one hook such as 没想到最喜欢这道 — do not name the dish AND 第一次来 in the same subtitle.
 
-${formatFullDishNameRules(context.dishes)}
+${formatCoverDishNameRules(context.dishes)}
 
-VALIDATE before return:
-1) mainTitle contains at least one pool keyword and is not keyword stuffing.
-2) subTitle is from this customer's actual input/context, has the strongest selling point, is not a generic restaurant line, does not repeat mainTitle, and does not copy the note verbatim.
-3) Any dish name in mainTitle or subTitle is the complete name, never a shortened nickname.
-If mainTitle is missing a required keyword, rewrite mainTitle in this same JSON. Do not make a second request.
+NEGATIVES: never put 贵 / 难吃 / 踩雷 / 不推荐 / 失望 / 服务不好 / 态度不好 / 不会回购 on the cover. Neutralize or pick another evidence. Never invert into fake praise.
 
-FORBIDDEN except the allowed keyword 必吃: 第一 / 唯一 / 顶级 / 最强 / 最好吃 / 封神 / 全网第一 / 曼谷第一 / invented 泰国人爱吃 / 本地人爱吃 / 明星爱吃
-Never copy customer negatives onto the cover. Never write 第一次美食冒险. No hashtag, address, hours, emoji, Location & Time. Never invent a dish.`;
+FORBIDDEN except cover keyword 必吃: 第一 / 唯一 / 顶级 / 最强 / 最好吃 / 封神 / 全网第一 / 曼谷第一 / 泰国人爱吃 / 本地人爱吃 / 明星爱吃
+No hashtag, address, hours, emoji, Location & Time. Never invent a dish.
+
+QUALITY CHECK before return — if any item fails, rewrite from the same single evidence, do not output:
+Ask: would a real Xiaohongshu user write this cover line? Would it spark a little curiosity while staying true?
+MainTitle: 4–7 units; ≥1 and ≤2 pool keywords; real headline not stuffing; not a shortened titles[] item; not previous cover formula; mall name only if true and relevant; no banned claims; no hashtag/address/hours/emoji.
+SubTitle: 6–10 units; one complete natural sentence; one core reason from THIS visit; Xiaohongshu hook without new facts; approved dish shorts only; no concatenated evidence; no verbatim note; no mainTitle repeat; no fake praise, slang, or 让人惊艳 templates; no raw negatives; no hashtag/address/hours/emoji.
+
+FALLBACK if subTitle fails: walk evidence in order (selected dish → meal spend → first visit → enjoy-most → location convenience → default). Use the FIRST evidence that can become a natural 6–10 unit Xiaohongshu sentence. Rewrite that one evidence only. Never concatenate 黄咖喱蟹肉600泰铢第一次来.`;
 }
