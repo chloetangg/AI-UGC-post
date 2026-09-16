@@ -95,19 +95,19 @@ type CoverOverlay = { title: string; subtitle: string };
 
 const DISH_COVER_OVERLAYS: Record<RecommendedDish, CoverOverlay[]> = {
   "Yellow Curry Crab Meat": [
-    { title: "曼谷必吃", subtitle: "招牌咖喱蟹" },
-    { title: "泰餐必吃", subtitle: "招牌咖喱蟹" },
-    { title: "曼谷泰餐", subtitle: "招牌咖喱蟹" },
+    { title: "曼谷必吃", subtitle: "必点黄咖喱蟹肉" },
+    { title: "泰餐必吃", subtitle: "必点黄咖喱蟹肉" },
+    { title: "曼谷泰餐", subtitle: "必点黄咖喱蟹肉" },
   ],
   "Tom Yum Goong": [
-    { title: "曼谷必吃", subtitle: "招牌冬阴功" },
-    { title: "泰餐必吃", subtitle: "招牌冬阴功" },
-    { title: "曼谷泰餐", subtitle: "招牌冬阴功" },
+    { title: "曼谷必吃", subtitle: "必点冬阴功虾汤" },
+    { title: "泰餐必吃", subtitle: "必点冬阴功虾汤" },
+    { title: "曼谷泰餐", subtitle: "必点冬阴功虾汤" },
   ],
   "Thai Sweet & Sour Steamed Fish": [
-    { title: "曼谷必吃", subtitle: "招牌酸甜鱼" },
-    { title: "泰餐必吃", subtitle: "招牌酸甜鱼" },
-    { title: "曼谷泰餐", subtitle: "招牌酸甜鱼" },
+    { title: "曼谷必吃", subtitle: "招牌泰式酸甜蒸鱼" },
+    { title: "泰餐必吃", subtitle: "招牌泰式酸甜蒸鱼" },
+    { title: "曼谷泰餐", subtitle: "招牌泰式酸甜蒸鱼" },
   ],
   "Stir-Fried Shrimp with Garlic": [
     { title: "曼谷必吃", subtitle: "蒜蓉炒虾" },

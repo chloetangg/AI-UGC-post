@@ -10,9 +10,11 @@ export const ANALYTICS_EVENT_TYPES = [
   "form_submit",
   "generation_complete",
   "xhs_publish_click",
+  "xhs_copy_content",
   "publish_click",
   "publish_platform_selected",
   "publish_dianping_click",
+  "dianping_copy_content",
   "dianping_open_attempt",
   "dianping_fallback",
 ] as const;

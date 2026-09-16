@@ -177,7 +177,10 @@ export async function POST(request: Request) {
       },
       openai,
       model,
-      coverContext,
+      coverContext: {
+        ...coverContext,
+        sourceTexts: [...formatted, story],
+      },
     });
     const titles = fixFruitEmojisInTitles(
       evaluateTitleFormats(compliant.titles, previousTitles).ok

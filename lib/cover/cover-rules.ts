@@ -1,4 +1,5 @@
 import { branchKey, OFFICIAL_LOCATIONS, type BaanYingLocationId } from "@/lib/locations";
+import { formatFullDishNameRules } from "./dish-names";
 import { sanitizeCoverLine, toCoverGraphemes } from "./cover-title-text";
 
 export const COVER_LOCATION_KEYWORDS = [
@@ -72,16 +73,17 @@ const KSP_MARKERS = [
 ] as const;
 
 const DISH_SUBTITLES: Array<{ match: RegExp; subtitle: string }> = [
-  { match: /yellow curry|咖喱蟹|黄咖喱/i, subtitle: "必点招牌咖喱蟹" },
+  { match: /yellow curry|咖喱蟹|黄咖喱/i, subtitle: "必点黄咖喱蟹肉" },
   { match: /tom yum|冬阴功/i, subtitle: "必点冬阴功虾汤" },
-  { match: /sweet\s*&\s*sour|酸甜.*鱼|蒸鱼/i, subtitle: "招牌酸甜蒸鱼" },
+  { match: /sweet\s*&\s*sour|酸甜.*鱼|蒸鱼/i, subtitle: "招牌泰式酸甜蒸鱼" },
   { match: /garlic|蒜蓉|炒虾/i, subtitle: "必点蒜蓉炒虾" },
-  { match: /mango|芒果糯米/i, subtitle: "必点芒果糯米" },
+  { match: /mango|芒果糯米/i, subtitle: "必点芒果糯米饭" },
 ];
 
 export type CoverTitleContext = {
   branch?: string;
   dishes?: string[];
+  sourceTexts?: string[];
   postTitles?: string[];
   previousCoverTitle?: string;
   variantIndex?: number;
@@ -346,9 +348,12 @@ Dining note "第一次吃到可以自己DIY打抛饭，觉得很有趣，而且�
 "两个人吃了600泰铢，点了很多菜，份量很足"
 → mainTitle 曼谷必吃泰餐 / subTitle 两人600泰铢吃到超满足
 
+${formatFullDishNameRules(context.dishes)}
+
 VALIDATE before return:
 1) mainTitle contains at least one pool keyword and is not keyword stuffing.
 2) subTitle is from this customer's actual input/context, has the strongest selling point, is not a generic restaurant line, does not repeat mainTitle, and does not copy the note verbatim.
+3) Any dish name in mainTitle or subTitle is the complete name, never a shortened nickname.
 If mainTitle is missing a required keyword, rewrite mainTitle in this same JSON. Do not make a second request.
 
 FORBIDDEN except the allowed keyword 必吃: 第一 / 唯一 / 顶级 / 最强 / 最好吃 / 封神 / 全网第一 / 曼谷第一 / invented 泰国人爱吃 / 本地人爱吃 / 明星爱吃

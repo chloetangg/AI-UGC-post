@@ -95,7 +95,10 @@ export function parseGeneratedContent(
   }
 
   const postTitles: [string, string, string] = [titles[0], titles[1], titles[2]];
-  const overlay = asCoverOverlay(parsed, postTitles, coverContext);
+  const overlay = asCoverOverlay(parsed, postTitles, {
+    ...coverContext,
+    sourceTexts: [...(coverContext.sourceTexts ?? []), ...postTitles, caption],
+  });
   const selectedPhotoIndex = parsePhotoIndex(parsed.selectedPhotoIndex, photoCount);
   const selectedTemplateId = autoMatchTemplate({
     selected: String(parsed.selectedTemplateId ?? ""),

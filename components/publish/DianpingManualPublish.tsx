@@ -4,25 +4,42 @@ import { useMemo, useState } from "react";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useT } from "@/components/providers/language-provider";
-import { copyPublishText, formatDianpingPasteText, type RednotePublishPackage } from "@/lib/rednote-publish";
+import {
+  copyPublishText,
+  formatDianpingPasteText,
+  formatXiaohongshuPasteText,
+  type RednotePublishPackage,
+} from "@/lib/rednote-publish";
 import { DIANPING_SHOP_WEB_URL } from "@/lib/publish/dianping-shop";
 
-export function DianpingCopyModal({
-  pkg,
+function PublishCopyModal({
+  title,
+  description,
+  pasteText,
+  copyLabel,
+  copiedLabel,
+  publishLabel,
+  publishPendingLabel,
   busy,
   showFallback,
   onClose,
+  onCopied,
   onPublish,
 }: {
-  pkg: RednotePublishPackage;
+  title: string;
+  description: string;
+  pasteText: string;
+  copyLabel: string;
+  copiedLabel: string;
+  publishLabel: string;
+  publishPendingLabel: string;
   busy?: boolean;
   showFallback?: boolean;
   onClose: () => void;
+  onCopied?: () => void;
   onPublish: () => void;
 }) {
   const t = useT();
-  const g = t.publish.dianpingGuide;
-  const pasteText = useMemo(() => formatDianpingPasteText(pkg), [pkg]);
   const [copied, setCopied] = useState(false);
   const [copyFailed, setCopyFailed] = useState(false);
 
@@ -31,23 +48,24 @@ export function DianpingCopyModal({
     setCopyFailed(!ok);
     if (!ok) return;
     setCopied(true);
+    onCopied?.();
   }
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center">
-      <button type="button" className="absolute inset-0" aria-label={g.back} onClick={onClose} />
+      <button type="button" className="absolute inset-0" aria-label={t.publish.dianpingGuide.back} onClick={onClose} />
       <div
         role="dialog"
         aria-modal="true"
-        aria-labelledby="dianping-copy-title"
+        aria-labelledby="publish-copy-title"
         className="relative z-10 w-full max-w-[400px] rounded-3xl border border-border bg-card p-5 shadow-lg"
       >
         <div className="mb-4 flex items-start justify-between gap-3">
           <div className="min-w-0 space-y-1">
-            <h2 id="dianping-copy-title" className="text-lg font-semibold text-foreground">
-              {g.copyBodyTitle}
+            <h2 id="publish-copy-title" className="text-lg font-semibold text-foreground">
+              {title}
             </h2>
-            <p className="text-sm leading-relaxed text-muted-foreground">{g.copyFirst}</p>
+            <p className="text-sm leading-relaxed text-muted-foreground">{description}</p>
           </div>
           <button
             type="button"
@@ -69,10 +87,10 @@ export function DianpingCopyModal({
 
         <div className="space-y-2.5">
           <Button className="w-full" size="lg" variant={copied ? "outline" : "default"} onClick={() => void copyBody()}>
-            {copied ? g.copied : g.copyAll}
+            {copied ? copiedLabel : copyLabel}
           </Button>
           <Button className="w-full" size="lg" disabled={!copied || busy} onClick={onPublish}>
-            {t.publish.publishAction.dianping}
+            {copied ? publishLabel : publishPendingLabel}
           </Button>
         </div>
 
@@ -88,5 +106,85 @@ export function DianpingCopyModal({
         ) : null}
       </div>
     </div>
+  );
+}
+
+export function DianpingCopyModal({
+  pkg,
+  busy,
+  showFallback,
+  onClose,
+  onCopied,
+  onPublish,
+}: {
+  pkg: RednotePublishPackage;
+  busy?: boolean;
+  showFallback?: boolean;
+  onClose: () => void;
+  onCopied?: () => void;
+  onPublish: () => void;
+}) {
+  const t = useT();
+  const g = t.publish.dianpingGuide;
+  const pasteText = useMemo(() => formatDianpingPasteText(pkg), [pkg]);
+
+  return (
+    <PublishCopyModal
+      title={g.title}
+      description={g.copyFirst}
+      pasteText={pasteText}
+      copyLabel={g.copyAll}
+      copiedLabel={g.copied}
+      publishLabel={t.publish.publishAction.dianping}
+      publishPendingLabel={g.copyNeedFirst}
+      busy={busy}
+      showFallback={showFallback}
+      onClose={onClose}
+      onCopied={onCopied}
+      onPublish={onPublish}
+    />
+  );
+}
+
+export function XiaohongshuCopyModal({
+  pkg,
+  busy,
+  onClose,
+  onCopied,
+  onPublish,
+}: {
+  pkg: RednotePublishPackage;
+  busy?: boolean;
+  onClose: () => void;
+  onCopied?: () => void;
+  onPublish: () => void;
+}) {
+  const t = useT();
+  const g = t.publish.xhsGuide;
+  const pasteText = useMemo(
+    () =>
+      formatXiaohongshuPasteText({
+        title: pkg.title,
+        caption: pkg.caption,
+        hashtags: pkg.hashtags,
+        titles: pkg.titles,
+      }),
+    [pkg.caption, pkg.hashtags, pkg.title, pkg.titles],
+  );
+
+  return (
+    <PublishCopyModal
+      title={g.title}
+      description={g.copyFirst}
+      pasteText={pasteText}
+      copyLabel={g.copyAll}
+      copiedLabel={g.copied}
+      publishLabel={t.publish.publishAction.xiaohongshu}
+      publishPendingLabel={g.copyNeedFirst}
+      busy={busy}
+      onClose={onClose}
+      onCopied={onCopied}
+      onPublish={onPublish}
+    />
   );
 }

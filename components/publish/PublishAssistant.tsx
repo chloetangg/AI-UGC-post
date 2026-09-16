@@ -2,8 +2,7 @@
 
 import { useMemo, useState, useSyncExternalStore } from "react";
 import { Check } from "lucide-react";
-import { CopyButton } from "@/components/publish/CopyButton";
-import { DianpingCopyModal } from "@/components/publish/DianpingManualPublish";
+import { DianpingCopyModal, XiaohongshuCopyModal } from "@/components/publish/DianpingManualPublish";
 import { PostSlideshow } from "@/components/result/PostSlideshow";
 import { Button } from "@/components/ui/button";
 import { useT } from "@/components/providers/language-provider";
@@ -13,8 +12,6 @@ import type { FinalSlide } from "@/lib/cover/post-layout";
 import {
   canShareFiles,
   collectRednoteDownloads,
-  copyPublishText,
-  formatRednotePasteText,
   isMobileDevice,
   openRednotePublish,
   type PublishStatus,
@@ -38,31 +35,15 @@ export function PublishAssistant({
   const { generationId } = useCampaignFlow();
   const mobile = useSyncExternalStore(emptySubscribe, isMobileDevice, () => false);
   const fileShare = useSyncExternalStore(emptySubscribe, canShareFiles, () => false);
-  const pasteText = useMemo(() => formatRednotePasteText(pkg), [pkg]);
   const downloads = useMemo(() => collectRednoteDownloads(pkg), [pkg]);
 
   const [status, setStatus] = useState<PublishStatus>("idle");
+  const [xhsOpen, setXhsOpen] = useState(false);
   const [dianpingOpen, setDianpingOpen] = useState(false);
   const [dianpingFallback, setDianpingFallback] = useState(false);
-  const [copyFailed, setCopyFailed] = useState(false);
-  const [copiedAll, setCopiedAll] = useState(false);
-  const [showPaste, setShowPaste] = useState(false);
   const [openFailed, setOpenFailed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [filesPartial, setFilesPartial] = useState(false);
-
-  async function copyAll() {
-    const ok = await copyPublishText(pasteText);
-    setCopyFailed(!ok);
-    if (ok) {
-      setCopiedAll(true);
-      window.setTimeout(() => setCopiedAll(false), 1800);
-      setStatus((current) => (current === "idle" ? "copied" : current));
-      return true;
-    }
-    setShowPaste(true);
-    return false;
-  }
 
   function trackPlatformSelected(platform: PublishPlatform) {
     trackAnalyticsEvent({
@@ -96,9 +77,46 @@ export function PublishAssistant({
     });
   }
 
-  async function handleXiaohongshu() {
+  function trackXhsCopy() {
+    trackAnalyticsEvent({
+      eventType: "xhs_copy_content",
+      metadata: {
+        platform: "xiaohongshu",
+        source: "share_page",
+      },
+    });
+  }
+
+  function trackXhsPublish() {
+    trackAnalyticsEvent({
+      eventType: "xhs_publish_click",
+      metadata: {
+        platform: "xiaohongshu",
+        source: "share_page",
+      },
+    });
+  }
+
+  function trackDianpingCopy() {
+    trackAnalyticsEvent({
+      eventType: "dianping_copy_content",
+      metadata: {
+        platform: "dianping",
+        source: "share_page",
+      },
+    });
+  }
+
+  function handleXiaohongshu() {
     if (busy) return;
     trackPlatformSelected("xiaohongshu");
+    setXhsOpen(true);
+  }
+
+  async function publishXiaohongshu() {
+    if (busy) return;
+    trackXhsPublish();
+    setXhsOpen(false);
     setBusy(true);
     setOpenFailed(false);
     setFilesPartial(false);
@@ -167,9 +185,7 @@ export function PublishAssistant({
             {t.publish.choosePlatform}
           </h1>
           <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-muted-foreground">
-            {status === "idle" || status === "copied"
-              ? t.publish.subtitle
-              : statusMessage(status, openFailed, t)}
+            {status === "idle" ? t.publish.subtitle : statusMessage(status, openFailed, t)}
           </p>
         </div>
 
@@ -201,34 +217,13 @@ export function PublishAssistant({
           </ul>
         </section>
 
-        <Button className="w-full" size="lg" variant="outline" onClick={() => void copyAll()}>
-          {copiedAll ? t.publish.checkCopied : t.publish.copyAll}
-        </Button>
-
-        {copyFailed || showPaste ? (
-          <section className="rounded-3xl border border-border bg-card p-4 shadow-sm">
-            {copyFailed ? (
-              <p className="mb-3 text-sm text-destructive">{t.publish.statusCopyFailed}</p>
-            ) : null}
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                {t.publish.captionLabel}
-              </h2>
-              <CopyButton label={t.publish.copyAll} value={pasteText} />
-            </div>
-            <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-foreground select-text">
-              {pasteText}
-            </p>
-          </section>
-        ) : null}
-
         <section className="space-y-3">
           <PlatformCard
             name={t.publish.platforms.xiaohongshu}
             description={t.publish.dianpingGuide.chooseXhs}
             logoSrc="/publish/xiaohongshu.png"
             disabled={busy}
-            onClick={() => void handleXiaohongshu()}
+            onClick={handleXiaohongshu}
           />
           <PlatformCard
             name={t.publish.platforms.dianping}
@@ -276,12 +271,22 @@ export function PublishAssistant({
           </Button>
         ) : null}
       </div>
+      {xhsOpen ? (
+        <XiaohongshuCopyModal
+          pkg={pkg}
+          busy={busy}
+          onClose={() => setXhsOpen(false)}
+          onCopied={trackXhsCopy}
+          onPublish={() => void publishXiaohongshu()}
+        />
+      ) : null}
       {dianpingOpen ? (
         <DianpingCopyModal
           pkg={pkg}
           busy={busy}
           showFallback={dianpingFallback}
           onClose={() => setDianpingOpen(false)}
+          onCopied={trackDianpingCopy}
           onPublish={() => void publishDianping()}
         />
       ) : null}

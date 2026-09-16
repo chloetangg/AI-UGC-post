@@ -24,6 +24,7 @@ export type RednotePublishPhoto = {
 };
 
 export type RednotePublishPackage = {
+  titles: string[];
   title: string;
   caption: string;
   hashtags: string[];
@@ -118,9 +119,37 @@ export function finalTitle(pkg: Pick<RednotePublishPackage, "title">) {
   return pkg.title;
 }
 
-/** Paste-ready block: title, caption (with Location & Time), hashtags. */
-export function formatRednotePasteText(pkg: Pick<RednotePublishPackage, "title" | "caption" | "hashtags">) {
-  return joinBlocks([pkg.title, pkg.caption, pkg.hashtags.filter(Boolean).join(" ")]);
+function stripLeadingTitles(caption: string, titles: string[]) {
+  let next = caption.trim();
+  const blocks = titles.map((title) => title.trim()).filter(Boolean);
+  let changed = true;
+  while (changed && next) {
+    changed = false;
+    for (const title of blocks) {
+      if (next === title) return "";
+      if (next.startsWith(`${title}\n`)) {
+        next = next.slice(title.length).replace(/^\s+/, "");
+        changed = true;
+      }
+    }
+  }
+  return next;
+}
+
+/** Xiaohongshu paste: only the selected title + caption + hashtags. */
+export function formatXiaohongshuPasteText(
+  pkg: Pick<RednotePublishPackage, "title" | "caption" | "hashtags"> & { titles?: string[] },
+) {
+  const title = pkg.title.trim();
+  const caption = stripLeadingTitles(pkg.caption, [title, ...(pkg.titles ?? [])]);
+  return joinBlocks([title, caption, pkg.hashtags.filter(Boolean).join(" ")]);
+}
+
+/** Paste-ready block: selected title, caption (with Location & Time), hashtags. */
+export function formatRednotePasteText(
+  pkg: Pick<RednotePublishPackage, "title" | "caption" | "hashtags">,
+) {
+  return formatXiaohongshuPasteText(pkg);
 }
 
 /** Dianping paste: generated caption only. No title, no hashtags. */
@@ -133,7 +162,9 @@ export function formatDianpingPasteText(pkg: Pick<RednotePublishPackage, "captio
  * Local only — no OpenAI, no Cover Composer.
  */
 export function prepareRednotePublishPackage(source: RednotePublishSource): RednotePublishPackage {
-  const title = source.titles[source.selectedTitleIndex] ?? source.titles[0] ?? "";
+  const titles = (Array.isArray(source.titles) ? source.titles : []).map((title) => title.trim()).filter(Boolean);
+  const selected = titles[source.selectedTitleIndex] ?? titles[0] ?? "";
+  const title = selected.split(/\n\s*\n/)[0]?.trim() || selected;
   const caption = stripAllHashtagsFromCaption(source.caption);
   const hashtags = [...ensureRequiredHashtags(source.hashtags)];
   const selectedPhotoIndex = Number.isInteger(source.selectedPhotoIndex) ? source.selectedPhotoIndex : 0;
@@ -151,6 +182,7 @@ export function prepareRednotePublishPackage(source: RednotePublishSource): Redn
   }));
 
   return {
+    titles,
     title,
     caption,
     hashtags,

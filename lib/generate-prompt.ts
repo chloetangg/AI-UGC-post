@@ -56,12 +56,12 @@ export const generatePostJsonSchema = {
       mainTitle: {
         type: "string",
         description:
-          "Independent Xiaohongshu COVER mainTitle. Natural headline with AT LEAST ONE keyword from 曼谷 / centralwOrld / 泰餐 / 美食 / 必吃. Do not keyword-stuff. 4–7 units. Count centralwOrld as 1 unit. No emoji. Never shorten titles[]. Never truncate.",
+          "Independent Xiaohongshu COVER mainTitle. Natural headline with AT LEAST ONE keyword from 曼谷 / centralwOrld / 泰餐 / 美食 / 必吃. Do not keyword-stuff. 4–7 units. Count centralwOrld as 1 unit. No emoji. If a dish is named, use the COMPLETE dish name (黄咖喱蟹肉 not 咖喱蟹). Never shorten titles[]. Never truncate.",
       },
       subTitle: {
         type: "string",
         description:
-          "Independent COVER subTitle. Extracted from this customer's FEEL tags, dining note, spend, dishes, and KSP — not a fixed template. Strongest save/click reason. 6–10 units. Do not repeat mainTitle. No emoji. Never empty.",
+          "Independent COVER subTitle. Extracted from this customer's FEEL tags, dining note, spend, dishes, and KSP — not a fixed template. Strongest save/click reason. 6–10 units. Do not repeat mainTitle. No emoji. Never empty. If a dish is named, use the COMPLETE dish name.",
       },
       selectedPhotoIndex: {
         type: "integer",
@@ -330,7 +330,7 @@ COVER OVERLAY — JSON "mainTitle" + "subTitle". Completely independent from "ti
 ${formatCoverHookRules()}
 
 Do not pad mainTitle with filler. No hashtag, address, hours, phone, URL, or Location & Time.
-Do not copy titles[]. Before return, check: mainTitle has at least one pool keyword and is not stuffed; subTitle is extracted from this customer's evidence, not a generic 招牌泰式料理 template, and does not repeat the mainTitle.
+Do not copy titles[]. Before return, check: mainTitle has at least one pool keyword and is not stuffed; subTitle is extracted from this customer's evidence, not a generic 招牌泰式料理 template, and does not repeat the mainTitle. If either cover line names a dish, use the complete dish name from the customer's dishes or this post's titles/caption.
 
 COVER PHOTOS — selectedPhotoIndex is the ONE Cover Source for a normal cover.
 Photos are attached in order: Photo 1 = 0, Photo 2 = 1, …
@@ -539,14 +539,16 @@ ${formatStrategySelection(library, suggestedStrategy, {
 })}
 Diversity seed: ${input.variantIndex}
 
-DISH NAME REFERENCE (Chinese in caption; original names allowed as supplement):
-- Yellow Curry Crab Meat = 黄咖喱蟹肉
-- Tom Yum Goong = 冬阴功虾汤
-- Thai Sweet & Sour Steamed Fish = 泰式酸甜蒸鱼
+DISH NAME REFERENCE (Chinese in caption and COVER; original names allowed as supplement):
+- Yellow Curry Crab Meat = 黄咖喱蟹肉  (never 咖喱蟹)
+- Tom Yum Goong = 冬阴功虾汤  (never 冬阴功)
+- Thai Sweet & Sour Steamed Fish = 泰式酸甜蒸鱼  (never 蒸鱼)
 - Stir-Fried Shrimp with Garlic = 蒜蓉炒虾
-- Mango Sticky Rice = 芒果糯米饭
+- Mango Sticky Rice = 芒果糯米饭  (never 芒果糯米)
+If a customer-written dish has a complete name (泰式青咖喱鸡 / 泰式香辣打抛猪肉饭), keep that complete name. Never shorten to 青咖喱 or 打抛.
 If a dish was not provided, do not name a specific dish.
 Allowed cover dishes = only the recommended/mentioned list above. Never invent Pad Thai, Som Tam, Green Curry, or other unsupported dishes.
+If mainTitle/subTitle mentions a dish, copy the complete name from titles/caption or this list. Do not shorten a dish name to fit the 4–7 / 6–10 unit limits — shorten the other words or move the complete dish name to subTitle.
 
 ${previousBlock}
 

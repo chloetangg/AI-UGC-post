@@ -76,7 +76,7 @@ HOOK-02 Adjective only if the meal supports it, prefer it in subTitle
 HOOK-03 Reaction belongs in subTitle, not as a 3-character mainTitle
 HOOK-04 Soft CTA lives in caption
 HOOK-05 Local identity ONLY with evidence. Never invent 泰国人爱吃.
-HOOK-06 Dish-led subtitle from a real selected dish or the dining note
+HOOK-06 Dish-led subtitle from a real selected dish or the dining note, using the COMPLETE dish name (黄咖喱蟹肉 not 咖喱蟹; 冬阴功虾汤 not 冬阴功)
 HOOK-07 Warm home-style feeling in subTitle when the note supports it
 HOOK-08 Location in the title only when it is the hook, e.g. centralwOrld泰餐推荐. Never force centralwOrld.
 

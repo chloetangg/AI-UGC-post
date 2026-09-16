@@ -576,7 +576,10 @@ export function CampaignFlowProvider({
       data.titles[0],
       data.titles[1],
       data.titles[2],
-    ], coverContext);
+    ], {
+      ...coverContext,
+      sourceTexts: [data.titles[0], data.titles[1], data.titles[2], data.caption],
+    });
     const coverTitle = overlay.title;
     const coverSubtitle = overlay.subtitle;
     const previousTemplateId = current.cover?.selectedCoverTemplateId || "";

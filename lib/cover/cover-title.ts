@@ -6,6 +6,7 @@ import {
   sanitizeCoverLine,
 } from "./cover-title-text";
 import {
+  COVER_POOL_KEYWORDS,
   coverFallbackPairs,
   countCoverUnits,
   coverKeywordPairKey,
@@ -18,6 +19,7 @@ import {
   usesUnselectedCoverLocation,
   type CoverTitleContext,
 } from "./cover-rules";
+import { collectFullDishNames, expandShortDishNames } from "./dish-names";
 
 export {
   countCoverChars,
@@ -219,14 +221,86 @@ export function splitCoverTitleForTwoGraphics(title: string, subtitle = "") {
   return splitCoverTitleSemantically(title, subtitle);
 }
 
+function firstPoolKeyword(title: string) {
+  return COVER_POOL_KEYWORDS.find((keyword) => title.includes(keyword)) ?? "";
+}
+
+function fitSubtitleAroundDish(dish: string, current: string) {
+  if (current.includes(dish)) {
+    const units = countCoverUnits(current);
+    if (units >= MIN_SUB_TITLE_CHARS && units <= MAX_SUB_TITLE_CHARS) return current;
+  }
+  const dishUnits = countCoverUnits(dish);
+  if (dishUnits >= MIN_SUB_TITLE_CHARS && dishUnits <= MAX_SUB_TITLE_CHARS) return dish;
+  const padded = `必点${dish}`;
+  if (countCoverUnits(padded) <= MAX_SUB_TITLE_CHARS) return padded;
+  return dish;
+}
+
+function applyFullDishNames(
+  title: string,
+  subtitle: string,
+  postTitles: string[],
+  context: CoverTitleContext,
+) {
+  const fullNames = collectFullDishNames({
+    dishes: context.dishes,
+    sourceTexts: [...(context.sourceTexts ?? []), ...postTitles, context.diningNote ?? ""],
+  });
+  if (fullNames.length === 0) return { title, subtitle };
+
+  let nextTitle = expandShortDishNames(title, fullNames);
+  let nextSubtitle = expandShortDishNames(subtitle, fullNames);
+  if (isAcceptableCoverOverlay(nextTitle, nextSubtitle, postTitles, context)) {
+    return { title: nextTitle, subtitle: nextSubtitle };
+  }
+
+  const dishesInTitle = fullNames.filter((name) => nextTitle.includes(name));
+  if (dishesInTitle.length > 0 && countCoverUnits(nextTitle) > MAX_MAIN_TITLE_CHARS) {
+    const dish = dishesInTitle[0];
+    const keyword = firstPoolKeyword(nextTitle) || "曼谷";
+    const compact = `${keyword}${dish}`;
+    if (
+      countCoverUnits(compact) >= MIN_MAIN_TITLE_CHARS &&
+      countCoverUnits(compact) <= MAX_MAIN_TITLE_CHARS &&
+      isAcceptableMainTitle(compact, postTitles, context)
+    ) {
+      nextTitle = compact;
+    } else {
+      let withoutDish = nextTitle;
+      for (const name of dishesInTitle) withoutDish = withoutDish.split(name).join("");
+      withoutDish = prepareCoverLine(withoutDish);
+      if (!isAcceptableMainTitle(withoutDish, postTitles, context)) {
+        const fallbackMain = countCoverUnits(`${keyword}泰餐`) <= MAX_MAIN_TITLE_CHARS ? `${keyword}泰餐` : keyword;
+        withoutDish = isAcceptableMainTitle(fallbackMain, postTitles, context) ? fallbackMain : withoutDish;
+      }
+      nextTitle = withoutDish;
+      if (!nextSubtitle.includes(dish)) nextSubtitle = fitSubtitleAroundDish(dish, nextSubtitle);
+    }
+  }
+
+  if (countCoverUnits(nextSubtitle) > MAX_SUB_TITLE_CHARS) {
+    const dishesInSub = fullNames.filter((name) => nextSubtitle.includes(name));
+    if (dishesInSub.length > 0) nextSubtitle = fitSubtitleAroundDish(dishesInSub[0], nextSubtitle);
+  }
+
+  return { title: prepareCoverLine(nextTitle), subtitle: prepareCoverLine(nextSubtitle) };
+}
+
 export function layoutCoverOverlay(
   rawTitle: string,
   rawSubtitle = "",
   postTitles: string[] = [],
   context: CoverTitleContext = {},
 ) {
-  const first = prepareCoverLine(rawTitle);
-  const second = prepareCoverLine(rawSubtitle);
+  const expanded = applyFullDishNames(
+    prepareCoverLine(rawTitle),
+    prepareCoverLine(rawSubtitle),
+    postTitles,
+    context,
+  );
+  const first = expanded.title;
+  const second = expanded.subtitle;
 
   if (isAcceptableCoverOverlay(first, second, postTitles, context)) {
     return { title: first, subtitle: second };

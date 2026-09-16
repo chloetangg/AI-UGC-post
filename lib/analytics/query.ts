@@ -66,11 +66,8 @@ export async function queryAnalyticsReport(input: {
           rednoteClicks: [
             {
               $match: {
-                $or: [
-                  { eventType: "xhs_publish_click" },
-                  { eventType: "publish_click", "metadata.platform": "rednote" },
-                  { eventType: "publish_click", "metadata.platform": "xiaohongshu" },
-                ],
+                eventType: "publish_platform_selected",
+                "metadata.platform": { $in: ["xiaohongshu", "rednote"] },
               },
             },
             { $count: "count" },
@@ -78,10 +75,8 @@ export async function queryAnalyticsReport(input: {
           dianpingClicks: [
             {
               $match: {
-                $or: [
-                  { eventType: "publish_dianping_click" },
-                  { eventType: "publish_click", "metadata.platform": "dianping" },
-                ],
+                eventType: "publish_platform_selected",
+                "metadata.platform": "dianping",
               },
             },
             { $count: "count" },
@@ -109,14 +104,9 @@ export async function queryAnalyticsReport(input: {
                   $sum: {
                     $cond: [
                       {
-                        $or: [
-                          { $eq: ["$eventType", "xhs_publish_click"] },
-                          {
-                            $and: [
-                              { $eq: ["$eventType", "publish_click"] },
-                              { $in: ["$metadata.platform", ["rednote", "xiaohongshu"]] },
-                            ],
-                          },
+                        $and: [
+                          { $eq: ["$eventType", "publish_platform_selected"] },
+                          { $in: ["$metadata.platform", ["xiaohongshu", "rednote"]] },
                         ],
                       },
                       1,
@@ -128,14 +118,9 @@ export async function queryAnalyticsReport(input: {
                   $sum: {
                     $cond: [
                       {
-                        $or: [
-                          { $eq: ["$eventType", "publish_dianping_click"] },
-                          {
-                            $and: [
-                              { $eq: ["$eventType", "publish_click"] },
-                              { $eq: ["$metadata.platform", "dianping"] },
-                            ],
-                          },
+                        $and: [
+                          { $eq: ["$eventType", "publish_platform_selected"] },
+                          { $eq: ["$metadata.platform", "dianping"] },
                         ],
                       },
                       1,
