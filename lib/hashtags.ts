@@ -1,4 +1,4 @@
-export const REQUIRED_HASHTAGS = ["#baanying曼谷", "#曼谷必吃", "#centralworld泰餐推荐"] as const;
+export const REQUIRED_HASHTAGS = ["#baanying曼谷"] as const;
 export const RANDOM_HASHTAG_POOL = [
   "#centralworld",
   "#曼谷centralworld",
@@ -16,10 +16,13 @@ export const RANDOM_HASHTAG_POOL = [
   "#曼谷探店推荐",
   "#曼谷正宗泰餐",
   "#曼谷泰式家常菜",
+  "#曼谷必吃",
+  "#centralworld泰餐推荐",
 ] as const;
 export const HASHTAG_COUNT = 5;
-export const DYNAMIC_HASHTAG_COUNT = 2;
+export const DYNAMIC_HASHTAG_COUNT = 4;
 export const FIXED_HASHTAG_LINE = REQUIRED_HASHTAGS.join(" ");
+export const POOL_HASHTAG_LINE = RANDOM_HASHTAG_POOL.join(" ");
 
 export type GeneratedHashtags = [string, string, string, string, string];
 
@@ -52,17 +55,16 @@ If a previous caption included hashtags, ignore them and do not copy them.`;
 
 export const HASHTAGS_JSON_FIELD_RULES = `HASHTAGS — JSON field "hashtags" only. Never put hashtags in titles or caption.
 
-Exactly 5 hashtags, in this order:
-1. #baanying曼谷
-2. #曼谷必吃
-3. #centralworld泰餐推荐
-4–5. exactly 2 tags randomly chosen from the approved pool. Never invent, shorten, combine, translate, or rewrite pool tags.
+Exactly 5 hashtags:
+- Always include #baanying曼谷
+- Pick exactly 4 different tags from the approved pool. Never invent, shorten, combine, translate, or rewrite pool tags.
+- Shuffle all 5 into a random order. #baanying曼谷 is NOT always first.
 
 Approved pool ONLY:
-#centralworld #曼谷centralworld #centralworld美食 #泰国 #泰国旅游 #泰国旅游攻略 #泰国美食 #曼谷泰餐推荐 #centralworld泰餐 #曼谷 #曼谷美食 #泰国菜 #曼谷打卡 #曼谷探店推荐 #曼谷正宗泰餐 #曼谷泰式家常菜
+${POOL_HASHTAG_LINE}
 
-The 2 random tags MUST be different from each other and should differ from previousHashtags when another pair exists.
-Never pick the 3 fixed tags as the random pair. Never output a tag outside this pool.`;
+The 4 random tags MUST be different from each other and should differ from previousHashtags when another set exists.
+Never pick #baanying曼谷 as one of the 4 random tags. Never output a tag outside this pool.`;
 
 export const STRICT_HASHTAG_RULES = `【HASHTAG GENERATION — SEPARATE MODULE】
 
@@ -70,20 +72,19 @@ You generate hashtags ONLY. You do NOT write captions.
 
 Return ONLY the 5 hashtags. No explanations.
 
-1. FIXED HASHTAGS (always first, exact spelling, this order):
-${FIXED_HASHTAG_LINE}
+1. FIXED HASHTAG (always include, exact spelling, random position):
+#baanying曼谷
 
 2. RANDOM HASHTAGS:
-Select exactly 2 different hashtags from this pool only:
-#centralworld #曼谷centralworld #centralworld美食 #泰国 #泰国旅游 #泰国旅游攻略 #泰国美食 #曼谷泰餐推荐 #centralworld泰餐 #曼谷 #曼谷美食 #泰国菜 #曼谷打卡 #曼谷探店推荐 #曼谷正宗泰餐 #曼谷泰式家常菜
+Select exactly 4 different hashtags from this pool only:
+${POOL_HASHTAG_LINE}
 Do not invent, shorten, combine, translate, or rewrite them.
-Do not pick any of the 3 fixed hashtags as the random pair.
-Do not repeat the previous random pair when another pair exists.
+Do not pick #baanying曼谷 as one of the 4 random tags.
+Do not repeat the previous random set when another set exists.
 
-3. COUNT: exactly 5. Order: 3 fixed, then 2 random.
+3. COUNT: exactly 5. Shuffle the 1 fixed tag + 4 random tags into a random order.
 
-4. OUTPUT:
-${FIXED_HASHTAG_LINE} #随机1 #随机2`;
+4. OUTPUT: five hashtags separated by spaces, in random order.`;
 
 function formatHashtag(value: string) {
   const trimmed = value.trim().replace(/^#+/, "").replace(/\s+/g, "");
@@ -106,16 +107,110 @@ function previousRandomTags(previous?: string[] | null) {
   return (previous ?? []).map(formatHashtag).filter((tag) => tag && isPoolHashtag(tag) && !isRequiredHashtag(tag));
 }
 
-function pickRandomPoolHashtags(exclude: string[] = []): [string, string] {
+function shuffleTags(tags: string[]): string[] {
+  const next = [...tags];
+  const cryptoObj = globalThis.crypto;
+  for (let index = next.length - 1; index > 0; index -= 1) {
+    let swap = Math.floor(Math.random() * (index + 1));
+    if (typeof cryptoObj?.getRandomValues === "function") {
+      const bytes = new Uint32Array(1);
+      cryptoObj.getRandomValues(bytes);
+      swap = bytes[0] % (index + 1);
+    }
+    [next[index], next[swap]] = [next[swap], next[index]];
+  }
+  return next;
+}
+
+function asFive(tags: string[]): GeneratedHashtags {
+  return [tags[0] ?? "", tags[1] ?? "", tags[2] ?? "", tags[3] ?? "", tags[4] ?? ""];
+}
+
+function sameTagSet(left: string[], right: string[]) {
+  if (left.length !== right.length) return false;
+  return left.every((tag) => right.some((item) => tagKey(item) === tagKey(tag)));
+}
+
+function pickRandomPoolHashtags(exclude: string[] = []): string[] {
   const blocked = new Set(exclude.map(tagKey));
   const available = RANDOM_HASHTAG_POOL.filter((tag) => !blocked.has(tagKey(tag)));
   const source = available.length >= DYNAMIC_HASHTAG_COUNT ? available : [...RANDOM_HASHTAG_POOL];
-  const shuffled = [...source];
-  for (let index = shuffled.length - 1; index > 0; index -= 1) {
-    const swap = Math.floor(Math.random() * (index + 1));
-    [shuffled[index], shuffled[swap]] = [shuffled[swap], shuffled[index]];
+  return shuffleTags([...source]).slice(0, DYNAMIC_HASHTAG_COUNT);
+}
+
+function fillPoolHashtags(current: string[], exclude: string[]) {
+  const extras = [...current];
+  const seen = new Set(extras.map(tagKey));
+  const [firstPass, secondPass] = [
+    pickRandomPoolHashtags([...REQUIRED_HASHTAGS, ...extras, ...exclude]),
+    pickRandomPoolHashtags([...REQUIRED_HASHTAGS, ...extras]),
+  ];
+  for (const tag of [...firstPass, ...secondPass]) {
+    if (extras.length === DYNAMIC_HASHTAG_COUNT) break;
+    if (seen.has(tagKey(tag))) continue;
+    seen.add(tagKey(tag));
+    extras.push(tag);
   }
-  return [shuffled[0], shuffled[1]];
+  return extras.slice(0, DYNAMIC_HASHTAG_COUNT);
+}
+
+function orderHashtags(candidates: string[], extras: string[], required: string) {
+  const allowed = new Map<string, string>();
+  allowed.set(tagKey(required), required);
+  for (const tag of extras) allowed.set(tagKey(tag), tag);
+  const ordered: string[] = [];
+  const seen = new Set<string>();
+  for (const candidate of candidates) {
+    const tag = formatHashtag(candidate);
+    const key = tagKey(tag);
+    const canonical = allowed.get(key);
+    if (!canonical || seen.has(key)) continue;
+    seen.add(key);
+    ordered.push(canonical);
+  }
+  if (!seen.has(tagKey(required))) {
+    ordered.unshift(required);
+    seen.add(tagKey(required));
+  }
+  for (const tag of extras) {
+    if (ordered.length >= HASHTAG_COUNT) break;
+    if (seen.has(tagKey(tag))) continue;
+    seen.add(tagKey(tag));
+    ordered.push(tag);
+  }
+  return ordered.slice(0, HASHTAG_COUNT);
+}
+
+/**
+ * Always include #baanying曼谷 plus exactly 4 approved-pool tags.
+ * Generation shuffles all 5. Manual edits keep the current order.
+ */
+export function normalizeHashtags(
+  candidates: string[] = [],
+  previousHashtags: string[] = [],
+  options: { shuffle?: boolean } = {},
+): GeneratedHashtags {
+  const shuffle = options.shuffle !== false;
+  const required = REQUIRED_HASHTAGS[0];
+  const seen = new Set([tagKey(required)]);
+  const previousRandom = previousRandomTags(previousHashtags);
+  let extras: string[] = [];
+
+  for (const candidate of candidates) {
+    const tag = formatHashtag(candidate);
+    if (!tag || seen.has(tagKey(tag)) || !isPoolHashtag(tag)) continue;
+    seen.add(tagKey(tag));
+    extras.push(tag);
+    if (extras.length === DYNAMIC_HASHTAG_COUNT) break;
+  }
+
+  if (sameTagSet(extras, previousRandom) && extras.length === DYNAMIC_HASHTAG_COUNT) {
+    extras = [];
+  }
+
+  extras = fillPoolHashtags(extras, previousRandom);
+  const ordered = orderHashtags(candidates, extras, required);
+  return asFive(shuffle ? shuffleTags(ordered) : ordered);
 }
 
 export function extractHashtags(text: string): string[] {
@@ -139,54 +234,6 @@ export function extractTrailingHashtags(caption: string): string[] {
 
 export function captionContainsHashtags(caption: string) {
   return extractHashtags(caption).length > 0;
-}
-
-/**
- * Always 3 fixed tags, then exactly 2 approved-pool tags.
- * Candidates outside the pool are dropped. Gaps are filled at random.
- */
-export function normalizeHashtags(
-  candidates: string[] = [],
-  previousHashtags: string[] = [],
-): GeneratedHashtags {
-  const required = [...REQUIRED_HASHTAGS];
-  const seen = new Set(required.map(tagKey));
-  const previousRandom = previousRandomTags(previousHashtags);
-  const extras: string[] = [];
-
-  for (const candidate of candidates) {
-    const tag = formatHashtag(candidate);
-    if (!tag || seen.has(tagKey(tag)) || !isPoolHashtag(tag)) continue;
-    seen.add(tagKey(tag));
-    extras.push(tag);
-    if (extras.length === DYNAMIC_HASHTAG_COUNT) break;
-  }
-
-  const sameAsPrevious =
-    extras.length === DYNAMIC_HASHTAG_COUNT &&
-    previousRandom.length === DYNAMIC_HASHTAG_COUNT &&
-    extras.every((tag) => previousRandom.some((item) => tagKey(item) === tagKey(tag)));
-  if (sameAsPrevious) {
-    for (const tag of extras) seen.delete(tagKey(tag));
-    extras.length = 0;
-  }
-
-  if (extras.length < DYNAMIC_HASHTAG_COUNT) {
-    const [first, second] = pickRandomPoolHashtags([...required, ...extras, ...previousRandom]);
-    for (const tag of [first, second]) {
-      if (extras.length === DYNAMIC_HASHTAG_COUNT) break;
-      if (seen.has(tagKey(tag))) continue;
-      seen.add(tagKey(tag));
-      extras.push(tag);
-    }
-  }
-
-  if (extras.length < DYNAMIC_HASHTAG_COUNT) {
-    const [first, second] = pickRandomPoolHashtags([...required, ...extras]);
-    extras.push(first, second);
-  }
-
-  return [required[0], required[1], required[2], extras[0], extras[1]];
 }
 
 export function validateHashtags(
@@ -236,9 +283,9 @@ export function finalizeGeneratedHashtags(
   };
 }
 
-/** Keep required tags first; keep at most 2 approved-pool extras. */
+/** Keep #baanying曼谷 and at most 4 approved-pool extras, preserving order. */
 export function ensureRequiredHashtags(tags: string[]): GeneratedHashtags {
-  return normalizeHashtags(tags);
+  return normalizeHashtags(tags, [], { shuffle: false });
 }
 
 export function stripTrailingHashtagBlock(caption: string) {

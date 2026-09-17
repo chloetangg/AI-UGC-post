@@ -2,6 +2,7 @@ import {
   GENERATE_CONTENT_LANGUAGE,
   type GenerateContentRequest,
 } from "@/lib/generate-content/types";
+import { formatCaptionConsumerVoiceRules } from "@/lib/caption-voice";
 import { CAPTION_NO_HASHTAG_RULES } from "@/lib/hashtags";
 import { complianceGenerationRules } from "@/lib/compliance/prompt";
 import {
@@ -38,7 +39,7 @@ export const generateContentJsonSchema = {
       body: {
         type: "string",
         description:
-          "Exactly 1 Simplified Chinese Xiaohongshu story body written as a real diner, with short conversational paragraphs. Do not invent facts. Do not include hashtags. Do not include Location & Time; the system appends one of 6 locked templates after this body.",
+          "Exactly 1 Simplified Chinese Xiaohongshu story body written as a real diner. Length follows the evidence — 2 sentences is valid. No fixed sentence/word quota. Do not invent facts. Do not include hashtags. Do not include Location & Time; the system appends one of 6 locked templates after this body.",
       },
     },
   },
@@ -66,6 +67,7 @@ CONTENT PRINCIPLES:
 - Avoid overly commercial language.
 - Avoid excessive exclamation marks.
 - Avoid repetitive sentence structures.
+- Caption length is not a quota. Simple visits can be 2 sentences. Richer visits can run longer. Never pad.
 - Do not use the customer's real name in the post.
 - Origins or age may appear only if the user provided them, and only as a light natural aside.
 - Photo fields are metadata only. Do not claim you saw plating, color, or other visual details that were not described.
@@ -91,9 +93,12 @@ XIAOHONGSHU STYLE:
 - Titles can use emojis naturally.
 - 🍋 is lemon / 柠檬 only. 🥭 is mango / 芒果 only. Never use 🍋 for 芒果糯米饭.
 - Use conversational Chinese.
-- The body should have a natural social-media rhythm with short paragraphs.
+- Body length follows this visit's evidence. 2 sentences is valid. Do not force a 3–5 sentence intro/experience/recommend/summary template.
+- Vary sentence length, paragraphing, opening, and emoji count across generations.
 - The content should feel like something a real person would post after dining at a restaurant.
 - Do not make every sentence sound promotional.
+
+${formatCaptionConsumerVoiceRules()}
 
 TITLE DIVERSITY:
 Generate exactly 3 different title angles, in this order:
@@ -187,6 +192,8 @@ Generate exactly 3 different Xiaohongshu titles, in this order:
 The 3 titles must not be simple rewrites of each other.
 Generate exactly 1 Xiaohongshu body.
 The body MUST contain ZERO hashtags. Do not write Location & Time; the system appends it.
+Let the body length follow the information provided. If two sentences are enough, write two. Do not pad.
+Write as a diner who just ate, not a restaurant brochure. Keep mixed like/so-so from the evidence. Do not invent flaws. Do not force a summary CTA.
 Do not add information that is not provided.
 If Favorite dish is Not provided, do not name a specific dish.
 Terminal 21 and One Bangkok must remain English in titles, body, and location lines. Do not translate mall names that have no approved Chinese name.

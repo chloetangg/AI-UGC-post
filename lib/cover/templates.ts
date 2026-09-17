@@ -9,7 +9,7 @@ const W = CANVAS_WIDTH;
 const SAFE = SAFE_AREA;
 
 export const COLORS = {
-  green: "#24662d",
+  green: "#1c3b20",
   black: "#0f0f0f",
   yellow: "#fac414",
   white: "#ffffff",

@@ -106,6 +106,12 @@ export function parseGeneratedContent(
     previousTemplateId,
   });
 
+  const selectedPhotoIndexes = parsePhotoIndexes(
+    parsed.selectedPhotoIndexes,
+    selectedPhotoIndex,
+    photoCount,
+  );
+
   return {
     titles: postTitles,
     caption,
@@ -113,11 +119,7 @@ export function parseGeneratedContent(
     coverTitle: overlay.title,
     coverSubtitle: overlay.subtitle,
     selectedPhotoIndex,
-    selectedPhotoIndexes: parsePhotoIndexes(
-      parsed.selectedPhotoIndexes,
-      selectedPhotoIndex,
-      photoCount,
-    ),
+    selectedPhotoIndexes,
     photoSelectionReason: cleanCoverTitle(String(parsed.photoSelectionReason ?? "")),
     selectedTemplateId,
     suitableTemplateIds: asStringArray(parsed.suitableTemplateIds),
@@ -126,6 +128,7 @@ export function parseGeneratedContent(
       selectedPhotoIndex,
       photoCount,
       selectedTemplateId,
+      selectedPhotoIndexes,
     ),
     remainingOrderPattern: String(parsed.remainingOrderPattern ?? "").trim(),
     selectedKspId: String(parsed.selectedKspId ?? "").trim() || undefined,

@@ -32,7 +32,7 @@ export const mockGeneratedContent: GeneratedContent = {
     "曼谷泰菜推荐｜Baan Ying 一次吃好多经典泰味😋",
   ],
   caption:
-    `来曼谷当然要安排一顿泰国菜🇹🇭 这次吃到 Baan Ying，整体体验很适合和朋友一起约饭！从经典泰菜到各种适合分享的料理，一桌点起来超满足😋 如果你最近也在找曼谷餐厅，不妨把这家先收藏起来✨\n\n📍 尚泰世界购物中心（centralwOrld）3楼\n⏰ 10:00–22:00`,
+    `来曼谷当然要安排一顿泰国菜🇹🇭 这次吃到 Baan Ying，整体都还蛮对胃口。我最喜欢的还是那几道适合一起分的菜，吃完也没有特别想总结，就是这顿吃得挺舒服😋\n\n📍 尚泰世界购物中心（centralwOrld）3楼\n⏰ 10:00–22:00`,
   hashtags: validateHashtags(["#曼谷美食", "#泰国菜"]),
   coverTitle: "曼谷泰餐推荐",
   coverSubtitle: "这几道菜让人想再点",
@@ -81,9 +81,9 @@ const CONTENT_OPENERS: Record<ContentType, string[]> = {
 };
 
 const ANGLE_HASHTAG_SETS = [
-  ["#曼谷美食", "#泰国菜"],
-  ["#泰国美食", "#曼谷泰餐推荐"],
-  ["#centralworld", "#曼谷打卡"],
+  ["#曼谷美食", "#泰国菜", "#曼谷打卡", "#泰国"],
+  ["#泰国美食", "#曼谷泰餐推荐", "#曼谷必吃", "#centralworld"],
+  ["#centralworld", "#曼谷打卡", "#centralworld泰餐推荐", "#曼谷"],
 ] as const;
 
 function mockDynamicHashtags(input: GeneratePostInput): GeneratedHashtags {
@@ -234,23 +234,6 @@ export function getMockGeneratedContent(input: GeneratePostInput): GeneratedCont
     hoursDisplay,
   );
 
-  if (input.variantIndex % 3 === 0) {
-    const base = mockGeneratedContent.caption.replace(/\n\n📍[\s\S]*$/, "").trim();
-    return {
-      titles: [...mockGeneratedContent.titles] as GeneratedContent["titles"],
-      caption: stripAllHashtagsFromCaption(
-        locationSection ? `${base}\n\n${locationSection}` : base,
-      ),
-      hashtags,
-      coverTitle: overlay.title,
-      coverSubtitle: overlay.subtitle,
-      selectedPhotoIndex: 0,
-      selectedPhotoIndexes: [0],
-      photoSelectionReason: mockGeneratedContent.photoSelectionReason,
-      ...mockCoverLayout(input, 0),
-    };
-  }
-
   const enjoy =
     input.enjoyMost.length > 0 ? input.enjoyMost : (["The food"] as EnjoyMost[]);
   const highlightText = joinChinese(enjoy.map((item) => item.replace(/^The /, "").toLowerCase()));
@@ -283,16 +266,29 @@ export function getMockGeneratedContent(input: GeneratePostInput): GeneratedCont
   ];
 
   const titles = titlePool[input.variantIndex % titlePool.length];
-  const caption = [
-    opener,
-    photoLine,
-    `最有感的是${highlightText}，${sceneText}都很合适，一桌点起来也很好分享。`,
-    "整体氛围很放松，吃起来像真实探店，不像硬广。",
-    "如果你最近也在找曼谷餐厅，不妨把 Baan Ying 先收藏起来✨",
-    locationSection,
-  ]
-    .filter(Boolean)
-    .join("\n\n");
+  const note = input.diningExperienceNote?.trim() ?? "";
+  const simpleVisit = !note && input.photoCount <= 1 && (input.recommendedDishes?.length ?? 0) <= 1;
+  const lengthBand = simpleVisit ? input.variantIndex % 2 : input.variantIndex % 4;
+  const captionParts =
+    lengthBand === 0
+      ? [opener, `这顿最有感的是${highlightText}。`]
+      : lengthBand === 1
+        ? [opener, `最有感的是${highlightText}，${sceneText}都很合适。`, photoLine]
+        : lengthBand === 2
+          ? [
+              opener,
+              photoLine,
+              `最有感的是${highlightText}，${sceneText}都很合适，一桌点起来也很好分享。`,
+              "整体氛围很放松，吃起来像真实探店。",
+            ]
+          : [
+              opener,
+              photoLine,
+              `最有感的是${highlightText}，${sceneText}都很合适，一桌点起来也很好分享。`,
+              "整体氛围很放松，吃起来像真实探店，不像硬广。",
+              "下次再来想把这次没点到的也试一下。",
+            ];
+  const caption = [...captionParts, locationSection].filter(Boolean).join("\n\n");
 
   return {
     titles,

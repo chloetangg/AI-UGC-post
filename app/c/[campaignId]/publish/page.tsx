@@ -6,7 +6,7 @@ import { FlowGuard } from "@/components/flow/FlowGuard";
 import { useCampaignFlow } from "@/components/providers/campaign-flow-provider";
 import { PublishAssistant } from "@/components/publish/PublishAssistant";
 import { campaignPath } from "@/lib/flow";
-import { buildFinalSlides, isFourPhotoGridCover } from "@/lib/cover/post-layout";
+import { buildFinalSlides } from "@/lib/cover/post-layout";
 import { prepareRednotePublishPackage } from "@/lib/rednote-publish";
 
 export default function PublishPage() {
@@ -21,8 +21,19 @@ export default function PublishPage() {
     }
   }, [campaignId, canAccess, draft, hydrated, router]);
 
+  const slides = useMemo(() => buildFinalSlides(photos, cover), [cover, photos]);
+
   const pkg = useMemo(() => {
     if (!draft || !generated) return null;
+    const bodyPhotos = slides
+      .filter((slide) => slide.kind === "photo")
+      .map((slide) => {
+        const original = photos.find((photo) => photo.id === slide.id);
+        return {
+          previewUrl: slide.src,
+          name: original?.name,
+        };
+      });
     return prepareRednotePublishPackage({
       titles: generated.titles,
       selectedTitleIndex: draft.selectedTitleIndex,
@@ -30,17 +41,10 @@ export default function PublishPage() {
       hashtags: draft.hashtags,
       coverImageUrl: cover?.generatedCoverImageUrl ?? null,
       selectedPhotoIndex: cover?.selectedPhotoIndex ?? generated.selectedPhotoIndex ?? 0,
-      coverPhotoIndexes: isFourPhotoGridCover(
-        photos.length,
-        cover?.selectedCoverTemplateId ?? generated.selectedTemplateId ?? "",
-      )
-        ? []
-        : [cover?.selectedPhotoIndex ?? generated.selectedPhotoIndex ?? 0],
-      photos: photos.map((photo) => ({ previewUrl: photo.previewUrl, name: photo.name })),
+      coverPhotoIndexes: [],
+      photos: bodyPhotos,
     });
-  }, [cover, draft, generated, photos]);
-
-  const slides = useMemo(() => buildFinalSlides(photos, cover), [cover, photos]);
+  }, [cover, draft, generated, photos, slides]);
 
   return (
     <>

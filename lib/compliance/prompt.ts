@@ -32,13 +32,13 @@ Restaurant copy must NOT hard-sell: 必打卡 全网爆火 网红必吃 曼谷�
 Focus on ordered dishes, taste, texture, atmosphere, interior, location, personal experience, suitable occasions, and only verified price/hours.
 BAD: 曼谷必吃的顶级泰餐！
 GOOD: 这次在曼谷吃到一家风格很舒服的泰餐
-Exception: the exact required hashtag #曼谷必吃 may appear in the hashtags array. COVER mainTitle MAY use 必吃 as one natural keyword from 曼谷 / centralwOrld / 泰餐 / 美食 / 必吃. Post titles and caption must still not hard-sell 必吃.
+Exception: the pool hashtag #曼谷必吃 may appear in the hashtags array. COVER mainTitle MAY use 必吃 as one natural keyword from 曼谷 / centralwOrld / 泰餐 / 美食 / 必吃. Post titles and caption must still not hard-sell 必吃.
 
 No unverifiable photo claims: 完全无P 100%真实 原图直出 零滤镜 绝对真实.
 
 Titles must pass the same rules. BAD: 曼谷最好吃的泰餐！真的封神了！ GOOD: 曼谷最近吃到的一家泰餐｜这几道菜很喜欢
 
-Hashtags: keep exact #baanying曼谷 #曼谷必吃 #centralworld泰餐推荐, then exactly 2 tags from the approved pool. Never invent hashtags.
+Hashtags: always include #baanying曼谷, plus exactly 4 tags from the approved pool, shuffled. Never invent hashtags.
 
 Do not copy sample posts, openings, or paragraph skeletons.
 

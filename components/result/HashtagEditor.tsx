@@ -24,7 +24,12 @@ export function HashtagEditor({
   function addTag(raw: string) {
     const tag = normalizeTag(raw);
     if (!tag) return;
-    if (!isPoolHashtag(tag) || isRequiredHashtag(tag)) {
+    if (isRequiredHashtag(tag)) {
+      if (value.some((item) => isRequiredHashtag(item))) {
+        setDraft("");
+        return;
+      }
+    } else if (!isPoolHashtag(tag)) {
       setDraft("");
       return;
     }

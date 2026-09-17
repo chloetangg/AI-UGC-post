@@ -602,15 +602,12 @@ export function CampaignFlowProvider({
       aiSelectedPhotoIndex,
       files.length || 1,
       selectedTemplateId,
+      selectedPhotoIndexes,
     );
     const templateFontIds = generateRandomFontAssignments();
     const selectedFontId = fontForTemplate(selectedTemplateId, templateFontIds);
     const coverSourcePhoto = photosRef.current[aiSelectedPhotoIndex] ?? photosRef.current[0] ?? null;
-    const remainingPhotos = isFourPhotoGridCover(photosRef.current.length, selectedTemplateId)
-      ? photosInIndexOrder(photosRef.current, remainingPhotoIndexes)
-      : photosInIndexOrder(photosRef.current, remainingPhotoIndexes).filter(
-          (photo) => photo.id !== coverSourcePhoto?.id,
-        );
+    const remainingPhotos = photosInIndexOrder(photosRef.current, remainingPhotoIndexes);
     const nextGenerated: GeneratedContent = {
       titles: [data.titles[0], data.titles[1], data.titles[2]],
       caption: located.caption,
@@ -807,6 +804,7 @@ export function CampaignFlowProvider({
         id: cover.coverSourcePhotoId,
         index: cover.selectedPhotoIndex,
         remainingOrder: snapshot.generated?.remainingPhotoIndexes,
+        coverPhotoIndexes: cover.selectedPhotoIndexes,
       });
       patchFlow(campaignId, { selectedCoverTemplateId: templateId });
       await composeCurrentCover({

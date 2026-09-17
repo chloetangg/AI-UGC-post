@@ -46,7 +46,7 @@ Do not force a KSP because it is a brand priority. Do not invent missing facts.
 KSPs:
 ${ksps}
 
-STORYLINES (narrative intention only; vary opening, paragraph order, emoji, and wording):
+STORYLINES (narrative intention only; vary opening, paragraph count, length, emoji, and wording):
 ${storylines}
 
 CONTENT ANGLES:
@@ -103,7 +103,7 @@ Follow this process inside the SAME JSON response:
 3. Select a compatible Storyline as narrative intention only. Suggested: ${suggested.storylineId} ${storyline?.name ?? ""} — ${storyline?.narrativeIntention ?? ""}
 4. Select a Content Angle. Suggested: ${suggested.contentAngleId} ${angle?.name ?? ""}
 5. Select a Search Keyword. Suggested: ${suggested.searchKeyword}
-6. Generate titles, caption, hashtags, mainTitle, subTitle, photo selection.
+6. Generate titles, caption, hashtags, mainTitle, subTitle, photo selection. Caption length follows this visit — 2 sentences is valid; do not pad.
 
 If the suggestion conflicts with customer evidence, choose another supported combination from the library. Prefer not to reuse:
 - previous KSP: ${previous.previousKspId || "none"}
@@ -117,5 +117,5 @@ ${lineList(evidenceLines)}
 Photo selection should support the selected Storyline / Angle.
 ${photoSelectionHint(suggested.contentAngleId)}
 
-Hashtags: pick exactly 2 random tags from the approved pool. Do NOT invent tags. Do NOT hard-code hashtags by Storyline.`;
+Hashtags: always include #baanying曼谷, pick exactly 4 tags from the approved pool, and shuffle all 5. Do NOT invent tags. Do NOT hard-code hashtags by Storyline.`;
 }
