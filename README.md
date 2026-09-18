@@ -623,7 +623,7 @@ Cover Composer 失败时：「Cover generation failed」+ Retry Cover（只重�
 
 | 事件 | 何时写入 | 去重 |
 | --- | --- | --- |
-| `qr_scan` | 每次进入 YOU 页 | 每次进入一条；`/qr/:qrCodeId` 只跳转，不单独记 |
+| `qr_scan` | 服务端渲染 YOU 页时 | 每次进入一条；跳过 Link prefetch。`/qr/:qrCodeId` 只跳转，不单独记 |
 | `form_submit` | 现有 `POST /api/generate` 真正发出时 | 每 session 一次 |
 | `generation_complete` | 现有 `/api/generate` 成功返回前 | 每 session 一次 |
 | `publish_click` | 小红书系统分享成功，或确认打开 `xhsdiscover://post` | 每 session + platform 一次。系统分享：`platform=unknown`，`method=web_share`。Deep Link：`platform=xiaohongshu`，`method=deep_link`。取消不记 |

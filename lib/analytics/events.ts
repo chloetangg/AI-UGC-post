@@ -86,7 +86,7 @@ export async function recordAnalyticsEvent(input: RecordAnalyticsInput) {
     };
     const db = await getDb();
     await db.collection(ANALYTICS_COLLECTION).insertOne(document);
-    void persistAnalyticsEvent({
+    await persistAnalyticsEvent({
       brandId: document.brandId,
       eventType: document.eventType,
       timestamp,

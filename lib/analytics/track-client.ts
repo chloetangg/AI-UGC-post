@@ -12,7 +12,6 @@ export function trackAnalyticsEvent(input: {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input),
       credentials: "same-origin",
-      keepalive: true,
     }).catch(() => {});
   } catch {
     /* Analytics must never block publishing. */
