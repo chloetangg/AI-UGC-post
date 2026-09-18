@@ -94,30 +94,55 @@ function mockDynamicHashtags(input: GeneratePostInput): GeneratedHashtags {
 type CoverOverlay = { title: string; subtitle: string };
 
 const DISH_COVER_OVERLAYS: Record<RecommendedDish, CoverOverlay[]> = {
-  "Yellow Curry Crab Meat": [
-    { title: "曼谷必吃", subtitle: "这口咖喱蟹肉像家的味道" },
-    { title: "泰餐必吃", subtitle: "没想到最喜欢这道" },
-    { title: "曼谷泰餐", subtitle: "这口咖喱蟹肉有点特别" },
-  ],
-  "Tom Yum Goong": [
+  "River Prawn Tom Yum": [
     { title: "曼谷必吃", subtitle: "这口冬阴功有点特别" },
-    { title: "泰餐必吃", subtitle: "没想到最喜欢这道" },
+    { title: "泰餐必吃", subtitle: "没想到超爱这道" },
     { title: "曼谷泰餐", subtitle: "这口冬阴功有点特别" },
   ],
-  "Thai Sweet & Sour Steamed Fish": [
-    { title: "曼谷必吃", subtitle: "这口泰式蒸鱼有点特别" },
-    { title: "泰餐必吃", subtitle: "没想到最喜欢这道" },
-    { title: "曼谷泰餐", subtitle: "这口泰式蒸鱼有点特别" },
+  "Crab Meat Curry": [
+    { title: "曼谷必吃", subtitle: "这口蟹肉咖喱像家的味道" },
+    { title: "泰餐必吃", subtitle: "没想到超爱这道" },
+    { title: "曼谷泰餐", subtitle: "这口蟹肉咖喱有点特别" },
   ],
-  "Stir-Fried Shrimp with Garlic": [
-    { title: "曼谷必吃", subtitle: "这口蒜蓉炒虾有点特别" },
-    { title: "泰餐必吃", subtitle: "没想到最喜欢这道" },
-    { title: "曼谷泰餐", subtitle: "这口蒜蓉炒虾有点特别" },
+  "Stir-Fried Morning Glory": [
+    { title: "曼谷必吃", subtitle: "这口炒空心菜有点特别" },
+    { title: "泰餐必吃", subtitle: "没想到超爱这道" },
+    { title: "曼谷泰餐", subtitle: "这口炒空心菜有点特别" },
+  ],
+  "Pineapple Fried Rice": [
+    { title: "曼谷必吃", subtitle: "这口菠萝炒饭有点特别" },
+    { title: "泰餐必吃", subtitle: "没想到超爱这道" },
+    { title: "曼谷泰餐", subtitle: "这口菠萝炒饭有点特别" },
   ],
   "Mango Sticky Rice": [
-    { title: "曼谷必吃", subtitle: "没想到最喜欢这道" },
+    { title: "曼谷必吃", subtitle: "没想到超爱这道" },
     { title: "泰餐必吃", subtitle: "这口芒果糯米饭有点特别" },
-    { title: "曼谷美食", subtitle: "没想到最喜欢这道" },
+    { title: "曼谷美食", subtitle: "没想到超爱这道" },
+  ],
+  "Garlic Shrimp Egg Rice": [
+    { title: "曼谷必吃", subtitle: "这口虾仁滑蛋饭有点特别" },
+    { title: "泰餐必吃", subtitle: "没想到超爱这道" },
+    { title: "曼谷泰餐", subtitle: "这口虾仁滑蛋饭有点特别" },
+  ],
+  "Lemon Sea Bass": [
+    { title: "曼谷必吃", subtitle: "这口柠檬鲈鱼有点特别" },
+    { title: "泰餐必吃", subtitle: "没想到超爱这道" },
+    { title: "曼谷泰餐", subtitle: "这口柠檬鲈鱼有点特别" },
+  ],
+  "Curry Crab Claws": [
+    { title: "曼谷必吃", subtitle: "这口咖喱蟹脚有点特别" },
+    { title: "泰餐必吃", subtitle: "没想到超爱这道" },
+    { title: "曼谷泰餐", subtitle: "这口咖喱蟹脚有点特别" },
+  ],
+  "Sweet and Sour River Prawns": [
+    { title: "曼谷必吃", subtitle: "这口酸甜酱炒河虾有点特别" },
+    { title: "泰餐必吃", subtitle: "没想到超爱这道" },
+    { title: "曼谷泰餐", subtitle: "这口酸甜酱炒河虾有点特别" },
+  ],
+  "Green Curry Beef": [
+    { title: "曼谷必吃", subtitle: "这口青咖喱牛肉有点特别" },
+    { title: "泰餐必吃", subtitle: "没想到超爱这道" },
+    { title: "曼谷泰餐", subtitle: "这口青咖喱牛肉有点特别" },
   ],
   Others: [],
 };
@@ -174,10 +199,10 @@ function mockCoverOverlay(input: GeneratePostInput): CoverOverlay {
       ? fromDish[variant % fromDish.length]
       : note.includes("芒果")
         ? DISH_COVER_OVERLAYS["Mango Sticky Rice"][variant % 3]
-        : note.includes("咖喱")
-          ? DISH_COVER_OVERLAYS["Yellow Curry Crab Meat"][variant % 3]
+        : note.includes("蟹肉") || note.includes("咖喱")
+          ? DISH_COVER_OVERLAYS["Crab Meat Curry"][variant % 3]
           : note.includes("冬阴功")
-            ? DISH_COVER_OVERLAYS["Tom Yum Goong"][variant % 3]
+            ? DISH_COVER_OVERLAYS["River Prawn Tom Yum"][variant % 3]
             : GENERIC_COVER_OVERLAYS[variant % GENERIC_COVER_OVERLAYS.length];
   return layoutCoverOverlay(picked.title, picked.subtitle, [], context);
 }

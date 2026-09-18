@@ -60,11 +60,16 @@ export const ENJOY_MOST = [
 ] as const;
 
 export const RECOMMENDED_DISHES = [
-  "Yellow Curry Crab Meat",
-  "Tom Yum Goong",
-  "Thai Sweet & Sour Steamed Fish",
-  "Stir-Fried Shrimp with Garlic",
+  "River Prawn Tom Yum",
+  "Crab Meat Curry",
+  "Stir-Fried Morning Glory",
+  "Pineapple Fried Rice",
   "Mango Sticky Rice",
+  "Garlic Shrimp Egg Rice",
+  "Lemon Sea Bass",
+  "Curry Crab Claws",
+  "Sweet and Sour River Prawns",
+  "Green Curry Beef",
   "Others",
 ] as const;
 
@@ -139,7 +144,13 @@ export const emptyProductFeedback: ProductFeedback = {
 };
 
 export function withDefaultBranch(feedback: ProductFeedback): ProductFeedback {
-  return { ...feedback, branch: DEFAULT_BAAN_YING_BRANCH };
+  return {
+    ...feedback,
+    branch: DEFAULT_BAAN_YING_BRANCH,
+    recommendedDishes: feedback.recommendedDishes.filter((item): item is RecommendedDish =>
+      (RECOMMENDED_DISHES as readonly string[]).includes(item),
+    ),
+  };
 }
 
 export type PhotoItem = {

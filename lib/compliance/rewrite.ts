@@ -1,4 +1,5 @@
 import { sanitizeOfficialMallNames } from "@/lib/locations";
+import { sanitizeCoverAbsoluteLanguage } from "@/lib/cover/cover-absolute";
 import { allPhraseRules, COMPILED_SEMANTIC_PATTERNS, REQUIRED_SAFE_HASHTAGS } from "./lexicon";
 import { neutralizeHarshNegatives } from "./negative-feedback";
 import { scanCompliance, type ComplianceField } from "./scan";
@@ -40,6 +41,9 @@ export function rewriteCompliantText(text: string, field: ComplianceField = "gen
       next = next.split(rule.phrase).join(rule.replacement);
     }
     next = neutralizeHarshNegatives(next);
+    if (field === "coverTitle" || field === "coverSubtitle") {
+      next = sanitizeCoverAbsoluteLanguage(next);
+    }
     if (field !== "hashtag") next = sanitizeOfficialMallNames(next);
     return next;
   };

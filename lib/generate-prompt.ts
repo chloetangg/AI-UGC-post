@@ -8,6 +8,7 @@ import { BAAN_YING_CONTENT_STRATEGY } from "@/lib/brand/baan-ying-strategy";
 import { formatCoverHookRules, suggestCoverHookFamily } from "@/lib/cover/cover-hooks";
 import { formatCoverStyleFitRules } from "@/lib/cover/style-fit";
 import { formatCoverTitleRules } from "@/lib/cover/cover-rules";
+import { allDishNameHints, chineseFullDishName, formatCaptionDishNameRules } from "@/lib/cover/dish-names";
 import { formatCaptionConsumerVoiceRules } from "@/lib/caption-voice";
 import { formatStrategyLibrary, formatStrategySelection } from "@/lib/content-strategy/format";
 import type { ContentStrategyLibrary } from "@/lib/content-strategy/types";
@@ -64,12 +65,12 @@ export const generatePostJsonSchema = {
       mainTitle: {
         type: "string",
         description:
-          "Independent Xiaohongshu COVER mainTitle. Natural headline with AT LEAST ONE and AT MOST TWO keywords from 曼谷 / centralwOrld / 泰餐 / 美食 / 必吃. Not a keyword list. 4–7 units. Han=1, centralwOrld=1, Terminal 21/Siam Center/One Bangkok=2. No emoji. If a dish is named, use the approved cover short (咖喱蟹肉 / 冬阴功 / 泰式蒸鱼 / 蒜蓉炒虾 / 芒果糯米饭). Never shorten titles[]. Never copy the previous cover formula.",
+          "Independent Xiaohongshu COVER mainTitle. Natural headline with AT LEAST ONE and AT MOST TWO keywords from 曼谷 / centralwOrld / 泰餐 / 美食 / 必吃. Not a keyword list. 4–7 units. Han=1, centralwOrld=1, Terminal 21/Siam Center/One Bangkok=2. No emoji. No ranking/absolute language: 最 / 第一 / 最爱 / 天花板 / No.1 / 全曼谷 — rewrite to 超爱 / 很喜欢. If a dish is named, use the approved cover short only. Never shorten titles[]. Never copy the previous cover formula.",
       },
       subTitle: {
         type: "string",
         description:
-          "Independent COVER subTitle. ONE Xiaohongshu hook from a single customer evidence — curiosity/scene/emotion, not a flat 菜名+很好吃 line, not glued keywords, not slang or fake praise. 6–10 units. Approved dish shorts only. Do not repeat mainTitle. No emoji. Never empty.",
+          "Independent COVER subTitle. ONE Xiaohongshu hook from a single customer evidence — curiosity/scene/emotion, not a flat 菜名+很好吃 line, not glued keywords, not slang or fake praise. 6–10 units. Approved dish shorts only. Do not repeat mainTitle. No 最/第一/最爱 ranking language (第一次/最近 OK); rewrite 最爱 to 超爱. No emoji. Never empty.",
       },
       selectedPhotoIndex: {
         type: "integer",
@@ -176,21 +177,7 @@ function list(values: string[]) {
   return values.join("、");
 }
 
-const DISH_NAME_HINTS = [
-  "黄咖喱蟹肉",
-  "咖喱蟹",
-  "curry crab",
-  "冬阴功虾汤",
-  "冬阴功",
-  "tom yum",
-  "泰式酸甜蒸鱼",
-  "蒸鱼",
-  "蒜蓉炒虾",
-  "炒虾",
-  "芒果糯米饭",
-  "糯米饭",
-  "mango sticky",
-];
+const DISH_NAME_HINTS = allDishNameHints();
 
 const DISH_LEANING_ANGLES = new Set<string>([
   "CA-02",
@@ -380,7 +367,7 @@ VALIDATE before returning:
 - 1 personal caption that does not repeat the titles; length follows this visit (2 sentences OK); no Location & Time, no hashtags, Xiaohongshu-compliant wording; do not pad
 - caption reads like a diner who just ate, not a brand/travel-media script; keep mixed like/so-so/dislike from evidence; no invented flaws; no forced summary CTA; no copied reference-review sentences
 - 5 hashtags: always #baanying曼谷 plus 4 different tags from the approved pool, shuffled into random order
-- 1 independent mainTitle with 1–2 pool keywords (曼谷 / centralwOrld / 泰餐 / 美食 / 必吃), a real headline not a keyword dump, 4–7 units (centralwOrld=1; Terminal 21/Siam Center/One Bangkok=2); subTitle is one Xiaohongshu hook from ONE evidence, 6–10 units, not concatenated, not 招牌泰式料理 / 让人惊艳 / 菜名很好吃, not slang. Approved cover dish shorts only. No emoji. Never a broken sentence. Not copied from titles[]. Do not reuse the previous cover formula.
+- 1 independent mainTitle with 1–2 pool keywords (曼谷 / centralwOrld / 泰餐 / 美食 / 必吃), a real headline not a keyword dump, 4–7 units (centralwOrld=1; Terminal 21/Siam Center/One Bangkok=2); subTitle is one Xiaohongshu hook from ONE evidence, 6–10 units, not concatenated, not 招牌泰式料理 / 让人惊艳 / 菜名很好吃, not slang. No 最/第一/最爱/天花板/冠军/全曼谷 ranking language — rewrite to 超爱 / 很喜欢 / 很想再吃. Approved cover dish shorts only. No emoji. Never a broken sentence. Not copied from titles[]. Do not reuse the previous cover formula.
 - selectedPhotoIndex in range; selectedPhotoIndexes unique and in range
 - suitableTemplateIds lists ONLY styles that pass composition fit (not all 6 by default); if none fit, ["photo-only"]; selectedTemplateId is one of those IDs and is not copied from the sample JSON
 - remainingPhotoOrder uses original uploads only: four-grid re-sorts ALL photos; non-grid excludes the cover source and never repeats it
@@ -391,7 +378,9 @@ VALIDATE before returning:
 }
 
 export function buildUserPrompt(input: GenerateRequestBody) {
-  const dishNames: string[] = input.recommendedDishes.filter((dish) => dish !== "Others");
+  const dishNames: string[] = input.recommendedDishes
+    .filter((dish) => dish !== "Others")
+    .map((dish) => chineseFullDishName(dish));
   if (input.recommendedDishOther.trim()) {
     dishNames.push(input.recommendedDishOther.trim());
   }
@@ -520,7 +509,7 @@ ${formatCoverTitleRules({
   visitFrequency: input.visitFrequency,
   customerType: input.customerType,
 })}
-Cover overlay: write mainTitle + subTitle in THIS JSON. No extra API call. No emoji. Natural Chinese first, then evidence, then one selling point, then length. mainTitle: 1–2 pool keywords from 曼谷 / centralwOrld / 泰餐 / 美食 / 必吃, real headline not a dump, 4–7 units (Han=1, centralwOrld=1, Terminal 21/Siam Center/One Bangkok=2). subTitle: rewrite ONE core evidence into a Xiaohongshu hook — curiosity / scene / emotion, not a flat description. Never glue dish+price+first-visit. Never 招牌泰式料理 / 让人惊艳 / 绝绝子. Never invent 彻底爱上 / 吃到撑. 6–10 units without breaking grammar. GOOD: 曼谷泰餐新体验 + 原来打抛饭也可以DIY / 曼谷隐藏泰餐 + 这口咖喱蟹肉像家的味道 / 曼谷必吃泰餐 + 逛完街来吃刚刚好. BAD: 曼谷centralwOrld泰餐美食必吃推荐 / 咖喱蟹肉很有家常味 (too flat when a hook exists) / 第一次来黄咖喱蟹肉家常菜 / 副标题永远招牌泰式料理. 必吃 is allowed on the COVER only. No hashtag, address, hours.
+Cover overlay: write mainTitle + subTitle in THIS JSON. No extra API call. No emoji. Natural Chinese first, then evidence, then one selling point, then length. mainTitle: 1–2 pool keywords from 曼谷 / centralwOrld / 泰餐 / 美食 / 必吃, real headline not a dump, 4–7 units (Han=1, centralwOrld=1, Terminal 21/Siam Center/One Bangkok=2). subTitle: rewrite ONE core evidence into a Xiaohongshu hook — curiosity / scene / emotion, not a flat description. Never glue dish+price+first-visit. Never 招牌泰式料理 / 让人惊艳 / 绝绝子. Never invent 彻底爱上 / 吃到撑. 6–10 units without breaking grammar. GOOD: 曼谷泰餐新体验 + 原来打抛饭也可以DIY / 曼谷隐藏泰餐 + 这口蟹肉咖喱像家的味道 / 曼谷必吃泰餐 + 逛完街来吃刚刚好. BAD: 曼谷centralwOrld泰餐美食必吃推荐 / 蟹肉咖喱很有家常味 (too flat when a hook exists) / 第一次来蟹肉咖喱家常菜 / 副标题永远招牌泰式料理. 必吃 is allowed on the COVER only. No hashtag, address, hours.
 Cover photo: pick ONE selectedPhotoIndex from 0 to ${Math.max((input.photoCount || 1) - 1, 0)}. selectedPhotoIndexes[0] must equal selectedPhotoIndex. If photoCount >= 4 and the cover style is top-stroke or dual-line, also return 3 more unique indexes so selectedPhotoIndexes has the best 4 photos for the 2x2 grid.
 Cover style: analyze ALL attached photos (subject, position, safe area, crop risk, faces, dishes, storefronts). Return suitableTemplateIds with ONLY styles that can sit on the photos without covering or cropping the main subject. Do not list all 6 unless they all fit. If none fully fit, return ["photo-only"]. selectedTemplateId must be inside that list; the website then picks the final Style with history avoidance. Do not copy sample JSON template IDs. Diversity seed: ${input.variantIndex}.
 Body photos: original uploads only, never the composed cover file. Non-grid: exclude the cover source, then sort remainingPhotoOrder with one of the 6 patterns. Four-grid (photoCount >= 4 AND top-stroke / dual-line): keep ALL originals in the pool — including the 4 grid photos — and re-sort remainingPhotoOrder with the same 6 patterns. Do not copy the 2x2 order.
@@ -550,21 +539,7 @@ ${formatStrategySelection(library, suggestedStrategy, {
 Diversity seed: ${input.variantIndex}
 
 DISH NAME REFERENCE:
-titles[] and caption use COMPLETE Chinese names:
-- Yellow Curry Crab Meat = 黄咖喱蟹肉
-- Tom Yum Goong = 冬阴功虾汤
-- Thai Sweet & Sour Steamed Fish = 泰式酸甜蒸鱼
-- Stir-Fried Shrimp with Garlic = 蒜蓉炒虾
-- Mango Sticky Rice = 芒果糯米饭
-COVER mainTitle / subTitle use ONLY these approved shorts (never invent another):
-- 黄咖喱蟹肉 → 咖喱蟹肉 (never 黄咖喱)
-- 冬阴功虾汤 → 冬阴功
-- 泰式酸甜蒸鱼 → 泰式蒸鱼 (never 蒸鱼)
-- 蒜蓉炒虾 → 蒜蓉炒虾 (never 炒虾)
-- 芒果糯米饭 → 芒果糯米饭 (never 芒果)
-If a customer-written dish has a complete name (泰式青咖喱鸡 / 泰式香辣打抛猪肉饭), keep that complete name. Never shorten to 青咖喱 or 打抛.
-If a dish was not provided, do not name a specific dish.
-Allowed cover dishes = only the recommended/mentioned list above. Never invent Pad Thai, Som Tam, Green Curry, or other unsupported dishes.
+${formatCaptionDishNameRules()}
 Never glue a dish together with price and first-visit in one subtitle.
 
 ${previousBlock}

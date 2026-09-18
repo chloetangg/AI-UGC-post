@@ -1,4 +1,5 @@
 import { branchKey, OFFICIAL_LOCATIONS, type BaanYingLocationId } from "@/lib/locations";
+import { formatCoverAbsoluteRules } from "./cover-absolute";
 import {
   collectFullDishNames,
   coverDishShortName,
@@ -277,7 +278,7 @@ export function packsMultipleCoverEvidence(text: string, context: CoverTitleCont
   });
   const hasDish =
     mentionsCoverDishName(hay, dishes) ||
-    /黄咖喱蟹肉|咖喱蟹肉|冬阴功虾汤|泰式酸甜蒸鱼|泰式蒸鱼|蒜蓉炒虾|芒果糯米饭/.test(hay);
+    /河虾冬阴功汤|冬阴功|蟹肉咖喱|炒空心菜|菠萝炒饭|芒果糯米饭|蒜炒虾仁滑蛋饭|虾仁滑蛋饭|柠檬鲈鱼|咖喱蟹脚|酸甜酱炒河虾|青咖喱牛肉/.test(hay);
   const hasPrice = /\d+\s*(泰铢|THB)/i.test(hay);
   const hasFirst = /第一次/.test(hay);
   const hasMall = findCoverLocationKeywords(hay).length > 0;
@@ -354,11 +355,11 @@ export function subtitleFromCoverContext(context: CoverTitleContext = {}) {
     if (fitsSubtitleUnits("逛完街来吃刚刚好")) return "逛完街来吃刚刚好";
   }
   if (short) {
-    const named = `没想到最喜欢${short}`;
+    const named = `没想到超爱${short}`;
     if (fitsSubtitleUnits(named)) return named;
     const special = `这口${short}有点特别`;
     if (fitsSubtitleUnits(special)) return special;
-    if (fitsSubtitleUnits("没想到最喜欢这道")) return "没想到最喜欢这道";
+    if (fitsSubtitleUnits("没想到超爱这道")) return "没想到超爱这道";
   }
   const amount = context.mealAmount;
   if (typeof amount === "number" && Number.isFinite(amount) && amount > 0) {
@@ -436,20 +437,20 @@ Accuracy > clickiness. Natural ≠ bland. Clicky ≠ exaggerated. Spoken ≠ sla
 Voice: a friend sharing this meal on Xiaohongshu, not restaurant advertising.
 FORBIDDEN brand speak: 精选泰式家常料理 / 品尝正宗泰式美食 / 丰富菜品搭配，满足味蕾需求 / 招牌泰式料理 / 家常泰式料理
 FORBIDDEN slang unless the customer asked for it: 绝绝子 / yyds / 狠狠爱了 / 直接封神 / 太太太好吃了 / 真的会谢 / 谁懂啊 / 救命 / 不允许有人没吃过
-Spoken texture is allowed as a method, not a template: 没想到 / 原来 / 这口 / 这一道 / 居然 / 真的有点 / 吃出了 / 有点像 / 刚好 / 意外地 / 最喜欢的反而是 / 逛完刚好来吃. Do not paste these if the evidence does not support them.
+Spoken texture is allowed as a method, not a template: 没想到 / 原来 / 这口 / 这一道 / 居然 / 真的有点 / 吃出了 / 有点像 / 刚好 / 意外地 / 超爱的反而是 / 逛完刚好来吃. Do not paste these if the evidence does not support them.
 
 Pick ONE core evidence only. Then choose the highest style the evidence actually supports:
-1 curiosity (没想到最喜欢的是这道 / 这口咖喱蟹肉有点特别)
+1 curiosity (没想到超爱的是这道 / 这口蟹肉咖喱有点特别)
 2 contrast/surprise ONLY if the customer said something unexpected
 3 scene (逛完街来吃刚刚好 / 自己动手拌打抛饭)
 4 emotion already in the evidence (这顿吃下来很满足)
-5 information last (两人600泰铢吃得满足 / 咖喱蟹肉很有家常味)
-Never glue dish + price + first-visit. Never 咖喱蟹肉味道很像泰式家常菜而且两个人吃600泰铢.
+5 information last (两人600泰铢吃得满足 / 蟹肉咖喱很有家常味)
+Never glue dish + price + first-visit. Never 蟹肉咖喱味道很像泰式家常菜而且两个人吃600泰铢.
 Do not default to 菜名+很好吃 / 菜名+很有家常味 when a supported hook exists.
 Do not inflate: 不错 ≠ 惊艳到不行; 价格还可以 ≠ 吃到撑; 第一次来 ≠ 狠狠圈粉 / 彻底爱上; 喜欢 ≠ 直接封神.
 
-GOOD: 这口咖喱蟹肉像家的味道 / 没想到最喜欢的是这道 / 原来打抛饭也可以DIY / 逛完街来吃刚刚好 / 两个人吃下来很满足
-BAD: 咖喱蟹肉很有家常味 (too flat if a hook exists) / 咖喱蟹肉很好吃 / 第一次来黄咖喱蟹肉很好吃 / 第一次来就被狠狠圈粉 / 精选泰式家常料理
+GOOD: 这口蟹肉咖喱像家的味道 / 没想到超爱的是这道 / 原来打抛饭也可以DIY / 逛完街来吃刚刚好 / 两个人吃下来很满足
+BAD: 蟹肉咖喱很有家常味 (too flat if a hook exists) / 蟹肉咖喱很好吃 / 第一次来蟹肉咖喱很好吃 / 第一次来就被狠狠圈粉 / 精选泰式家常料理
 Length: 6–10 units, never empty, never a broken sentence. Do not copy the dining note verbatim. Do not repeat mainTitle.
 
 Customer evidence for subtitle (INTERNAL — pick ONE, then rewrite):
@@ -460,19 +461,23 @@ Customer evidence for subtitle (INTERNAL — pick ONE, then rewrite):
 - Visit: ${context.visitFrequency || "none"} / ${context.customerType || "none"}
 ${locationHint}
 
-If first-visit is the ONLY chosen evidence: 第一次来尝试Baan Ying. Never 第一次美食冒险 / 第一次来就被圈粉 / 第一次来就爱上. If they also said a favorite dish, prefer one hook such as 没想到最喜欢这道 — do not name the dish AND 第一次来 in the same subtitle.
+If first-visit is the ONLY chosen evidence: 第一次来尝试Baan Ying. Never 第一次美食冒险 / 第一次来就被圈粉 / 第一次来就爱上. If they also said a favorite dish, prefer one hook such as 没想到超爱这道 — do not name the dish AND 第一次来 in the same subtitle.
 
 ${formatCoverDishNameRules(context.dishes)}
 
 NEGATIVES: never put 贵 / 难吃 / 踩雷 / 不推荐 / 失望 / 服务不好 / 态度不好 / 不会回购 on the cover. Neutralize or pick another evidence. Never invert into fake praise.
 
-FORBIDDEN except cover keyword 必吃: 第一 / 唯一 / 顶级 / 最强 / 最好吃 / 封神 / 全网第一 / 曼谷第一 / 泰国人爱吃 / 本地人爱吃 / 明星爱吃
+FORBIDDEN except cover keyword 必吃: 第一 (except 第一次/第一道) / 唯一 / 顶级 / 最 / 最爱 / 最强 / 最好吃 / 封神 / 全网第一 / 曼谷第一 / 泰国第一 / 全曼谷 / 全泰国 / 冠军 / 天花板 / 无敌 / Top 1 / No.1 / 必须吃 / 必吃第一名 / 泰国人爱吃 / 本地人爱吃 / 明星爱吃
+最爱 must become 超爱. Do not keep 最 because it is “personal”.
+
+${formatCoverAbsoluteRules()}
+
 No hashtag, address, hours, emoji, Location & Time. Never invent a dish.
 
 QUALITY CHECK before return — if any item fails, rewrite from the same single evidence, do not output:
 Ask: would a real Xiaohongshu user write this cover line? Would it spark a little curiosity while staying true?
-MainTitle: 4–7 units; ≥1 and ≤2 pool keywords; real headline not stuffing; not a shortened titles[] item; not previous cover formula; mall name only if true and relevant; no banned claims; no hashtag/address/hours/emoji.
-SubTitle: 6–10 units; one complete natural sentence; one core reason from THIS visit; Xiaohongshu hook without new facts; approved dish shorts only; no concatenated evidence; no verbatim note; no mainTitle repeat; no fake praise, slang, or 让人惊艳 templates; no raw negatives; no hashtag/address/hours/emoji.
+MainTitle: 4–7 units; ≥1 and ≤2 pool keywords; real headline not stuffing; not a shortened titles[] item; not previous cover formula; mall name only if true and relevant; no banned claims; no 最/第一/排名/全范围绝对化 (第一次/最近 OK); no hashtag/address/hours/emoji.
+SubTitle: 6–10 units; one complete natural sentence; one core reason from THIS visit; Xiaohongshu hook without new facts; approved dish shorts only; no concatenated evidence; no verbatim note; no mainTitle repeat; no fake praise, slang, or 让人惊艳 templates; no raw negatives; no 最爱 or other 最-ranking; no hashtag/address/hours/emoji.
 
-FALLBACK if subTitle fails: walk evidence in order (selected dish → meal spend → first visit → enjoy-most → location convenience → default). Use the FIRST evidence that can become a natural 6–10 unit Xiaohongshu sentence. Rewrite that one evidence only. Never concatenate 黄咖喱蟹肉600泰铢第一次来.`;
+FALLBACK if subTitle fails: walk evidence in order (selected dish → meal spend → first visit → enjoy-most → location convenience → default). Use the FIRST evidence that can become a natural 6–10 unit Xiaohongshu sentence. Rewrite that one evidence only. Never concatenate 蟹肉咖喱600泰铢第一次来.`;
 }

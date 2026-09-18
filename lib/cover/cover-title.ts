@@ -22,6 +22,7 @@ import {
   usesUnselectedCoverLocation,
   type CoverTitleContext,
 } from "./cover-rules";
+import { sanitizeCoverAbsoluteLanguage } from "./cover-absolute";
 import { collectFullDishNames, applyCoverDishShortNames, coverDishShortName, hasIllegalCoverDishShort } from "./dish-names";
 
 export {
@@ -105,7 +106,7 @@ export function looksIncompleteCover(text: string) {
 }
 
 const FORBIDDEN_COVER_CLAIMS =
-  /最好吃|封神|顶级|最强|唯一|全网第一|曼谷第一|明星爱吃|名人推荐|泰国人也爱|泰国人爱吃|本地人爱吃|本地人都/;
+  /最好吃|最爱|最强|最绝|最正宗|最值得|最推荐|最便宜|最划算|最火|之最|封神|顶级|唯一|全网第一|曼谷第一|泰国第一|全曼谷|全泰国|必吃第一名|必须吃|明星爱吃|名人推荐|泰国人也爱|泰国人爱吃|本地人爱吃|本地人都|天花板|无敌/;
 
 function comparableHan(text: string) {
   return sanitizeCoverLine(text).replace(/[^\p{Script=Han}]+/gu, "");
@@ -128,7 +129,7 @@ function repeatsMain(main: string, sub: string) {
 }
 
 function prepareCoverLine(raw: string) {
-  return normalizeCoverLocations(sanitizeCoverLine(raw));
+  return sanitizeCoverAbsoluteLanguage(normalizeCoverLocations(sanitizeCoverLine(raw)));
 }
 
 const GENERIC_SUBTITLE =
@@ -245,11 +246,11 @@ function fitSubtitleAroundDish(dish: string, current: string) {
       return applyCoverDishShortNames(current, [dish]);
     }
   }
-  const named = `没想到最喜欢${short}`;
+  const named = `没想到超爱${short}`;
   if (countCoverUnits(named) >= MIN_SUB_TITLE_CHARS && countCoverUnits(named) <= max) return named;
   const special = `这口${short}有点特别`;
   if (countCoverUnits(special) >= MIN_SUB_TITLE_CHARS && countCoverUnits(special) <= max) return special;
-  if (countCoverUnits("没想到最喜欢这道") <= MAX_SUB_TITLE_CHARS) return "没想到最喜欢这道";
+  if (countCoverUnits("没想到超爱这道") <= MAX_SUB_TITLE_CHARS) return "没想到超爱这道";
   return short;
 }
 
