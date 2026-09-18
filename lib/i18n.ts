@@ -57,7 +57,7 @@ const en = {
     customQuestion: "What did you enjoy most about your Baan Ying experience?",
   },
   customer: {
-    title: "Thank you for sharing!",
+    title: "Appreciate your sharing!",
     subtitle: "We’ll only use this for the campaign. It takes about 30 seconds.",
     name: "Name / Nickname",
     namePlaceholder: "Your name",
