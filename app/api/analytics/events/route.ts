@@ -3,7 +3,9 @@ import { recordAnalyticsEvent } from "@/lib/analytics/events";
 import { readAnalyticsSession } from "@/lib/analytics/session";
 import {
   ANALYTICS_QR_COOKIE,
+  ANALYTICS_SESSION_COOKIE,
   analyticsCookieOptions,
+  newAnalyticsSessionId,
   sanitizeQrCodeId,
 } from "@/lib/analytics/cookie";
 import { ANALYTICS_CAMPAIGN, ANALYTICS_EVENT_TYPES, type AnalyticsEventType } from "@/lib/analytics/types";
@@ -25,13 +27,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, skipped: true });
     }
     const session = await readAnalyticsSession();
-    if (!session.sessionId) {
-      return NextResponse.json({ ok: true, skipped: true });
-    }
-    const qrCodeId =
+    const sessionId = session.sessionId || newAnalyticsSessionId();
+    const qrCodeId = sanitizeQrCodeId(
       typeof body.qrCodeId === "string" && body.qrCodeId.trim()
-        ? sanitizeQrCodeId(body.qrCodeId)
-        : session.qrCodeId;
+        ? body.qrCodeId
+        : session.qrCodeId,
+    );
     const metadata =
       body.metadata && typeof body.metadata === "object" && !Array.isArray(body.metadata)
         ? Object.fromEntries(
@@ -43,14 +44,17 @@ export async function POST(request: Request) {
     await recordAnalyticsEvent({
       eventType,
       eventId: typeof body.eventId === "string" ? body.eventId : undefined,
-      sessionId: session.sessionId,
+      sessionId,
       qrCodeId,
       campaign: ANALYTICS_CAMPAIGN,
       metadata,
     });
     const response = NextResponse.json({ ok: true });
+    const secure = new URL(request.url).protocol === "https:";
+    if (!session.sessionId) {
+      response.cookies.set(ANALYTICS_SESSION_COOKIE, sessionId, analyticsCookieOptions(secure));
+    }
     if (eventType === "qr_scan" && qrCodeId) {
-      const secure = new URL(request.url).protocol === "https:";
       response.cookies.set(ANALYTICS_QR_COOKIE, qrCodeId, analyticsCookieOptions(secure));
     }
     return response;

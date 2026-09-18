@@ -19,6 +19,8 @@ import {
   type VisitFrequency,
 } from "@/types/content";
 
+let lastYouScanAt = 0;
+
 export default function CustomerPage() {
   const router = useRouter();
   const { campaignId } = useParams<{ campaignId: string }>();
@@ -31,15 +33,17 @@ export default function CustomerPage() {
   const identityReady = Boolean(feedback.customerType && visitFrequency);
 
   useEffect(() => {
+    const now = Date.now();
+    if (now - lastYouScanAt < 500) return;
+    lastYouScanAt = now;
     const params = new URLSearchParams(window.location.search);
     const raw = params.get("qr");
-    if (!raw) return;
-    const qrCodeId = sanitizeQrCodeId(raw);
     trackAnalyticsEvent({
       eventType: "qr_scan",
-      qrCodeId,
-      metadata: { source: "customer-entry" },
+      ...(raw ? { qrCodeId: sanitizeQrCodeId(raw) } : {}),
+      metadata: { source: "you-page" },
     });
+    if (!raw) return;
     params.delete("qr");
     const next = params.toString();
     window.history.replaceState(null, "", `${window.location.pathname}${next ? `?${next}` : ""}`);

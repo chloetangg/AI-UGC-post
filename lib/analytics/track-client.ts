@@ -11,6 +11,7 @@ export function trackAnalyticsEvent(input: {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input),
+      credentials: "same-origin",
       keepalive: true,
     }).catch(() => {});
   } catch {

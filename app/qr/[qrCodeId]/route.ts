@@ -1,6 +1,4 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { deviceTypeFromUserAgent } from "@/lib/analytics/device";
-import { recordAnalyticsEvent } from "@/lib/analytics/events";
 import {
   ANALYTICS_QR_COOKIE,
   ANALYTICS_SESSION_COOKIE,
@@ -9,7 +7,7 @@ import {
   newAnalyticsSessionId,
   sanitizeQrCodeId,
 } from "@/lib/analytics/cookie";
-import { ANALYTICS_CAMPAIGN, ANALYTICS_SESSION_HEADER } from "@/lib/analytics/types";
+import { ANALYTICS_SESSION_HEADER } from "@/lib/analytics/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,23 +24,6 @@ export async function GET(
     request.cookies.get(ANALYTICS_SESSION_COOKIE)?.value?.trim() ||
     newAnalyticsSessionId();
   const secure = request.nextUrl.protocol === "https:";
-  const userAgent = request.headers.get("user-agent") ?? "";
-
-  try {
-    await recordAnalyticsEvent({
-      eventType: "qr_scan",
-      sessionId,
-      qrCodeId,
-      campaign: ANALYTICS_CAMPAIGN,
-      metadata: {
-        userAgent: userAgent.slice(0, 180),
-        deviceType: deviceTypeFromUserAgent(userAgent),
-        source: "qr",
-      },
-    });
-  } catch {
-    /* Tracking must not block the redirect. */
-  }
 
   const destination = request.nextUrl.clone();
   destination.pathname = `/c/${campaignId}/customer`;
