@@ -29,6 +29,7 @@ export default function ResultPage() {
     coverComposing,
     photos,
     updateDraft,
+    updateGeneratedTitles,
     retryCover,
     selectCoverTemplate,
   } = useCampaignFlow();
@@ -104,6 +105,19 @@ export default function ResultPage() {
           titles={generated.titles}
           selectedIndex={draft.selectedTitleIndex}
           onSelect={(selectedTitleIndex) => patch({ selectedTitleIndex })}
+          onChangeTitle={(index, value) => {
+            setSaved(false);
+            const next: [string, string, string] = [
+              generated.titles[0],
+              generated.titles[1],
+              generated.titles[2],
+            ];
+            next[index] = value;
+            updateGeneratedTitles(next);
+            if (draft.selectedTitleIndex !== index) {
+              patch({ selectedTitleIndex: index });
+            }
+          }}
         />
         <CaptionEditor
           value={draft.caption}

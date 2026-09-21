@@ -34,8 +34,8 @@ export const mockGeneratedContent: GeneratedContent = {
   caption:
     `来曼谷当然要安排一顿泰国菜🇹🇭 这次吃到 Baan Ying，整体都还蛮对胃口。我最喜欢的还是那几道适合一起分的菜，吃完也没有特别想总结，就是这顿吃得挺舒服😋\n\n📍 尚泰世界购物中心（centralwOrld）3楼\n⏰ 10:00–22:00`,
   hashtags: validateHashtags(["#曼谷美食", "#泰国菜"]),
-  coverTitle: "曼谷泰餐推荐",
-  coverSubtitle: "这几道菜让人想再点",
+  coverTitle: "曼谷泰餐新体验",
+  coverSubtitle: "这顿吃下来很满足",
   selectedPhotoIndex: 0,
   selectedPhotoIndexes: [0],
   photoSelectionReason: "食物主体清晰、构图完整，适合叠加标题。",
@@ -148,11 +148,11 @@ const DISH_COVER_OVERLAYS: Record<RecommendedDish, CoverOverlay[]> = {
 };
 
 const GENERIC_COVER_OVERLAYS: CoverOverlay[] = [
-  { title: "曼谷必吃", subtitle: "这顿吃下来很满足" },
-  { title: "泰餐必吃", subtitle: "逛完街来吃刚刚好" },
+  { title: "曼谷泰餐新体验", subtitle: "这顿吃下来很满足" },
+  { title: "曼谷吃饭很舒服", subtitle: "逛完街来吃刚刚好" },
   { title: "曼谷泰餐", subtitle: "这几道菜还想再点" },
-  { title: "美食必吃", subtitle: "这顿吃下来很满足" },
-  { title: "曼谷美食", subtitle: "逛完街来吃刚刚好" },
+  { title: "必吃泰式料理", subtitle: "这顿吃下来很满足" },
+  { title: "曼谷美食", subtitle: "坐下来刚好能慢慢聊" },
 ];
 
 function mockCoverOverlay(input: GeneratePostInput): CoverOverlay {
@@ -169,6 +169,12 @@ function mockCoverOverlay(input: GeneratePostInput): CoverOverlay {
     previousCoverTitle: input.previousCoverTitle,
     kspId: input.suggestedKspId,
     contentAngleId: input.suggestedContentAngle,
+    diningNote: note,
+    enjoyMost: input.enjoyMost,
+    recommendTo: input.recommendTo,
+    visitFrequency: input.visitFrequency,
+    customerType: input.customerType,
+    mealAmount: input.totalMealExpense,
   };
   if (shouldUseCoverLocation(context)) {
     const pairs = coverFallbackPairs(context);
@@ -213,6 +219,7 @@ function mockCoverLayout(input: GeneratePostInput, coverIndex: number) {
     selected: "",
     suitable: COVER_TEMPLATE_OPTIONS.map((item) => item.id),
     previousTemplateId: input.previousCoverTemplateId,
+    photoCount,
   });
   return {
     selectedTemplateId,
@@ -260,7 +267,7 @@ export function getMockGeneratedContent(input: GeneratePostInput): GeneratedCont
   );
 
   const enjoy =
-    input.enjoyMost.length > 0 ? input.enjoyMost : (["The food"] as EnjoyMost[]);
+    input.enjoyMost.length > 0 ? input.enjoyMost : (["食物味道正宗美味"] as EnjoyMost[]);
   const highlightText = joinChinese(enjoy.map((item) => item.replace(/^The /, "").toLowerCase()));
   const sceneText = [input.customerType, input.visitFrequency].filter(Boolean).join("、") || "这次用餐";
   const photoLine =

@@ -18,7 +18,7 @@ import { BAAN_YING_CONTENT_STRATEGY } from "@/lib/brand/baan-ying-strategy";
 import { keywordsFromTitles } from "@/lib/title-keywords";
 import { buildGenerateRequest } from "@/lib/generate-prompt";
 import { emptyCustomerInfo, type CustomerInfo } from "@/types/customer";
-import { isMealExpenseComplete } from "@/lib/meal-expense";
+import { isMealExpenseRangeComplete } from "@/lib/meal-expense";
 import { isKnownOriginCity } from "@/lib/world-cities";
 import { composeCoverImage, preloadCoverFile } from "@/lib/compose-cover-client";
 import { layoutCoverOverlay } from "@/lib/cover/cover-title";
@@ -101,6 +101,7 @@ type CampaignFlowContextValue = {
   removePhoto: (id: string) => void;
   generatePost: (onPhase?: (phase: GeneratePhase) => void) => Promise<ResultDraft>;
   updateDraft: (draft: ResultDraft) => void;
+  updateGeneratedTitles: (titles: [string, string, string]) => void;
   retryCover: () => Promise<void>;
   selectCoverTemplate: (templateId: string) => Promise<void>;
   canAccess: (step: FlowStep) => boolean;
@@ -144,25 +145,15 @@ function defaultPersisted(): PersistedFlow {
   };
 }
 
-function isCustomerComplete(customer: CustomerInfo) {
-  return Boolean(
-    customer.ageRange &&
-      customer.gender &&
-      isKnownOriginCity(customer.location),
-  );
-}
-
 function isIdentityComplete(productFeedback: ProductFeedback) {
   return Boolean(productFeedback.customerType && productFeedback.visitFrequency);
 }
 
-function isYouComplete(customer: CustomerInfo, productFeedback: ProductFeedback) {
-  return isCustomerComplete(customer) && isIdentityComplete(productFeedback);
-}
-
-function isRateFeedbackComplete(productFeedback: ProductFeedback) {
+function isReviewFormComplete(customer: CustomerInfo, productFeedback: ProductFeedback) {
   return (
-    isMealExpenseComplete(productFeedback.totalMealExpense) &&
+    isIdentityComplete(productFeedback) &&
+    isKnownOriginCity(customer.location) &&
+    isMealExpenseRangeComplete(productFeedback.mealExpenseRange) &&
     isDiningExperienceNoteComplete(productFeedback.diningExperienceNote ?? "")
   );
 }
@@ -424,6 +415,10 @@ export function CampaignFlowProvider({
       previousLocationFormats,
       Boolean(captionHoursForBranch(diningBranch)),
     );
+    const recommendTo = [
+      ...current.productFeedback.recommendTo,
+      current.productFeedback.recommendToOther?.trim() ?? "",
+    ].filter(Boolean);
     const angleInput = {
       branch: diningBranch,
       customerType: current.productFeedback.customerType,
@@ -442,7 +437,7 @@ export function CampaignFlowProvider({
       {
         ...angleInput,
         recommendedDishOther: current.productFeedback.recommendedDishOther,
-        recommendTo: current.productFeedback.recommendTo,
+        recommendTo,
         diningExperienceNote: current.productFeedback.diningExperienceNote ?? "",
         dinerOrigin: current.customer.location.trim(),
         dinerAgeRange: current.customer.ageRange,
@@ -460,9 +455,12 @@ export function CampaignFlowProvider({
     const payload = buildGenerateRequest(campaign, {
       ...angleInput,
       recommendedDishOther: current.productFeedback.recommendedDishOther,
-      recommendTo: current.productFeedback.recommendTo,
+      enjoyMostOther: current.productFeedback.enjoyMostOther,
+      recommendTo,
+      recommendToOther: current.productFeedback.recommendToOther,
       diningExperienceNote: current.productFeedback.diningExperienceNote ?? "",
       totalMealExpense: current.productFeedback.totalMealExpense,
+      mealExpenseRange: current.productFeedback.mealExpenseRange,
       photoCount: files.length || current.photoCount,
       contentType: campaign.contentStyle.contentType,
       productName: campaign.productName,
@@ -577,6 +575,7 @@ export function CampaignFlowProvider({
       diningNote: current.productFeedback.diningExperienceNote,
       mealAmount: current.productFeedback.totalMealExpense,
       enjoyMost: current.productFeedback.enjoyMost,
+      recommendTo: current.productFeedback.recommendTo,
       visitFrequency: current.productFeedback.visitFrequency,
       customerType: current.productFeedback.customerType,
     };
@@ -596,6 +595,7 @@ export function CampaignFlowProvider({
       suitable: data.suitableTemplateIds,
       previousTemplateId,
       recentTemplateIds: current.coverTemplateHistory ?? [],
+      photoCount: files.length || 1,
     });
     const remainingPhotoIndexes = parseRemainingPhotoIndexes(
       data.remainingPhotoIndexes,
@@ -823,6 +823,15 @@ export function CampaignFlowProvider({
     [campaignId],
   );
 
+  const updateGeneratedTitles = useCallback(
+    (titles: [string, string, string]) => {
+      const generated = getFlowSnapshot(campaignId).generated;
+      if (!generated) return;
+      patchFlow(campaignId, { generated: { ...generated, titles } });
+    },
+    [campaignId],
+  );
+
   const photoReady = photos.length > 0 || persisted.photoCount > 0;
 
   const canAccess = useCallback(
@@ -830,18 +839,13 @@ export function CampaignFlowProvider({
       switch (step) {
         case "landing":
         case "customer":
-          return true;
         case "experience":
         case "upload":
-          return isYouComplete(persisted.customer, persisted.productFeedback);
+          return true;
         case "generating":
         case "result":
         case "publish":
-          return (
-            isYouComplete(persisted.customer, persisted.productFeedback) &&
-            isRateFeedbackComplete(persisted.productFeedback) &&
-            photoReady
-          );
+          return isReviewFormComplete(persisted.customer, persisted.productFeedback) && photoReady;
         default:
           return false;
       }
@@ -852,9 +856,8 @@ export function CampaignFlowProvider({
   const firstBlockedStep = useCallback(
     (step: FlowStep): FlowStep | null => {
       if (canAccess(step)) return null;
-      if (!isYouComplete(persisted.customer, persisted.productFeedback)) return "customer";
-      if (!isRateFeedbackComplete(persisted.productFeedback) || !photoReady) return "experience";
-      return "customer";
+      if (!isReviewFormComplete(persisted.customer, persisted.productFeedback) || !photoReady) return "experience";
+      return "experience";
     },
     [canAccess, persisted.customer, persisted.productFeedback, photoReady],
   );
@@ -882,6 +885,7 @@ export function CampaignFlowProvider({
       removePhoto,
       generatePost,
       updateDraft,
+      updateGeneratedTitles,
       retryCover,
       selectCoverTemplate,
       canAccess,
@@ -907,6 +911,7 @@ export function CampaignFlowProvider({
       removePhoto,
       generatePost,
       updateDraft,
+      updateGeneratedTitles,
       retryCover,
       selectCoverTemplate,
       canAccess,

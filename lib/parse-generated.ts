@@ -104,6 +104,7 @@ export function parseGeneratedContent(
     selected: String(parsed.selectedTemplateId ?? ""),
     suitable: asStringArray(parsed.suitableTemplateIds),
     previousTemplateId,
+    photoCount,
   });
 
   const selectedPhotoIndexes = parsePhotoIndexes(

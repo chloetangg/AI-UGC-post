@@ -70,23 +70,25 @@ export function readStrategySignals(input: StrategyEvidence): Signals {
     friends ||
     family ||
     SHARE_RE.test(note) ||
-    enjoy.has("The variety of dishes");
+    enjoy.has("店里菜品选择丰富");
   const shoppingMention = SHOP_RE.test(note);
   const travelMention = TRAVEL_RE.test(note);
   const shopping = mallBranch || shoppingMention;
   const travel = tourist || travelMention;
   const authentic =
-    reasons.has("authentic") || AUTH_RE.test(note) || enjoy.has("The food") || enjoy.has("The flavors");
+    AUTH_RE.test(note) ||
+    enjoy.has("食物味道正宗美味") ||
+    [...reasons].some((item) => item.includes("正宗") || item.includes("浓郁"));
   const comfort =
     COMFORT_RE.test(note) ||
-    enjoy.has("The restaurant atmosphere") ||
-    enjoy.has("The overall experience") ||
-    enjoy.has("The service");
+    enjoy.has("餐厅风格有满满的家庭式温馨氛围") ||
+    enjoy.has("刚刚翻新环境很好") ||
+    enjoy.has("店员服务热情周到");
   const heritage = HERITAGE_RE.test(note);
   const returnIntent = confirmedRepeat || RETURN_RE.test(note);
   const approachable = firstVisit || EASY_RE.test(note);
   const everyday = !OCCASION_RE.test(note) && !confirmedRepeat && !friends && !family;
-  const tasteWords = (input.recommendTo ?? []).length > 0 || enjoy.has("The flavors");
+  const tasteWords = (input.recommendTo ?? []).length > 0 || enjoy.has("食物味道正宗美味");
 
   return {
     tourist,

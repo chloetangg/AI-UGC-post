@@ -24,6 +24,10 @@ import {
 } from "./cover-rules";
 import { sanitizeCoverAbsoluteLanguage } from "./cover-absolute";
 import { collectFullDishNames, applyCoverDishShortNames, coverDishShortName, hasIllegalCoverDishShort } from "./dish-names";
+import {
+  evidenceLedCoverPairs,
+  isWeakSeoCover,
+} from "@/lib/content-evidence";
 
 export {
   countCoverChars,
@@ -53,12 +57,11 @@ export const PREFERRED_COVER_TITLE_HAN = PREFERRED_MAIN_TITLE_CHARS;
 export const MAX_COVER_TITLE_HAN = MAX_MAIN_TITLE_CHARS;
 
 export const FALLBACK_COVER_PAIRS = [
-  { title: "曼谷隐藏泰餐", subtitle: "这顿吃下来很满足" },
-  { title: "曼谷泰餐推荐", subtitle: "逛完街来吃刚刚好" },
+  { title: "曼谷泰餐新体验", subtitle: "这顿吃下来很满足" },
+  { title: "曼谷吃饭很舒服", subtitle: "坐下来刚好能慢慢聊" },
   { title: "必吃泰式料理", subtitle: "这几道菜还想再点" },
-  { title: "曼谷美食发现", subtitle: "这几道菜还想再点" },
-  { title: "曼谷泰餐新体验", subtitle: "第一次来尝试Baan Ying" },
-  { title: "centralwOrld泰餐推荐", subtitle: "逛完街来吃刚刚好" },
+  { title: "曼谷隐藏泰餐", subtitle: "这顿吃下来很满足" },
+  { title: "centralwOrld泰餐", subtitle: "逛完街来吃刚刚好" },
   { title: "centralwOrld必吃美食", subtitle: "坐下来刚好能慢慢聊" },
 ] as const;
 
@@ -204,9 +207,10 @@ function pickFallbackPair(postTitles: string[], context: CoverTitleContext = {})
   const previousPair = coverKeywordPairKey(context.previousCoverTitle ?? "");
   const previousMain = comparableHan((context.previousCoverTitle ?? "").split("/")[0] ?? "");
   const pool = [
+    ...evidenceLedCoverPairs(context),
     ...coverFallbackPairs({ ...context, postTitles }),
     ...FALLBACK_COVER_PAIRS,
-  ].filter((item) => !blocked.has(comparableHan(item.title)));
+  ].filter((item) => !blocked.has(comparableHan(item.title)) && !isWeakSeoCover(item.title));
   const choices = pool.length > 0 ? pool : [...FALLBACK_COVER_PAIRS];
   const valid = choices.filter((item) =>
     isAcceptableCoverOverlay(item.title, item.subtitle, postTitles, context),
@@ -338,6 +342,16 @@ export function layoutCoverOverlay(
   }
 
   if (isAcceptableCoverOverlay(first, second, postTitles, context)) {
+    const evidencePairs = evidenceLedCoverPairs(context);
+    if (isWeakSeoCover(first) && evidencePairs.length > 0) {
+      const evidence = pickFallbackPair(postTitles, context);
+      if (
+        !isWeakSeoCover(evidence.title) &&
+        isAcceptableCoverOverlay(evidence.title, evidence.subtitle, postTitles, context)
+      ) {
+        return { title: evidence.title, subtitle: evidence.subtitle };
+      }
+    }
     return { title: first, subtitle: second };
   }
 

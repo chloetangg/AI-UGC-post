@@ -162,8 +162,8 @@ export function formatDianpingPasteText(pkg: Pick<RednotePublishPackage, "captio
  * Local only — no OpenAI, no Cover Composer.
  */
 export function prepareRednotePublishPackage(source: RednotePublishSource): RednotePublishPackage {
-  const titles = (Array.isArray(source.titles) ? source.titles : []).map((title) => title.trim()).filter(Boolean);
-  const selected = titles[source.selectedTitleIndex] ?? titles[0] ?? "";
+  const titles = (Array.isArray(source.titles) ? source.titles : []).map((title) => title.trim());
+  const selected = titles[source.selectedTitleIndex] ?? titles.find(Boolean) ?? "";
   const title = selected.split(/\n\s*\n/)[0]?.trim() || selected;
   const caption = stripAllHashtagsFromCaption(source.caption);
   const hashtags = [...ensureRequiredHashtags(source.hashtags)];

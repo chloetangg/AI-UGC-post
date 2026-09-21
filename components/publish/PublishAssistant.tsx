@@ -38,6 +38,7 @@ export function PublishAssistant({
   const downloads = useMemo(() => collectRednoteDownloads(pkg), [pkg]);
 
   const [status, setStatus] = useState<PublishStatus>("idle");
+  const [selectedPlatform, setSelectedPlatform] = useState<PublishPlatform | null>(null);
   const [xhsOpen, setXhsOpen] = useState(false);
   const [dianpingOpen, setDianpingOpen] = useState(false);
   const [dianpingFallback, setDianpingFallback] = useState(false);
@@ -109,6 +110,7 @@ export function PublishAssistant({
 
   function handleXiaohongshu() {
     if (busy) return;
+    setSelectedPlatform("xiaohongshu");
     trackPlatformSelected("xiaohongshu");
     setXhsOpen(true);
   }
@@ -148,6 +150,7 @@ export function PublishAssistant({
 
   function handleDianping() {
     if (busy) return;
+    setSelectedPlatform("dianping");
     trackPlatformSelected("dianping");
     setDianpingFallback(false);
     setDianpingOpen(true);
@@ -189,6 +192,25 @@ export function PublishAssistant({
           </p>
         </div>
 
+        <section className="grid grid-cols-2 gap-3">
+          <PlatformCard
+            name="小红书"
+            englishName="Rednote"
+            logoSrc="/publish/xiaohongshu.png"
+            selected={selectedPlatform === "xiaohongshu"}
+            disabled={busy}
+            onClick={handleXiaohongshu}
+          />
+          <PlatformCard
+            name="大众点评"
+            englishName="Dianping"
+            logoSrc="/publish/dianping.png"
+            selected={selectedPlatform === "dianping"}
+            disabled={busy}
+            onClick={handleDianping}
+          />
+        </section>
+
         {!mobile ? (
           <div className="rounded-3xl bg-accent/70 p-4 text-sm leading-relaxed whitespace-pre-wrap text-accent-foreground">
             {t.publish.desktopHint}
@@ -215,23 +237,6 @@ export function PublishAssistant({
               label={interpolate(t.publish.checkImageCount, { count: downloads.length })}
             />
           </ul>
-        </section>
-
-        <section className="space-y-3">
-          <PlatformCard
-            name={t.publish.platforms.xiaohongshu}
-            description={t.publish.dianpingGuide.chooseXhs}
-            logoSrc="/publish/xiaohongshu.png"
-            disabled={busy}
-            onClick={handleXiaohongshu}
-          />
-          <PlatformCard
-            name={t.publish.platforms.dianping}
-            description={t.publish.dianpingGuide.chooseDp}
-            logoSrc="/publish/dianping.png"
-            disabled={busy}
-            onClick={handleDianping}
-          />
         </section>
 
         {dianpingFallback && !dianpingOpen ? (
@@ -296,28 +301,39 @@ export function PublishAssistant({
 
 function PlatformCard({
   name,
-  description,
+  englishName,
   logoSrc,
+  selected,
   disabled,
   onClick,
 }: {
   name: string;
-  description: string;
+  englishName: string;
   logoSrc: string;
+  selected?: boolean;
   disabled?: boolean;
   onClick: () => void;
 }) {
+  const showEnglish = Boolean(englishName.trim());
+
   return (
     <button
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className="flex w-full items-center gap-4 rounded-3xl border border-border bg-card px-4 py-3.5 text-left shadow-sm transition-all duration-200 disabled:opacity-40 active:scale-[0.98]"
+      className={cn(
+        "flex h-full min-h-[9.5rem] w-full flex-col items-center justify-center gap-2 rounded-3xl border bg-card px-3 py-5 text-center shadow-sm transition-all duration-200 disabled:opacity-40 active:scale-[0.98]",
+        selected
+          ? "border-primary bg-accent ring-2 ring-primary/20"
+          : "border-border hover:border-primary/30",
+      )}
     >
       <img src={logoSrc} alt="" className="size-14 shrink-0 rounded-[14px]" />
       <span className="min-w-0">
         <span className="block text-base font-semibold text-foreground">{name}</span>
-        <span className="mt-0.5 block text-sm text-muted-foreground">{description}</span>
+        {showEnglish ? (
+          <span className="mt-0.5 block text-sm text-muted-foreground">{englishName}</span>
+        ) : null}
       </span>
     </button>
   );

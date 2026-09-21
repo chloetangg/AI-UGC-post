@@ -26,8 +26,8 @@ export function campaignPath(campaignId: string, step: FlowStep = "landing") {
 }
 
 export const PROGRESS_STEPS = [
-  { key: "you", steps: ["customer"] },
-  { key: "rate", steps: ["experience", "upload", "generating", "result"] },
+  { key: "review", steps: ["customer", "experience", "upload", "generating"] },
+  { key: "post", steps: ["result"] },
   { key: "share", steps: ["publish"] },
 ] as const;
 

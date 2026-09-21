@@ -13,6 +13,8 @@ import { readAnalyticsSession } from "@/lib/analytics/session";
 import { normalizeHashtags } from "@/lib/hashtags";
 import { attachOfficialLocationTime, resolveDiningBranch, stripGeneratedLocationTime } from "@/lib/locations";
 import { parseGeneratedContent } from "@/lib/parse-generated";
+import { classifyCoverHookType, ensureEvidenceLedCopy, previousPrimaryExperienceId } from "@/lib/content-evidence";
+import { layoutCoverOverlay } from "@/lib/cover/cover-title";
 import { aggregateGenerationCost, logGenerationCost, usageFromCompletion } from "@/lib/openai-usage";
 import { ensureTitleFormats, evaluateTitleFormats } from "@/lib/title-formats";
 import { enforceXiaohongshuCompliance } from "@/lib/compliance";
@@ -144,12 +146,29 @@ export async function POST(request: Request) {
         payload.recommendedDishOther.trim(),
       ].filter(Boolean),
       previousCoverTitle: payload.previousCoverTitle,
+      previousCoverHookType: classifyCoverHookType(payload.previousCoverTitle ?? ""),
+      previousPrimaryExperience: previousPrimaryExperienceId(
+        {
+          diningNote: payload.diningExperienceNote,
+          dishes: [
+            ...payload.recommendedDishes.filter((dish) => dish !== "Others"),
+            payload.recommendedDishOther.trim(),
+          ].filter(Boolean),
+          enjoyMost: payload.enjoyMost,
+          recommendTo: payload.recommendTo,
+          visitFrequency: payload.visitFrequency,
+          previousCoverTitle: payload.previousCoverTitle,
+        },
+        payload.previousTitles ?? [],
+      ),
+      previousTitleAngle: classifyCoverHookType(payload.previousTitle ?? ""),
       variantIndex: payload.variantIndex,
       kspId: payload.suggestedKspId,
       contentAngleId: payload.suggestedContentAngle,
       diningNote: payload.diningExperienceNote,
       mealAmount: payload.totalMealExpense,
       enjoyMost: payload.enjoyMost,
+      recommendTo: payload.recommendTo,
       visitFrequency: payload.visitFrequency,
       customerType: payload.customerType,
     };
@@ -188,8 +207,33 @@ export async function POST(request: Request) {
         : ensureTitleFormats(compliant.titles, previousTitles),
     );
     const storySafe = ensureCaptionEmojis(compliant.caption);
+    const diversified = ensureEvidenceLedCopy({
+      titles,
+      caption: storySafe,
+      coverTitle: compliant.coverTitle,
+      coverSubtitle: compliant.coverSubtitle,
+      context: {
+        ...coverContext,
+        sourceTexts: [...titles, storySafe],
+      },
+      previousTitles,
+    });
+    const evidenceTitles = fixFruitEmojisInTitles(
+      evaluateTitleFormats(diversified.titles, previousTitles).ok
+        ? diversified.titles
+        : ensureTitleFormats(diversified.titles, previousTitles),
+    );
+    const evidenceCover = layoutCoverOverlay(
+      diversified.coverTitle,
+      diversified.coverSubtitle,
+      evidenceTitles,
+      {
+        ...coverContext,
+        sourceTexts: [...evidenceTitles, diversified.caption],
+      },
+    );
     const located = attachOfficialLocationTime(
-      storySafe,
+      ensureCaptionEmojis(diversified.caption),
       payload.branch,
       payload.requiredLocationFormat,
       payload.previousLocationFormat,
@@ -228,11 +272,11 @@ export async function POST(request: Request) {
         customerType: payload.customerType,
         visitFrequency: payload.visitFrequency,
         mealExpenseThb: payload.totalMealExpense,
-        titles,
+        titles: evidenceTitles,
         caption: located.caption,
         hashtags,
-        coverTitle: compliant.coverTitle,
-        coverSubtitle: compliant.coverSubtitle,
+        coverTitle: evidenceCover.title,
+        coverSubtitle: evidenceCover.subtitle,
         enjoyMost: payload.enjoyMost,
         recommendedDishes: payload.recommendedDishes,
         recommendedDishOther: payload.recommendedDishOther,
@@ -256,11 +300,11 @@ export async function POST(request: Request) {
     ]);
 
     return Response.json({
-      titles,
+      titles: evidenceTitles,
       caption: located.caption,
       hashtags,
-      coverTitle: compliant.coverTitle,
-      coverSubtitle: compliant.coverSubtitle,
+      coverTitle: evidenceCover.title,
+      coverSubtitle: evidenceCover.subtitle,
       selectedPhotoIndex: parsed.selectedPhotoIndex,
       selectedPhotoIndexes: parsed.selectedPhotoIndexes,
       photoSelectionReason: parsed.photoSelectionReason,

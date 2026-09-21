@@ -22,7 +22,7 @@ const scenarios: Array<{ name: string; input: StrategyEvidence; expect: Partial<
       customerType: "Tourist",
       visitFrequency: "1st time",
       branch: "Baan Ying (centralwOrld, 3rd Floor)",
-      enjoyMost: ["The food"],
+      enjoyMost: ["食物味道正宗美味"],
     },
     expect: { ksp: ["KSP-01", "KSP-09"], storyline: ["ST-01", "ST-07"], angle: ["CA-01", "CA-04"] },
   },

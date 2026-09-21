@@ -35,64 +35,79 @@ export function isCoverTemplateId(value: string): value is CoverTemplateOptionId
 export const REMAINING_ORDER_PATTERNS = ["1", "2", "3", "4", "5", "6"] as const;
 export type RemainingOrderPattern = (typeof REMAINING_ORDER_PATTERNS)[number];
 
-function pickRandomTemplate(ids: CoverTemplateOptionId[]): CoverTemplateOptionId | undefined {
-  if (ids.length === 0) return undefined;
+const PREFERRED_FOUR_PHOTO_TEMPLATE_IDS: readonly CoverTemplateOptionId[] = ["top-stroke", "dual-line"];
+
+function randomIndex(length: number) {
+  if (length <= 1) return 0;
   const cryptoObj = globalThis.crypto;
   if (typeof cryptoObj?.getRandomValues === "function") {
+    const span = 256 - (256 % length);
     const bytes = new Uint8Array(1);
-    cryptoObj.getRandomValues(bytes);
-    return ids[bytes[0] % ids.length];
+    let value = 255;
+    do {
+      cryptoObj.getRandomValues(bytes);
+      value = bytes[0];
+    } while (value >= span);
+    return value % length;
   }
-  return ids[Math.floor(Math.random() * ids.length)];
+  return Math.floor(Math.random() * length);
 }
 
-function uniqueCoverTemplateIds(raw: Array<string | null | undefined> | null | undefined): CoverTemplateOptionId[] {
-  const seen = new Set<CoverTemplateOptionId>();
-  const ids: CoverTemplateOptionId[] = [];
-  for (const item of raw ?? []) {
-    if (!item || !isCoverTemplateId(item) || seen.has(item)) continue;
-    seen.add(item);
-    ids.push(item);
+function pickRandomTemplate(ids: CoverTemplateOptionId[]): CoverTemplateOptionId | undefined {
+  if (ids.length === 0) return undefined;
+  return ids[randomIndex(ids.length)];
+}
+
+function withoutRecentTemplates(
+  ids: CoverTemplateOptionId[],
+  recent: string[],
+  previous?: string | null,
+): CoverTemplateOptionId[] {
+  const blocked = new Set(
+    [previous, ...recent.slice(-2)].filter((id): id is string => Boolean(id)),
+  );
+  const fresh = ids.filter((id) => !blocked.has(id));
+  if (fresh.length > 0) return fresh;
+  const notPrevious = ids.filter((id) => id !== previous);
+  return notPrevious.length > 0 ? notPrevious : [...ids];
+}
+
+function pickFromPool(ids: CoverTemplateOptionId[], photoCount: number): CoverTemplateOptionId | undefined {
+  if (ids.length === 0) return undefined;
+  if (photoCount < 4) return pickRandomTemplate(ids);
+
+  const preferred = new Set<string>(PREFERRED_FOUR_PHOTO_TEMPLATE_IDS);
+  const bag: CoverTemplateOptionId[] = [];
+  for (const id of ids) {
+    const copies = preferred.has(id) ? 3 : 1;
+    for (let i = 0; i < copies; i += 1) bag.push(id);
   }
-  return ids;
+  return pickRandomTemplate(bag);
 }
 
 /**
- * Two-phase Style pick:
- * 1) composition pool = AI suitableTemplateIds (photo-only if none fit)
- * 2) history avoidance + random inside that pool
- * `selected` is ignored. Manual Style taps do not call this.
+ * Final Style is local: random among Style 1–6.
+ * Ignore AI selectedTemplateId / suitableTemplateIds.
+ * Avoid the last 1–2 styles so regenerate is not the same cover.
+ * photoCount >= 4: Style 1 and Style 2 get higher weight (four-grid).
+ * Manual Style taps do not call this.
  */
 export function autoMatchTemplate(input: {
   selected?: string | null;
   suitable?: string[] | null;
   previousTemplateId?: string | null;
   recentTemplateIds?: string[] | null;
+  photoCount?: number;
 }): CoverTemplateOptionId {
   void input.selected;
-  const suitable = uniqueCoverTemplateIds(input.suitable);
-  const compositionPool =
-    suitable.length > 0 ? suitable : ([PHOTO_ONLY_TEMPLATE_ID] as CoverTemplateOptionId[]);
-
-  if (compositionPool.length === 1) {
-    return compositionPool[0];
-  }
-
-  const previous =
-    input.previousTemplateId && isCoverTemplateId(input.previousTemplateId)
-      ? input.previousTemplateId
-      : "";
-  const recent = uniqueCoverTemplateIds(input.recentTemplateIds ?? []);
-  const avoid = new Set<string>([previous, ...recent].filter(Boolean));
-  const unused = compositionPool.filter((id) => !avoid.has(id));
-  if (unused.length > 0) {
-    return pickRandomTemplate(unused) ?? compositionPool[0];
-  }
-  const notPrevious = compositionPool.filter((id) => id !== previous);
-  if (notPrevious.length > 0) {
-    return pickRandomTemplate(notPrevious) ?? compositionPool[0];
-  }
-  return pickRandomTemplate(compositionPool) ?? DEFAULT_COVER_TEMPLATE_ID;
+  void input.suitable;
+  const all = COVER_TEMPLATE_OPTIONS.map((item) => item.id);
+  const photoCount = Number.isFinite(input.photoCount) ? Math.max(0, Number(input.photoCount)) : 0;
+  const recent = Array.isArray(input.recentTemplateIds)
+    ? input.recentTemplateIds.map((id) => String(id ?? "").trim()).filter(Boolean)
+    : [];
+  const pool = withoutRecentTemplates(all, recent, input.previousTemplateId);
+  return pickFromPool(pool, photoCount) ?? pickRandomTemplate(all) ?? DEFAULT_COVER_TEMPLATE_ID;
 }
 
 function uniqueAllowedIndexes(value: unknown, allowed: Set<number>) {

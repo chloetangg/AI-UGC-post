@@ -50,13 +50,32 @@ export const CUSTOMER_TYPES = ["Tourist", "Local"] as const;
 export const VISIT_FREQUENCIES = ["1st time", "Not first time"] as const;
 
 export const ENJOY_MOST = [
-  "The food",
-  "The flavors",
-  "The presentation",
-  "The variety of dishes",
-  "The restaurant atmosphere",
-  "The service",
-  "The overall experience",
+  "有中文菜单",
+  "餐厅面积很大",
+  "在购物商场里的泰餐连锁",
+  "刚刚翻新环境很好",
+  "店员服务热情周到",
+  "店里菜品选择丰富",
+  "食物味道正宗美味",
+  "餐厅风格有满满的家庭式温馨氛围",
+  "支付可以使用支付宝",
+  "其他",
+] as const;
+
+export const ENJOY_MOST_OTHER = "其他";
+
+export const MEAL_EXPENSE_RANGES = [
+  "฿1-200",
+  "฿200-400",
+  "฿400-600",
+  "฿600-800",
+  "฿800-1,000",
+  "฿1,000-1,200",
+  "฿1,200-1,400",
+  "฿1,400-1,600",
+  "฿1,600-1,800",
+  "฿1,800-2,000",
+  "฿2,000+",
 ] as const;
 
 export const RECOMMENDED_DISHES = [
@@ -96,16 +115,20 @@ export type VisitFrequency = (typeof VISIT_FREQUENCIES)[number];
 export type EnjoyMost = (typeof ENJOY_MOST)[number];
 export type RecommendedDish = (typeof RECOMMENDED_DISHES)[number];
 export type RecommendTo = (typeof RECOMMEND_TO)[number];
+export type MealExpenseRange = (typeof MEAL_EXPENSE_RANGES)[number];
 
 export type ProductFeedback = {
   branch: BaanYingBranch | "";
   customerType: CustomerType | "";
   visitFrequency: VisitFrequency | "";
   totalMealExpense: number | null;
+  mealExpenseRange: MealExpenseRange | "";
   enjoyMost: EnjoyMost[];
+  enjoyMostOther: string;
   recommendedDishes: RecommendedDish[];
   recommendedDishOther: string;
-  recommendTo: RecommendTo[];
+  recommendTo: string[];
+  recommendToOther: string;
   diningExperienceNote: string;
 };
 
@@ -136,10 +159,13 @@ export const emptyProductFeedback: ProductFeedback = {
   customerType: "",
   visitFrequency: "",
   totalMealExpense: null,
+  mealExpenseRange: "",
   enjoyMost: [],
+  enjoyMostOther: "",
   recommendedDishes: [],
   recommendedDishOther: "",
   recommendTo: [],
+  recommendToOther: "",
   diningExperienceNote: "",
 };
 
@@ -147,9 +173,18 @@ export function withDefaultBranch(feedback: ProductFeedback): ProductFeedback {
   return {
     ...feedback,
     branch: DEFAULT_BAAN_YING_BRANCH,
+    mealExpenseRange: (MEAL_EXPENSE_RANGES as readonly string[]).includes(feedback.mealExpenseRange)
+      ? feedback.mealExpenseRange
+      : "",
+    enjoyMost: feedback.enjoyMost.filter((item): item is EnjoyMost =>
+      (ENJOY_MOST as readonly string[]).includes(item),
+    ),
     recommendedDishes: feedback.recommendedDishes.filter((item): item is RecommendedDish =>
       (RECOMMENDED_DISHES as readonly string[]).includes(item),
     ),
+    recommendTo: Array.isArray(feedback.recommendTo)
+      ? feedback.recommendTo.filter((item) => typeof item === "string" && item.trim())
+      : [],
   };
 }
 
@@ -209,10 +244,13 @@ export type GeneratePostInput = {
   customerType: CustomerType | "";
   visitFrequency: VisitFrequency | "";
   totalMealExpense?: number | null;
+  mealExpenseRange?: MealExpenseRange | "";
   enjoyMost: EnjoyMost[];
+  enjoyMostOther?: string;
   recommendedDishes: RecommendedDish[];
   recommendedDishOther: string;
-  recommendTo: RecommendTo[];
+  recommendTo: string[];
+  recommendToOther?: string;
   diningExperienceNote: string;
   photoCount: number;
   contentType: ContentType;
@@ -246,6 +284,9 @@ export type GeneratePostInput = {
   previousTitleKeywords?: string[];
   previousCoverTemplateId?: string;
   previousCoverTitle?: string;
+  previousCoverHookType?: string;
+  previousPrimaryExperience?: string;
+  previousTitleAngle?: string;
   campaignId?: string;
   submissionId?: string;
 };

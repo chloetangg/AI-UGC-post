@@ -6,32 +6,45 @@ import { PageTitle } from "@/components/campaign/PageTitle";
 import { StickyAction } from "@/components/campaign/StickyAction";
 import { FlowGuard } from "@/components/flow/FlowGuard";
 import { ChoiceChip } from "@/components/preferences/ChoiceChip";
+import { OriginCityField } from "@/components/customer/OriginCityField";
 import { useCampaignFlow } from "@/components/providers/campaign-flow-provider";
 import { Input } from "@/components/ui/input";
 import { ExperienceNoteField } from "@/components/experience/ExperienceNoteField";
-import { MealExpenseField } from "@/components/experience/MealExpenseField";
+import { ReasonMultiSelect } from "@/components/experience/ReasonMultiSelect";
 import { PhotoUploader } from "@/components/upload/PhotoUploader";
 import { campaignPath } from "@/lib/flow";
-import { interpolate } from "@/lib/i18n";
+import { interpolate, recommendationReasonLabel } from "@/lib/i18n";
 import { useT } from "@/components/providers/language-provider";
+import { isKnownOriginCity } from "@/lib/world-cities";
 import {
+  midpointForMealExpenseRange,
+  pruneRecommendationReasons,
+  reasonsForDish,
+} from "@/lib/recommendation-reasons";
+import { isMealExpenseRangeComplete } from "@/lib/meal-expense";
+import {
+  CUSTOMER_TYPES,
   ENJOY_MOST,
-  RECOMMEND_TO,
+  ENJOY_MOST_OTHER,
+  MEAL_EXPENSE_RANGES,
   RECOMMENDED_DISHES,
+  VISIT_FREQUENCIES,
   emptyProductFeedback,
   isDiningExperienceNoteComplete,
   countDiningExperienceUnits,
   withDefaultBranch,
   type EnjoyMost,
-  type RecommendTo,
+  type MealExpenseRange,
   type RecommendedDish,
+  type VisitFrequency,
 } from "@/types/content";
-import { isMealExpenseComplete } from "@/lib/meal-expense";
 
 export default function ExperiencePage() {
   const router = useRouter();
   const { campaignId } = useParams<{ campaignId: string }>();
   const {
+    customer,
+    setCustomer,
     productFeedback,
     setProductFeedback,
     saveFeelExpense,
@@ -43,12 +56,27 @@ export default function ExperiencePage() {
   const [touched, setTouched] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const feedback = withDefaultBranch({ ...emptyProductFeedback, ...productFeedback });
+  const visitFrequency = VISIT_FREQUENCIES.includes(feedback.visitFrequency as VisitFrequency)
+    ? feedback.visitFrequency
+    : "";
 
-  const expenseReady = isMealExpenseComplete(feedback.totalMealExpense);
+  const identityReady = Boolean(feedback.customerType && visitFrequency);
+  const originReady = isKnownOriginCity(customer.location);
+  const expenseReady = isMealExpenseRangeComplete(feedback.mealExpenseRange);
   const noteReady = isDiningExperienceNoteComplete(feedback.diningExperienceNote);
   const photosReady = photos.length > 0;
-  const ready = expenseReady && noteReady && photosReady;
+  const ready = identityReady && originReady && expenseReady && noteReady && photosReady;
   const noteCount = countDiningExperienceUnits(feedback.diningExperienceNote);
+  const selectedDishes = feedback.recommendedDishes.filter((dish) => dish !== "Others");
+  const hasOthersDish = feedback.recommendedDishes.includes("Others");
+  const reasonGroups = selectedDishes.map((dish) => ({
+    id: dish,
+    label: t.options.recommendedDishes[dish],
+    options: reasonsForDish(dish).map((reason) => ({
+      value: reason,
+      label: t.options.recommendTo[reason],
+    })),
+  }));
 
   function continueNext() {
     setTouched(true);
@@ -61,58 +89,75 @@ export default function ExperiencePage() {
     });
   }
 
+  function patchFeedback(next: Partial<typeof feedback>) {
+    setProductFeedback({ ...feedback, ...next });
+  }
+
   function toggleEnjoyMost(option: EnjoyMost) {
+    if (option === ENJOY_MOST_OTHER) {
+      const selecting = !feedback.enjoyMost.includes(ENJOY_MOST_OTHER);
+      patchFeedback({
+        enjoyMost: selecting
+          ? [...feedback.enjoyMost, ENJOY_MOST_OTHER]
+          : feedback.enjoyMost.filter((item) => item !== ENJOY_MOST_OTHER),
+        enjoyMostOther: selecting ? feedback.enjoyMostOther : "",
+      });
+      return;
+    }
     const selected = feedback.enjoyMost.includes(option)
       ? feedback.enjoyMost.filter((item) => item !== option)
       : [...feedback.enjoyMost, option];
-    setProductFeedback({ ...feedback, enjoyMost: selected });
+    patchFeedback({ enjoyMost: selected });
+  }
+
+  function setEnjoyMostOther(value: string) {
+    const hasText = value.trim().length > 0;
+    const without = feedback.enjoyMost.filter((item) => item !== ENJOY_MOST_OTHER);
+    patchFeedback({
+      enjoyMost: hasText ? [...without, ENJOY_MOST_OTHER] : without,
+      enjoyMostOther: value,
+    });
   }
 
   function toggleRecommendedDish(option: RecommendedDish) {
     if (option === "Others") {
       const selecting = !feedback.recommendedDishes.includes("Others");
-      setProductFeedback({
-        ...feedback,
-        recommendedDishes: selecting
-          ? [...feedback.recommendedDishes, "Others"]
-          : feedback.recommendedDishes.filter((item) => item !== "Others"),
+      const recommendedDishes: RecommendedDish[] = selecting
+        ? [...feedback.recommendedDishes, "Others"]
+        : feedback.recommendedDishes.filter((item) => item !== "Others");
+      patchFeedback({
+        recommendedDishes,
         recommendedDishOther: selecting ? feedback.recommendedDishOther : "",
+        recommendToOther: selecting ? feedback.recommendToOther : "",
+        recommendTo: pruneRecommendationReasons(feedback.recommendTo, recommendedDishes),
       });
       return;
     }
-    const selected = feedback.recommendedDishes.includes(option)
+    const recommendedDishes: RecommendedDish[] = feedback.recommendedDishes.includes(option)
       ? feedback.recommendedDishes.filter((item) => item !== option)
       : [...feedback.recommendedDishes, option];
-    setProductFeedback({
-      ...feedback,
-      recommendedDishes: selected,
-    });
-  }
-
-  function toggleRecommendTo(option: RecommendTo) {
-    const selected = feedback.recommendTo.includes(option)
-      ? feedback.recommendTo.filter((item) => item !== option)
-      : [...feedback.recommendTo, option];
-    setProductFeedback({
-      ...feedback,
-      recommendTo: selected,
+    patchFeedback({
+      recommendedDishes,
+      recommendTo: pruneRecommendationReasons(feedback.recommendTo, recommendedDishes),
     });
   }
 
   function setRecommendedDishOther(value: string) {
     const hasText = value.trim().length > 0;
     const withoutOthers = feedback.recommendedDishes.filter((item) => item !== "Others");
-    setProductFeedback({
-      ...feedback,
-      recommendedDishes: hasText ? [...withoutOthers, "Others"] : withoutOthers,
+    const recommendedDishes: RecommendedDish[] = hasText ? [...withoutOthers, "Others"] : withoutOthers;
+    patchFeedback({
+      recommendedDishes,
       recommendedDishOther: value,
+      recommendToOther: hasText ? feedback.recommendToOther : "",
+      recommendTo: pruneRecommendationReasons(feedback.recommendTo, recommendedDishes),
     });
   }
 
-  function setDiningExperienceNote(value: string) {
-    setProductFeedback({
-      ...feedback,
-      diningExperienceNote: value,
+  function selectExpenseRange(range: MealExpenseRange) {
+    patchFeedback({
+      mealExpenseRange: range,
+      totalMealExpense: midpointForMealExpenseRange(range),
     });
   }
 
@@ -126,25 +171,45 @@ export default function ExperiencePage() {
       <div className="space-y-7 pb-28">
         <section className="space-y-3">
           <div>
-            <h2 className="text-base font-semibold">{t.experience.qExpenseTitle}</h2>
+            <h2 className="text-base font-semibold">{t.experience.q3Title}</h2>
+            <p className="text-sm text-muted-foreground">{t.experience.q3Description}</p>
           </div>
-          <MealExpenseField
-            value={feedback.totalMealExpense}
-            currency={t.experience.qExpenseCurrency}
-            placeholder={t.experience.qExpensePlaceholder}
-            invalid={touched && !expenseReady}
-            onChange={(totalMealExpense) => setProductFeedback({ ...feedback, totalMealExpense })}
-          />
-          {touched && !expenseReady ? (
-            <p className="text-xs text-destructive">{t.experience.qExpenseError}</p>
+          <div className="flex flex-wrap gap-2">
+            {VISIT_FREQUENCIES.map((option) => (
+              <ChoiceChip
+                key={option}
+                label={t.options.visitFrequencies[option]}
+                selected={visitFrequency === option}
+                onClick={() => patchFeedback({ visitFrequency: option })}
+              />
+            ))}
+          </div>
+        </section>
+
+        <section className="space-y-3">
+          <div>
+            <h2 className="text-base font-semibold">{t.experience.q2Title}</h2>
+            <p className="text-sm text-muted-foreground">{t.experience.q2Description}</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {CUSTOMER_TYPES.map((option) => (
+              <ChoiceChip
+                key={option}
+                label={t.options.customerTypes[option]}
+                selected={feedback.customerType === option}
+                onClick={() => patchFeedback({ customerType: option })}
+              />
+            ))}
+          </div>
+          {touched && !identityReady ? (
+            <p className="text-sm text-destructive">{t.experience.requiredError}</p>
           ) : null}
         </section>
+
         <section className="space-y-3">
           <div>
             <h2 className="text-base font-semibold">{t.experience.q4Title}</h2>
-            <p className="text-sm text-muted-foreground">
-              {t.experience.q4Description}
-            </p>
+            <p className="text-sm text-muted-foreground">{t.experience.q4Description}</p>
           </div>
           <div className="flex flex-wrap gap-2">
             {ENJOY_MOST.map((option) => (
@@ -156,7 +221,15 @@ export default function ExperiencePage() {
               />
             ))}
           </div>
+          {feedback.enjoyMost.includes(ENJOY_MOST_OTHER) || feedback.enjoyMostOther ? (
+            <Input
+              value={feedback.enjoyMostOther}
+              placeholder={t.experience.q4OthersPlaceholder}
+              onChange={(event) => setEnjoyMostOther(event.target.value)}
+            />
+          ) : null}
         </section>
+
         <section className="space-y-3">
           <div>
             <h2 className="text-base font-semibold">{t.experience.q5Title}</h2>
@@ -172,37 +245,59 @@ export default function ExperiencePage() {
               />
             ))}
           </div>
-          <Input
-            value={feedback.recommendedDishOther}
-            placeholder={t.experience.q5OthersPlaceholder}
-            onChange={(event) => setRecommendedDishOther(event.target.value)}
-          />
+          {hasOthersDish || feedback.recommendedDishOther ? (
+            <Input
+              value={feedback.recommendedDishOther}
+              placeholder={t.experience.q5OthersPlaceholder}
+              onChange={(event) => setRecommendedDishOther(event.target.value)}
+            />
+          ) : null}
         </section>
+
         <section className="space-y-3">
           <div>
             <h2 className="text-base font-semibold">{t.experience.q6Title}</h2>
-            <p className="text-sm text-muted-foreground">
-              {t.experience.q6Description}
-            </p>
+            <p className="text-sm text-muted-foreground">{t.experience.q6Description}</p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {RECOMMEND_TO.map((option) => (
-              <ChoiceChip
-                key={option}
-                label={t.options.recommendTo[option]}
-                selected={feedback.recommendTo.includes(option)}
-                onClick={() => toggleRecommendTo(option)}
-              />
-            ))}
-          </div>
+          <ReasonMultiSelect
+            groups={reasonGroups}
+            selected={feedback.recommendTo}
+            placeholder={t.experience.q6Placeholder}
+            emptyLabel={t.experience.q6Empty}
+            onChange={(recommendTo) => patchFeedback({ recommendTo })}
+          />
+          {feedback.recommendTo.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {feedback.recommendTo.map((reason) => (
+                <ChoiceChip
+                  key={reason}
+                  label={recommendationReasonLabel(t, reason)}
+                  selected
+                  onClick={() =>
+                    patchFeedback({
+                      recommendTo: feedback.recommendTo.filter((item) => item !== reason),
+                    })
+                  }
+                />
+              ))}
+            </div>
+          ) : null}
+          {hasOthersDish ? (
+            <Input
+              value={feedback.recommendToOther}
+              placeholder={t.experience.q6CustomPlaceholder}
+              onChange={(event) => patchFeedback({ recommendToOther: event.target.value })}
+            />
+          ) : null}
         </section>
+
         <section className="space-y-3">
           <h2 className="text-base font-semibold">{t.experience.q7Title}</h2>
           <ExperienceNoteField
             value={feedback.diningExperienceNote}
             placeholder={t.experience.q7Placeholder}
             invalid={touched && !noteReady}
-            onChange={setDiningExperienceNote}
+            onChange={(diningExperienceNote) => patchFeedback({ diningExperienceNote })}
           />
           <p className="text-sm text-muted-foreground">
             {interpolate(t.experience.q7Hint, { count: noteCount })}
@@ -211,10 +306,45 @@ export default function ExperiencePage() {
             <p className="text-sm text-destructive">{t.experience.q7Error}</p>
           ) : null}
         </section>
+
+        <section className="space-y-3">
+          <div>
+            <h2 className="text-base font-semibold">{t.experience.qExpenseTitle}</h2>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {MEAL_EXPENSE_RANGES.map((range) => (
+              <ChoiceChip
+                key={range}
+                label={range}
+                selected={feedback.mealExpenseRange === range}
+                onClick={() => selectExpenseRange(range)}
+              />
+            ))}
+          </div>
+          {touched && !expenseReady ? (
+            <p className="text-xs text-destructive">{t.experience.qExpenseError}</p>
+          ) : null}
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="text-base font-semibold">{t.experience.qOriginTitle}</h2>
+          <OriginCityField
+            value={customer.location}
+            invalid={touched && !originReady}
+            placeholder={t.customer.locationPlaceholder}
+            searchPlaceholder={t.customer.locationSearchPlaceholder}
+            noMatches={t.customer.locationNoMatches}
+            onChange={(location) => setCustomer({ ...customer, location })}
+          />
+          {touched && !originReady ? (
+            <p className="text-sm text-destructive">{t.customer.errors.location}</p>
+          ) : null}
+        </section>
+
         <section className="space-y-3">
           <div>
             <h2 className="text-base font-semibold">{t.upload.title}</h2>
-            <p className="text-sm text-muted-foreground">{t.upload.subtitle}</p>
+            <p className="whitespace-pre-wrap text-sm text-muted-foreground">{t.upload.subtitle}</p>
           </div>
           <PhotoUploader photos={photos} onAdd={addPhotos} onRemove={removePhoto} />
           {touched && !photosReady ? (

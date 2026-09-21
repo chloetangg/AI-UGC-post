@@ -1,3 +1,5 @@
+import { isMealExpenseRange } from "@/lib/recommendation-reasons";
+
 const MAX_CENTS = 99_999_999;
 
 export function centsFromCurrencyInput(text: string) {
@@ -20,4 +22,8 @@ export function formatMealExpense(amount: number | null) {
 
 export function isMealExpenseComplete(amount: number | null | undefined) {
   return typeof amount === "number" && Number.isFinite(amount) && amount > 0;
+}
+
+export function isMealExpenseRangeComplete(range: string | null | undefined) {
+  return Boolean(range && isMealExpenseRange(range));
 }
