@@ -16,7 +16,7 @@ import { parseGeneratedContent } from "@/lib/parse-generated";
 import { classifyCoverHookType, ensureEvidenceLedCopy, previousPrimaryExperienceId } from "@/lib/content-evidence";
 import { layoutCoverOverlay } from "@/lib/cover/cover-title";
 import { aggregateGenerationCost, logGenerationCost, usageFromCompletion } from "@/lib/openai-usage";
-import { ensureTitleFormats, evaluateTitleFormats } from "@/lib/title-formats";
+import { ensureTitleFormats } from "@/lib/title-formats";
 import { enforceXiaohongshuCompliance } from "@/lib/compliance";
 
 export const maxDuration = 60;
@@ -179,11 +179,7 @@ export async function POST(request: Request) {
       coverContext,
     );
 
-    const formatted = fixFruitEmojisInTitles(
-      evaluateTitleFormats(parsed.titles, previousTitles).ok
-        ? parsed.titles
-        : ensureTitleFormats(parsed.titles, previousTitles),
-    );
+    const formatted = fixFruitEmojisInTitles(ensureTitleFormats(parsed.titles, previousTitles));
 
     const story = ensureCaptionEmojis(stripGeneratedLocationTime(parsed.caption));
     const compliant = await enforceXiaohongshuCompliance({
@@ -201,11 +197,7 @@ export async function POST(request: Request) {
         sourceTexts: [...formatted, story],
       },
     });
-    const titles = fixFruitEmojisInTitles(
-      evaluateTitleFormats(compliant.titles, previousTitles).ok
-        ? compliant.titles
-        : ensureTitleFormats(compliant.titles, previousTitles),
-    );
+    const titles = fixFruitEmojisInTitles(ensureTitleFormats(compliant.titles, previousTitles));
     const storySafe = ensureCaptionEmojis(compliant.caption);
     const diversified = ensureEvidenceLedCopy({
       titles,
@@ -219,9 +211,7 @@ export async function POST(request: Request) {
       previousTitles,
     });
     const evidenceTitles = fixFruitEmojisInTitles(
-      evaluateTitleFormats(diversified.titles, previousTitles).ok
-        ? diversified.titles
-        : ensureTitleFormats(diversified.titles, previousTitles),
+      ensureTitleFormats(diversified.titles, previousTitles),
     );
     const evidenceCover = layoutCoverOverlay(
       diversified.coverTitle,

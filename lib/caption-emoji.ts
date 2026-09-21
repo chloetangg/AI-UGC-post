@@ -2,6 +2,29 @@ import { stripGeneratedLocationTime } from "@/lib/locations";
 
 const EMOJI_RE = /\p{Extended_Pictographic}/gu;
 
+/** Shared caption + title emoji list. Cover overlay still has no emoji. */
+export const STORY_EMOJI_POOL = [
+  "🍛",
+  "🦀",
+  "🍤",
+  "🍚",
+  "🍜",
+  "🥭",
+  "🍋",
+  "🌶️",
+  "😍",
+  "🥹",
+  "🤤",
+  "🥰",
+  "❤️",
+  "✨",
+  "🇹🇭",
+  "👀",
+  "🤯",
+  "😳",
+  "😋",
+] as const;
+
 export function splitCaptionStoryAndLocation(caption: string) {
   const trimmed = caption.trim();
   const story = stripGeneratedLocationTime(trimmed);
@@ -24,7 +47,7 @@ function chunkHasMango(text: string) {
 }
 
 function chunkHasLemon(text: string) {
-  return /柠檬|檸檬|lemon/i.test(text);
+  return /柠檬|檸檬|青柠|lemon/i.test(text);
 }
 
 function fixFruitEmojisInChunk(chunk: string) {

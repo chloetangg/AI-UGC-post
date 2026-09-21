@@ -281,7 +281,8 @@ Forbidden same-angle trio: 曼谷美食发现 / 曼谷美食推荐 / 曼谷泰�
 Each title must feel like Xiaohongshu, reflect actual customer experience, and naturally contain at least one Bangkok food search keyword. Prefer 3 different keywords. Do not keyword-stuff. Do not sound like an advertisement.
 Unacceptable: 曼谷Baan Ying好好吃 / 真的好好吃 / 超好吃. Do not make the 3 titles the same sentence with different adjectives.
 ZERO hashtags in titles.
-If a title mentions 芒果 / 芒果糯米饭 / mango, use 🥭 not 🍋. 🍋 is lemon / 柠檬 only.
+If a title mentions 芒果 / 芒果糯米饭 / mango, use 🥭 not 🍋. 🍋 is lemon / 柠檬 / 青柠 only.
+Title emojis, if any, must be chosen from the same list as the caption. Title 1 must not always start with 🇹🇭.
 ${formatTitleKeywordRules()}
 ${formatTitleFormatRules()}
 
@@ -309,13 +310,15 @@ Local: do not explain basic Bangkok tourist info.
 Favorite = food → food is central. Atmosphere → environment may appear. Variety → ordering several dishes. Sharing → sharing/group, but do not invent companions.
 Avoid empty lines like “这里提供丰富的泰式料理，适合朋友聚餐，整体体验非常不错。”
 
-EMOJI — in the STORY BODY only. Location 📍/⏰ do not count.
+EMOJI — titles and caption story body may use them. Cover overlay never uses emoji. Location 📍/⏰ do not count.
 Use emojis like a real diner, not a quota. Count should change with the caption: a 2-sentence post may have 0–2; a longer one may have more. Never an emoji after every sentence. Never add emojis to pad length.
-Relevant: 🍛 🦀 🍤 🍚 🍜 🥭 🍋 🌶️ 😍 🥹 🤤 🥰 ❤️ ✨ 🇹🇭 👀 🤯 😳 😋
-🍋 = lemon / 柠檬 ONLY. Never use 🍋 for mango / 芒果 / 芒果糯米饭.
+Approved list only: 🍛 🦀 🍤 🍚 🍜 🥭 🍋 🌶️ 😍 🥹 🤤 🥰 ❤️ ✨ 🇹🇭 👀 🤯 😳 😋
+Pick the one that fits: 蟹→🦀, 虾→🍤, 芒果→🥭, 柠檬/青柠→🍋, 饭→🍚, 冬阴功→🍜, 咖喱→🍛. Otherwise a mood emoji, or 🇹🇭 only when the sentence is actually about Thailand/Bangkok.
+🍋 = lemon / 柠檬 / 青柠 ONLY. Never use 🍋 for mango / 芒果 / 芒果糯米饭.
 🥭 = mango / 芒果 ONLY. Never use 🥭 for lemon / 柠檬.
 If the dish is 芒果糯米饭, use 🥭 not 🍋.
 Do NOT always use 🇹🇭 + 🍽️ + 🦀 + 😋 + 📍 + 🕐.
+Do NOT start every title 1 with 🇹🇭. Some title 1s have a list emoji, some have none. 🍽️ 📍 🕐 are not in the list.
 
 ${MALL_MENTION_RULES}
 
