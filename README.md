@@ -229,12 +229,12 @@ YOU 页标题：
 | --- | --- | --- | --- |
 | 1 | How much is the total expenses for this meal? | 必填 | THB 金额；生成成功后写入 `generations.mealExpenseThb` |
 | 2 | What did you enjoy most? | 多选可选 | The food / flavors / presentation / variety / atmosphere / service / overall experience |
-| 3 | What dish would you recommend the most? | 多选可选 | River Prawn Tom Yum / Crab Meat Curry / Stir-Fried Morning Glory / Pineapple Fried Rice / Mango Sticky Rice / Garlic Shrimp Egg Rice / Lemon Sea Bass / Curry Crab Claws / Sweet and Sour River Prawns / Green Curry Beef / Others（可填其他） |
-| 4 | Why do you recommend it? | 多选可选 | Delicious / Flavorful / Authentic / Fresh / Tender / Crispy / Fragrant / Rich / Creamy / Satisfying / Well-balanced（**没有 Others**） |
+| 3 | What dish would you recommend the most? | 多选可选 | River Prawn Tom Yum / Crab Meat Curry / Stir-Fried Morning Glory / Pineapple Fried Rice / Mango Sticky Rice / Scrambled Egg Rice / Lemon Sea Bass / Garlic Shrimp / Sweet and Sour River Prawns / Green Curry Beef / Others（可填其他） |
+| 4 | Why do you recommend it? | 多选可选 | 按所选菜品显示对应理由；可多选；另有 Other 自定义理由 |
 | 5 | Tell us more about your dining experience | 必填 | 多行文本框；只用于生成，不写入 Mongo |
 | 6 | Photos | 至少 1 张 | 1–5 张 JPG / JPEG / PNG / WEBP |
 
-中文菜名（问卷显示 / 标题与正文全称）：河虾冬阴功汤、蟹肉咖喱、炒空心菜、菠萝炒饭、芒果糯米饭、蒜炒虾仁滑蛋饭、柠檬鲈鱼、咖喱蟹脚、酸甜酱炒河虾、青咖喱牛肉、其他。封面叠字用短称：冬阴功、蟹肉咖喱、炒空心菜、菠萝炒饭、芒果糯米饭、虾仁滑蛋饭、柠檬鲈鱼、咖喱蟹脚、酸甜酱炒河虾、青咖喱牛肉。
+中文菜名（问卷显示 / 标题与正文全称）：河虾冬阴功汤、咖喱蟹肉、炒空心菜、菠萝炒饭、芒果糯米饭、滑蛋饭、青柠蒸鲈鱼、蒜炒虾仁、酸甜酱炒河虾、青咖喱牛肉、其他。封面叠字用短称：冬阴功、咖喱蟹肉、炒空心菜、菠萝炒饭、芒果糯米饭、滑蛋饭、青柠蒸鲈鱼、蒜炒虾仁、酸甜酱炒河虾、青咖喱牛肉。英文青柠蒸鲈鱼为 Steamed Sea Bass with Lime，泰文为 ปลากะพงนึ่งมะนาว。
 
 点 Continue 进入 Generating。RATE 答案不单独入库，生成成功后才写入 `generations`。
 

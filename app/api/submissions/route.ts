@@ -42,13 +42,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Missing submissionId or campaignId" }, { status: 400 });
     }
 
+    const customer = parseCustomer(body.customer);
     await upsertSubmission({
       submissionId,
       campaignId,
-      customer: parseCustomer(body.customer),
+      customer,
       customerType: parseOptionalString(body.customerType),
       visitFrequency: parseOptionalString(body.visitFrequency),
       mealExpenseThb: parseMealExpense(body.mealExpenseThb),
+      origin: parseOptionalString(body.origin) || customer?.location,
     });
 
     return NextResponse.json({ ok: true, submissionId });

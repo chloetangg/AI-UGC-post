@@ -17,6 +17,7 @@ export type SubmissionUpsert = {
   customerType?: string;
   visitFrequency?: string;
   mealExpenseThb?: number | null;
+  origin?: string;
 };
 
 export async function upsertSubmission(input: SubmissionUpsert) {
@@ -39,6 +40,9 @@ export async function upsertSubmission(input: SubmissionUpsert) {
   if (input.mealExpenseThb !== undefined) {
     set.mealExpenseThb = input.mealExpenseThb;
     set.mealExpenseCurrency = "THB";
+  }
+  if (input.origin !== undefined) {
+    set.origin = input.origin.trim();
   }
 
   await db.collection(SUBMISSIONS_COLLECTION).updateOne(

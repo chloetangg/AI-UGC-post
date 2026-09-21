@@ -17,9 +17,9 @@ export const OFFICIAL_COVER_DISHES: OfficialDishName[] = [
   },
   {
     id: "Crab Meat Curry",
-    full: "蟹肉咖喱",
-    cover: "蟹肉咖喱",
-    aliases: ["crab meat curry", "yellow curry crab meat", "curry crab meat", "咖喱蟹肉"],
+    full: "咖喱蟹肉",
+    cover: "咖喱蟹肉",
+    aliases: ["crab meat curry", "yellow curry crab meat", "curry crab meat", "蟹肉咖喱"],
   },
   {
     id: "Stir-Fried Morning Glory",
@@ -40,22 +40,28 @@ export const OFFICIAL_COVER_DISHES: OfficialDishName[] = [
     aliases: ["mango sticky rice", "芒果糯米", "糯米饭"],
   },
   {
-    id: "Garlic Shrimp Egg Rice",
-    full: "蒜炒虾仁滑蛋饭",
-    cover: "虾仁滑蛋饭",
-    aliases: ["garlic shrimp egg rice", "garlic shrimp with scrambled egg rice", "虾仁滑蛋饭", "蒜炒虾仁"],
+    id: "Scrambled Egg Rice",
+    full: "滑蛋饭",
+    cover: "滑蛋饭",
+    aliases: ["scrambled egg rice", "egg rice", "虾仁滑蛋饭", "蒜炒虾仁滑蛋饭"],
   },
   {
     id: "Lemon Sea Bass",
-    full: "柠檬鲈鱼",
-    cover: "柠檬鲈鱼",
-    aliases: ["lemon sea bass", "lemon fish", "鲈鱼"],
+    full: "青柠蒸鲈鱼",
+    cover: "青柠蒸鲈鱼",
+    aliases: [
+      "lemon sea bass",
+      "lemon fish",
+      "steamed sea bass with lime",
+      "鲈鱼",
+      "柠檬鲈鱼",
+    ],
   },
   {
-    id: "Curry Crab Claws",
-    full: "咖喱蟹脚",
-    cover: "咖喱蟹脚",
-    aliases: ["curry crab claws", "crab claws"],
+    id: "Garlic Shrimp",
+    full: "蒜炒虾仁",
+    cover: "蒜炒虾仁",
+    aliases: ["garlic shrimp", "garlic prawns", "shrimp garlic"],
   },
   {
     id: "Sweet and Sour River Prawns",
@@ -212,12 +218,9 @@ export function hasIllegalCoverDishShort(text: string, fullNames: string[] = [])
   for (const full of names) {
     if (full === "芒果糯米饭" && /芒果(?!糯米)/.test(hay)) return true;
     if (full === "菠萝炒饭" && /菠萝(?!炒饭)/.test(hay)) return true;
-    if (full === "柠檬鲈鱼" && hay.includes("鲈鱼") && !hay.includes("柠檬鲈鱼")) return true;
-    if (full === "咖喱蟹脚" && /咖喱蟹(?!脚)/.test(hay)) return true;
+    if (full === "青柠蒸鲈鱼" && hay.includes("鲈鱼") && !hay.includes("青柠蒸鲈鱼")) return true;
+    if (full === "咖喱蟹肉" && /咖喱蟹(?!肉)/.test(hay)) return true;
     if (full === "青咖喱牛肉" && /青咖喱(?!牛肉)/.test(hay)) return true;
-    if (full === "蒜炒虾仁滑蛋饭" && hay.includes("滑蛋饭") && !hay.includes("虾仁滑蛋饭") && !hay.includes("蒜炒虾仁滑蛋饭")) {
-      return true;
-    }
   }
   return false;
 }
@@ -230,7 +233,7 @@ export function formatCoverDishNameRules(dishes: string[] = []) {
   ]);
   return `COVER DISH NAMES — titles[] and caption still use the COMPLETE name. mainTitle / subTitle may only use these approved shorts (never invent another short):
 ${lines}
-Never 冬阴功汤 if the approved short is 冬阴功. Never 芒果 / 菠萝 / 鲈鱼 / 青咖喱 / 咖喱蟹 / 滑蛋饭 as a cover short.
+Never 冬阴功汤 if the approved short is 冬阴功. Never 芒果 / 菠萝 / 鲈鱼 / 青咖喱 / 咖喱蟹 as a cover short.
 If a customer-written dish is not in this table, keep its complete name. Do not shorten 泰式青咖喱鸡 to 青咖喱 or 泰式香辣打抛猪肉饭 to 打抛.
 A dish in subTitle is the ONE core reason — do not also add price or first-visit in the same line.
 Allowed cover names for this customer: ${allowed.join(" / ") || "none — do not invent a dish"}`;

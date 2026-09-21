@@ -53,6 +53,7 @@ import {
 } from "@/lib/locations";
 import type { LocationTimeFormatId } from "@/lib/locations";
 import { formatGenerationCostLog, type GenerationCostReport } from "@/lib/openai-usage";
+import { saveSubmissionToServer } from "@/lib/save-submission-client";
 import { createId } from "@/lib/id";
 import { compressPhotoForGenerate, compressPhotosForGenerate, makePhotoThumbUrl } from "@/lib/compress-photo";
 import type { FlowStep } from "@/lib/flow";
@@ -153,7 +154,7 @@ function isReviewFormComplete(customer: CustomerInfo, productFeedback: ProductFe
   return (
     isIdentityComplete(productFeedback) &&
     isKnownOriginCity(customer.location) &&
-    isMealExpenseRangeComplete(productFeedback.mealExpenseRange) &&
+    isMealExpenseRangeComplete(productFeedback.mealExpenseRange, productFeedback.totalMealExpense) &&
     isDiningExperienceNoteComplete(productFeedback.diningExperienceNote ?? "")
   );
 }
@@ -309,7 +310,28 @@ export function CampaignFlowProvider({
   }, [campaignId]);
 
   const saveFeelExpense = useCallback(async () => {
-    ensureSubmissionId(campaignId);
+    const submissionId = ensureSubmissionId(campaignId);
+    const current = getFlowSnapshot(campaignId);
+    const origin = current.customer.location.trim();
+    try {
+      await saveSubmissionToServer({
+        submissionId,
+        campaignId,
+        customer: {
+          ageRange: current.customer.ageRange,
+          gender: current.customer.gender,
+          location: origin,
+          countryIso2: current.customer.countryIso2,
+          countryCode: current.customer.countryCode,
+        },
+        customerType: current.productFeedback.customerType,
+        visitFrequency: current.productFeedback.visitFrequency,
+        mealExpenseThb: current.productFeedback.totalMealExpense,
+        origin,
+      });
+    } catch (error) {
+      console.error("[submissions] origin save failed", error);
+    }
   }, [campaignId]);
 
   const addPhotos = useCallback(

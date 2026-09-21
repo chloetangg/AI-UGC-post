@@ -20,10 +20,22 @@ export function formatMealExpense(amount: number | null) {
   return amount.toFixed(2);
 }
 
+export function parseMealExpenseBaht(text: string) {
+  const match = text.replace(/,/g, "").match(/\d+/);
+  if (!match) return null;
+  const amount = Number.parseInt(match[0] ?? "", 10);
+  if (!Number.isFinite(amount) || amount <= 0) return null;
+  return amount;
+}
+
 export function isMealExpenseComplete(amount: number | null | undefined) {
   return typeof amount === "number" && Number.isFinite(amount) && amount > 0;
 }
 
-export function isMealExpenseRangeComplete(range: string | null | undefined) {
+export function isMealExpenseRangeComplete(
+  range: string | null | undefined,
+  amount?: number | null,
+) {
+  if (range === "฿2,000+") return isMealExpenseComplete(amount);
   return Boolean(range && isMealExpenseRange(range));
 }

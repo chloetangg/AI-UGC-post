@@ -25,6 +25,7 @@ export function ReasonMultiSelect({
   placeholder,
   emptyLabel,
   disabled,
+  otherOption,
   onChange,
 }: {
   groups: ReasonGroup[];
@@ -32,13 +33,14 @@ export function ReasonMultiSelect({
   placeholder: string;
   emptyLabel: string;
   disabled?: boolean;
+  otherOption?: ReasonOption;
   onChange: (next: string[]) => void;
 }) {
   const { language, t } = useLanguage();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const selectedSet = new Set(selected);
-  const hasOptions = groups.some((group) => group.options.length > 0);
+  const hasOptions = groups.some((group) => group.options.length > 0) || Boolean(otherOption);
 
   function labelFor(value: string) {
     return recommendationReasonLabel(t, value);
@@ -142,6 +144,40 @@ export function ReasonMultiSelect({
               </div>
             ),
           )}
+          {otherOption ? (
+            <div className="border-t border-border py-1">
+              <ul role="listbox" aria-multiselectable="true">
+                <li>
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected={selectedSet.has(otherOption.value)}
+                    className={cn(
+                      "flex w-full items-start gap-3 px-4 py-2.5 text-left text-sm",
+                      selectedSet.has(otherOption.value)
+                        ? "bg-muted text-foreground"
+                        : "text-foreground hover:bg-muted/70",
+                    )}
+                    onClick={() => toggle(otherOption.value)}
+                  >
+                    <span
+                      className={cn(
+                        "mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border",
+                        selectedSet.has(otherOption.value)
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-border",
+                      )}
+                    >
+                      {selectedSet.has(otherOption.value) ? <Check className="size-3" strokeWidth={3} /> : null}
+                    </span>
+                    <span className="min-w-0 flex-1 whitespace-normal break-words">
+                      {labelFor(otherOption.value)}
+                    </span>
+                  </button>
+                </li>
+              </ul>
+            </div>
+          ) : null}
         </div>
       ) : null}
     </div>

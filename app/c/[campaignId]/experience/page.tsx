@@ -20,8 +20,9 @@ import {
   midpointForMealExpenseRange,
   pruneRecommendationReasons,
   reasonsForDish,
+  RECOMMENDATION_REASON_OTHER,
 } from "@/lib/recommendation-reasons";
-import { isMealExpenseRangeComplete } from "@/lib/meal-expense";
+import { isMealExpenseRangeComplete, parseMealExpenseBaht } from "@/lib/meal-expense";
 import {
   CUSTOMER_TYPES,
   ENJOY_MOST,
@@ -62,13 +63,15 @@ export default function ExperiencePage() {
 
   const identityReady = Boolean(feedback.customerType && visitFrequency);
   const originReady = isKnownOriginCity(customer.location);
-  const expenseReady = isMealExpenseRangeComplete(feedback.mealExpenseRange);
+  const expenseReady = isMealExpenseRangeComplete(feedback.mealExpenseRange, feedback.totalMealExpense);
   const noteReady = isDiningExperienceNoteComplete(feedback.diningExperienceNote);
   const photosReady = photos.length > 0;
   const ready = identityReady && originReady && expenseReady && noteReady && photosReady;
   const noteCount = countDiningExperienceUnits(feedback.diningExperienceNote);
   const selectedDishes = feedback.recommendedDishes.filter((dish) => dish !== "Others");
   const hasOthersDish = feedback.recommendedDishes.includes("Others");
+  const hasReasonOther = feedback.recommendTo.includes(RECOMMENDATION_REASON_OTHER);
+  const showReasonOther = selectedDishes.length > 0;
   const reasonGroups = selectedDishes.map((dish) => ({
     id: dish,
     label: t.options.recommendedDishes[dish],
@@ -119,26 +122,42 @@ export default function ExperiencePage() {
     });
   }
 
+  function keepRecommendToOther(recommendTo: string[], recommendedDishes: RecommendedDish[] = feedback.recommendedDishes) {
+    return recommendTo.includes(RECOMMENDATION_REASON_OTHER) || recommendedDishes.includes("Others")
+      ? feedback.recommendToOther
+      : "";
+  }
+
+  function patchRecommendTo(recommendTo: string[]) {
+    patchFeedback({
+      recommendTo,
+      recommendToOther: keepRecommendToOther(recommendTo),
+    });
+  }
+
   function toggleRecommendedDish(option: RecommendedDish) {
     if (option === "Others") {
       const selecting = !feedback.recommendedDishes.includes("Others");
       const recommendedDishes: RecommendedDish[] = selecting
         ? [...feedback.recommendedDishes, "Others"]
         : feedback.recommendedDishes.filter((item) => item !== "Others");
+      const recommendTo = pruneRecommendationReasons(feedback.recommendTo, recommendedDishes);
       patchFeedback({
         recommendedDishes,
         recommendedDishOther: selecting ? feedback.recommendedDishOther : "",
-        recommendToOther: selecting ? feedback.recommendToOther : "",
-        recommendTo: pruneRecommendationReasons(feedback.recommendTo, recommendedDishes),
+        recommendTo,
+        recommendToOther: keepRecommendToOther(recommendTo, recommendedDishes),
       });
       return;
     }
     const recommendedDishes: RecommendedDish[] = feedback.recommendedDishes.includes(option)
       ? feedback.recommendedDishes.filter((item) => item !== option)
       : [...feedback.recommendedDishes, option];
+    const recommendTo = pruneRecommendationReasons(feedback.recommendTo, recommendedDishes);
     patchFeedback({
       recommendedDishes,
-      recommendTo: pruneRecommendationReasons(feedback.recommendTo, recommendedDishes),
+      recommendTo,
+      recommendToOther: keepRecommendToOther(recommendTo, recommendedDishes),
     });
   }
 
@@ -146,18 +165,33 @@ export default function ExperiencePage() {
     const hasText = value.trim().length > 0;
     const withoutOthers = feedback.recommendedDishes.filter((item) => item !== "Others");
     const recommendedDishes: RecommendedDish[] = hasText ? [...withoutOthers, "Others"] : withoutOthers;
+    const recommendTo = pruneRecommendationReasons(feedback.recommendTo, recommendedDishes);
     patchFeedback({
       recommendedDishes,
       recommendedDishOther: value,
-      recommendToOther: hasText ? feedback.recommendToOther : "",
-      recommendTo: pruneRecommendationReasons(feedback.recommendTo, recommendedDishes),
+      recommendTo,
+      recommendToOther: keepRecommendToOther(recommendTo, recommendedDishes),
     });
   }
 
   function selectExpenseRange(range: MealExpenseRange) {
+    if (range === "฿2,000+") {
+      patchFeedback({
+        mealExpenseRange: range,
+        totalMealExpense: feedback.mealExpenseRange === "฿2,000+" ? feedback.totalMealExpense : null,
+      });
+      return;
+    }
     patchFeedback({
       mealExpenseRange: range,
       totalMealExpense: midpointForMealExpenseRange(range),
+    });
+  }
+
+  function setOver2000Amount(text: string) {
+    patchFeedback({
+      mealExpenseRange: "฿2,000+",
+      totalMealExpense: parseMealExpenseBaht(text),
     });
   }
 
@@ -264,7 +298,15 @@ export default function ExperiencePage() {
             selected={feedback.recommendTo}
             placeholder={t.experience.q6Placeholder}
             emptyLabel={t.experience.q6Empty}
-            onChange={(recommendTo) => patchFeedback({ recommendTo })}
+            otherOption={
+              showReasonOther
+                ? {
+                    value: RECOMMENDATION_REASON_OTHER,
+                    label: t.options.recommendTo[RECOMMENDATION_REASON_OTHER],
+                  }
+                : undefined
+            }
+            onChange={patchRecommendTo}
           />
           {feedback.recommendTo.length > 0 ? (
             <div className="flex flex-wrap gap-2">
@@ -274,15 +316,13 @@ export default function ExperiencePage() {
                   label={recommendationReasonLabel(t, reason)}
                   selected
                   onClick={() =>
-                    patchFeedback({
-                      recommendTo: feedback.recommendTo.filter((item) => item !== reason),
-                    })
+                    patchRecommendTo(feedback.recommendTo.filter((item) => item !== reason))
                   }
                 />
               ))}
             </div>
           ) : null}
-          {hasOthersDish ? (
+          {hasReasonOther || hasOthersDish ? (
             <Input
               value={feedback.recommendToOther}
               placeholder={t.experience.q6CustomPlaceholder}
@@ -311,18 +351,41 @@ export default function ExperiencePage() {
           <div>
             <h2 className="text-base font-semibold">{t.experience.qExpenseTitle}</h2>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {MEAL_EXPENSE_RANGES.map((range) => (
-              <ChoiceChip
-                key={range}
-                label={range}
-                selected={feedback.mealExpenseRange === range}
-                onClick={() => selectExpenseRange(range)}
-              />
-            ))}
+          <div className="flex flex-wrap items-start gap-2">
+            {MEAL_EXPENSE_RANGES.map((range) =>
+              range === "฿2,000+" ? (
+                <div key={range} className="space-y-2">
+                  <ChoiceChip
+                    label={range}
+                    selected={feedback.mealExpenseRange === range}
+                    onClick={() => selectExpenseRange(range)}
+                  />
+                  {feedback.mealExpenseRange === "฿2,000+" ? (
+                    <Input
+                      className="min-w-[16rem]"
+                      inputMode="numeric"
+                      placeholder={t.experience.qExpenseOverPlaceholder}
+                      value={feedback.totalMealExpense != null ? String(feedback.totalMealExpense) : ""}
+                      onChange={(event) => setOver2000Amount(event.target.value)}
+                    />
+                  ) : null}
+                </div>
+              ) : (
+                <ChoiceChip
+                  key={range}
+                  label={range}
+                  selected={feedback.mealExpenseRange === range}
+                  onClick={() => selectExpenseRange(range)}
+                />
+              ),
+            )}
           </div>
           {touched && !expenseReady ? (
-            <p className="text-xs text-destructive">{t.experience.qExpenseError}</p>
+            <p className="text-xs text-destructive">
+              {feedback.mealExpenseRange === "฿2,000+"
+                ? t.experience.qExpenseOverPlaceholder
+                : t.experience.qExpenseError}
+            </p>
           ) : null}
         </section>
 

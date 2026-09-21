@@ -282,7 +282,7 @@ export function packsMultipleCoverEvidence(text: string, context: CoverTitleCont
   });
   const hasDish =
     mentionsCoverDishName(hay, dishes) ||
-    /河虾冬阴功汤|冬阴功|蟹肉咖喱|炒空心菜|菠萝炒饭|芒果糯米饭|蒜炒虾仁滑蛋饭|虾仁滑蛋饭|柠檬鲈鱼|咖喱蟹脚|酸甜酱炒河虾|青咖喱牛肉/.test(hay);
+    /河虾冬阴功汤|冬阴功|咖喱蟹肉|炒空心菜|菠萝炒饭|芒果糯米饭|滑蛋饭|蒜炒虾仁|青柠蒸鲈鱼|酸甜酱炒河虾|青咖喱牛肉/.test(hay);
   const hasPrice = /\d+\s*(泰铢|THB)/i.test(hay);
   const hasFirst = /第一次/.test(hay);
   const hasMall = findCoverLocationKeywords(hay).length > 0;
@@ -451,7 +451,7 @@ Write a real Xiaohongshu cover headline: short, clickable, natural, one clear to
 Must include AT LEAST ONE pool keyword: 曼谷 / centralwOrld / 泰餐 / 美食 / 必吃
 The keyword must be woven into the experience hook. TWO are allowed only if it still reads as a headline. MAX 2 pool keywords. Never 3+.
 Priority: USER EXPERIENCE > specific food/scene > search keyword.
-GOOD: 曼谷泰餐遇到帅老板 / 曼谷吃饭被服务圈粉 / 曼谷逛街后来吃 / 曼谷泰餐蟹肉咖喱 / 曼谷这顿饭很放松
+GOOD: 曼谷泰餐遇到帅老板 / 曼谷吃饭被服务圈粉 / 曼谷逛街后来吃 / 曼谷泰餐咖喱蟹肉 / 曼谷这顿饭很放松
 BAD: 曼谷美食发现 / 曼谷泰餐推荐 / 曼谷美食推荐 / 曼谷泰餐美食必吃 / 曼谷centralwOrld泰餐美食必吃推荐
 Never use 曼谷美食发现 / 曼谷泰餐推荐 / 曼谷美食推荐 as a default or fallback template.
 Discovery covers (发现/推荐) are only one optional family — never the default when the dining note has a person, service, scene, atmosphere, or food reaction.
@@ -471,17 +471,17 @@ FORBIDDEN slang unless the customer asked for it: 绝绝子 / yyds / 狠狠爱�
 Spoken texture is allowed as a method, not a template: 没想到 / 原来 / 这口 / 这一道 / 居然 / 真的有点 / 吃出了 / 有点像 / 刚好 / 意外地 / 超爱的反而是 / 逛完刚好来吃. Do not paste these if the evidence does not support them.
 
 Pick ONE core evidence only. Then choose the highest style the evidence actually supports:
-1 curiosity (没想到超爱的是这道 / 这口蟹肉咖喱有点特别)
+1 curiosity (没想到超爱的是这道 / 这口咖喱蟹肉有点特别)
 2 contrast/surprise ONLY if the customer said something unexpected
 3 scene (逛完街来吃刚刚好 / 自己动手拌打抛饭)
 4 emotion already in the evidence (这顿吃下来很满足)
-5 information last (两人600泰铢吃得满足 / 蟹肉咖喱很有家常味)
-Never glue dish + price + first-visit. Never 蟹肉咖喱味道很像泰式家常菜而且两个人吃600泰铢.
+5 information last (两人600泰铢吃得满足 / 咖喱蟹肉很有家常味)
+Never glue dish + price + first-visit. Never 咖喱蟹肉味道很像泰式家常菜而且两个人吃600泰铢.
 Do not default to 菜名+很好吃 / 菜名+很有家常味 when a supported hook exists.
 Do not inflate: 不错 ≠ 惊艳到不行; 价格还可以 ≠ 吃到撑; 第一次来 ≠ 狠狠圈粉 / 彻底爱上; 喜欢 ≠ 直接封神.
 
-GOOD: 这口蟹肉咖喱像家的味道 / 没想到超爱的是这道 / 原来打抛饭也可以DIY / 逛完街来吃刚刚好 / 两个人吃下来很满足 / 老板本人很有记忆点 / 服务也很舒服
-BAD: 蟹肉咖喱很有家常味 (too flat if a hook exists) / 蟹肉咖喱很好吃 / 第一次来蟹肉咖喱很好吃 / 第一次来就被狠狠圈粉 / 精选泰式家常料理 / 老板很帅服务很好 (two facts glued)
+GOOD: 这口咖喱蟹肉像家的味道 / 没想到超爱的是这道 / 原来打抛饭也可以DIY / 逛完街来吃刚刚好 / 两个人吃下来很满足 / 老板本人很有记忆点 / 服务也很舒服
+BAD: 咖喱蟹肉很有家常味 (too flat if a hook exists) / 咖喱蟹肉很好吃 / 第一次来咖喱蟹肉很好吃 / 第一次来就被狠狠圈粉 / 精选泰式家常料理 / 老板很帅服务很好 (two facts glued)
 Length: 6–10 units, never empty, never a broken sentence. Do not copy the dining note verbatim. Do not repeat mainTitle.
 
 Customer evidence for subtitle (INTERNAL — pick ONE, then rewrite):
@@ -510,5 +510,5 @@ Ask: would a real Xiaohongshu user write this cover line? Would it spark a littl
 MainTitle: 4–7 units; ≥1 and ≤2 pool keywords; real headline not stuffing; not a shortened titles[] item; not previous cover formula; mall name only if true and relevant; no banned claims; no 最/第一/排名/全范围绝对化 (第一次/最近 OK); no hashtag/address/hours/emoji.
 SubTitle: 6–10 units; one complete natural sentence; one core reason from THIS visit; Xiaohongshu hook without new facts; approved dish shorts only; no concatenated evidence; no verbatim note; no mainTitle repeat; no fake praise, slang, or 让人惊艳 templates; no raw negatives; no 最爱 or other 最-ranking; no hashtag/address/hours/emoji.
 
-FALLBACK if mainTitle or subTitle fails: rebuild from diningExperienceNote first (person → service → scene → atmosphere → food), then selected dish, meal spend, first visit, enjoy-most, location convenience. Weave ONE pool keyword into the experience hook. Never concatenate 蟹肉咖喱600泰铢第一次来. Never fall back to 曼谷美食发现 / 曼谷泰餐推荐 / 曼谷美食推荐.`;
+FALLBACK if mainTitle or subTitle fails: rebuild from diningExperienceNote first (person → service → scene → atmosphere → food), then selected dish, meal spend, first visit, enjoy-most, location convenience. Weave ONE pool keyword into the experience hook. Never concatenate 咖喱蟹肉600泰铢第一次来. Never fall back to 曼谷美食发现 / 曼谷泰餐推荐 / 曼谷美食推荐.`;
 }

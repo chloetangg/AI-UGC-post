@@ -70,14 +70,14 @@ function firstDishShort(context: CoverTitleContext) {
   if (fromList) return coverDishShortName(chineseFullDishName(fromList as RecommendedDish) || fromList);
   const note = context.diningNote ?? "";
   const fromNote = [
-    "蟹肉咖喱",
+    "咖喱蟹肉",
     "冬阴功",
     "炒空心菜",
     "菠萝炒饭",
     "芒果糯米饭",
-    "虾仁滑蛋饭",
-    "柠檬鲈鱼",
-    "咖喱蟹脚",
+    "滑蛋饭",
+    "青柠蒸鲈鱼",
+    "蒜炒虾仁",
     "酸甜酱炒河虾",
     "青咖喱牛肉",
   ].find((name) => note.includes(name));

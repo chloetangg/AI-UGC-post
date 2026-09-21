@@ -1,4 +1,5 @@
 import { ensureRequiredHashtags, stripAllHashtagsFromCaption } from "@/lib/hashtags";
+import { stripGeneratedLocationTime } from "@/lib/locations";
 
 /** Official Rednote / Xiaohongshu in-app publish entry. No undocumented params. */
 export const REDNOTE_PUBLISH_DEEP_LINK = "xhsdiscover://post";
@@ -152,9 +153,9 @@ export function formatRednotePasteText(
   return formatXiaohongshuPasteText(pkg);
 }
 
-/** Dianping paste: generated caption only. No title, no hashtags. */
+/** Dianping paste: caption body only. No title, hashtags, or trailing store-name / Location & Time footer. */
 export function formatDianpingPasteText(pkg: Pick<RednotePublishPackage, "caption">) {
-  return pkg.caption.trim();
+  return stripGeneratedLocationTime(pkg.caption).trim();
 }
 
 /**

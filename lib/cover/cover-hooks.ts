@@ -98,7 +98,7 @@ HOOK-02 Adjective only if the meal supports it, prefer it in subTitle as the ONE
 HOOK-03 Reaction belongs in subTitle, not as a 3-character mainTitle. Do not invent 让人惊艳. Person/service facts from the dining note belong here.
 HOOK-04 Soft CTA lives in caption
 HOOK-05 Local identity ONLY with evidence. Never invent 泰国人爱吃.
-HOOK-06 Dish-led subtitle from a real selected dish or the dining note, using the approved cover short (冬阴功 not 河虾冬阴功汤; 虾仁滑蛋饭 not 蒜炒虾仁滑蛋饭). Prefer a curiosity/scene hook over 菜名+很好吃. One dish reason only — never glue dish + price + first-visit. Use this when the dining note is actually about food.
+HOOK-06 Dish-led subtitle from a real selected dish or the dining note, using the approved cover short (冬阴功 not 河虾冬阴功汤; 青柠蒸鲈鱼 not 鲈鱼). Prefer a curiosity/scene hook over 菜名+很好吃. One dish reason only — never glue dish + price + first-visit. Use this when the dining note is actually about food.
 HOOK-07 Warm home-style / comfortable atmosphere in subTitle when the note supports it
 HOOK-08 Location or mall-stop in the title only when it is the hook, e.g. 逛街后来吃. Never force centralwOrld.
 

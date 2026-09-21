@@ -272,6 +272,7 @@ export async function POST(request: Request) {
         customerType: payload.customerType,
         visitFrequency: payload.visitFrequency,
         mealExpenseThb: payload.totalMealExpense,
+        origin: payload.dinerOrigin,
         titles: evidenceTitles,
         caption: located.caption,
         hashtags,

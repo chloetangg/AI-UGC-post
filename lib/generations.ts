@@ -23,6 +23,7 @@ export type GenerationDocument = {
   customerType: string;
   visitFrequency: string;
   mealExpenseThb: number | null;
+  origin: string;
   titles: [string, string, string];
   caption: string;
   hashtags: [string, string, string, string, string];
@@ -63,6 +64,7 @@ export type InsertGenerationInput = {
   customerType?: string;
   visitFrequency?: string;
   mealExpenseThb?: number | null;
+  origin?: string;
   titles: [string, string, string];
   caption: string;
   hashtags: [string, string, string, string, string] | string[];
@@ -125,6 +127,7 @@ export async function insertGeneration(input: InsertGenerationInput) {
     customerType: input.customerType?.trim() || "",
     visitFrequency: input.visitFrequency?.trim() || "",
     mealExpenseThb: mealExpenseThb(input.mealExpenseThb),
+    origin: input.origin?.trim() || input.customer?.location?.trim() || "",
     titles: asTriple(input.titles),
     caption: input.caption,
     hashtags: asFive(input.hashtags),

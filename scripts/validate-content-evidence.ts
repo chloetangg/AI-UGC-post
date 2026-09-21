@@ -22,13 +22,13 @@ function layersHit(titles: string[], caption: string, cover: string, markers: st
 const case1Context = {
   diningNote: "老板很帅，服务很好",
   dishes: ["Crab Meat Curry"],
-  recommendTo: ["蟹肉咖喱味道很浓郁"],
+  recommendTo: ["咖喱蟹肉味道很浓郁"],
   enjoyMost: ["店员服务热情周到"],
 };
 
 const case1 = ensureEvidenceLedCopy({
   titles: ["曼谷美食发现", "曼谷美食推荐", "曼谷泰餐推荐"],
-  caption: "来曼谷当然要安排一顿泰国菜。蟹肉咖喱也不错。",
+  caption: "来曼谷当然要安排一顿泰国菜。咖喱蟹肉也不错。",
   coverTitle: "曼谷美食发现",
   coverSubtitle: "这几道菜还想再点",
   context: case1Context,
@@ -66,7 +66,7 @@ assert(/服务|第一次/.test(`${overlay3.title}${overlay3.subtitle}`), `case3 
 console.log(`case3 overlay: ${overlay3.title} | ${overlay3.subtitle}`);
 
 const case4Context = {
-  diningNote: "没有特别的服务体验，主要是蟹肉咖喱很好吃。",
+  diningNote: "没有特别的服务体验，主要是咖喱蟹肉很好吃。",
   dishes: ["Crab Meat Curry"],
 };
 const facts4 = extractExperienceFacts(case4Context);

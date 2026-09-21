@@ -34,7 +34,7 @@ const scenarios: Array<{ name: string; input: StrategyEvidence; expect: Partial<
       visitFrequency: "Not first time",
       recommendedDishes: ["Crab Meat Curry"],
       recommendTo: ["Delicious", "Flavorful"],
-      diningExperienceNote: "蟹肉咖喱真的很好吃，味道很香",
+      diningExperienceNote: "咖喱蟹肉真的很好吃，味道很香",
     },
     expect: { ksp: ["KSP-04"], storyline: ["ST-02", "ST-08"], angle: ["CA-02", "CA-03"] },
   },

@@ -7,6 +7,7 @@ export async function saveSubmissionToServer(input: {
   customerType?: string;
   visitFrequency?: string;
   mealExpenseThb?: number | null;
+  origin?: string;
 }) {
   const response = await fetch("/api/submissions", {
     method: "POST",
@@ -26,6 +27,7 @@ export async function saveSubmissionToServer(input: {
       customerType: input.customerType,
       visitFrequency: input.visitFrequency,
       mealExpenseThb: input.mealExpenseThb,
+      origin: input.origin ?? input.customer?.location,
     }),
     keepalive: true,
   });
