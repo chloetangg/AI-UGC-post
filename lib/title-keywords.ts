@@ -1,4 +1,7 @@
+import { isUnnaturalHeadline } from "@/lib/cover/cover-natural";
+
 export const PRIMARY_BANGKOK_TITLE_KEYWORDS = [
+  "曼谷必吃",
   "曼谷美食推荐",
   "曼谷美食攻略",
   "曼谷吃什么",
@@ -69,8 +72,11 @@ export function evaluateTitleKeywords(
   const reasons: string[] = [];
 
   if (cleaned.length < 3) reasons.push("Need exactly 3 titles.");
-  if (missingIndexes.length > 0) {
-    reasons.push(`Titles missing a Bangkok food keyword: ${missingIndexes.map((i) => i + 1).join(", ")}.`);
+  if (cleaned.some((title) => isUnnaturalHeadline(title))) {
+    reasons.push("A title failed the natural Chinese check.");
+  }
+  if (unique.length === 0) {
+    reasons.push("At least one title must naturally include a Bangkok food keyword.");
   }
   if (unique.length === 1 && keywords.filter(Boolean).length >= 3) {
     reasons.push(`All 3 titles use the same keyword: ${unique[0]}.`);
@@ -80,7 +86,7 @@ export function evaluateTitleKeywords(
   }
 
   return {
-    ok: reasons.length === 0 && cleaned.length >= 3 && missingIndexes.length === 0,
+    ok: reasons.length === 0 && cleaned.length >= 3 && unique.length >= 1,
     keywords,
     uniqueCount: unique.length,
     freshCount,
@@ -118,7 +124,9 @@ export function ensureTitleKeywords(
       keyword = nextUnusedKeyword(used, previous, pool);
       const flag = title.startsWith("🇹🇭") ? "🇹🇭" : "";
       const rest = title.replace(/^🇹🇭\s*/, "");
-      title = rest.startsWith(keyword) ? `${flag}${rest}` : `${flag}${keyword}，${rest}`;
+      const woven = rest.startsWith(keyword) ? `${flag}${rest}` : `${flag}${keyword}｜${rest}`;
+      title = isUnnaturalHeadline(woven) || isUnnaturalHeadline(rest) ? rest : woven;
+      keyword = keywordInTitle(title);
     } else if (used.has(keyword)) {
       const replacement = nextUnusedKeyword(used, previous, pool);
       title = title.replace(keyword, replacement);
@@ -143,8 +151,9 @@ export function ensureTitleKeywords(
 export function formatTitleKeywordRules() {
   return `TITLE SEARCH KEYWORDS — auxiliary only, never the topic.
 Real customer input and confirmed restaurant facts outrank generic keywords. Keywords must not invent a story.
-Each of the 3 titles must naturally contain at least one Bangkok food search keyword from the strategy library (primary preferred; secondary allowed).
-Prefer 3 different keywords in the same generation. Integrate them as a real Xiaohongshu title, not SEO glue.
+At least one of the 3 titles must naturally contain one of: 曼谷必吃 / 曼谷美食 / 曼谷泰餐 / 曼谷吃什么 / 曼谷美食推荐 / 曼谷泰菜 / 曼谷餐厅 / 曼谷吃饭 / 曼谷美食攻略 / 曼谷探店.
+Prefer 3 different keywords when they still read as real Xiaohongshu titles. Never glue 曼谷 onto a broken stub (曼谷超爱次来吃 / 曼谷很值得来吃 / 曼谷推荐来吃).
+If a keyword cannot sit naturally, switch phrase. Natural complete Chinese outranks stuffing every title.
 Do NOT require the same keyword in every title.
 Do NOT use 必吃 / 最好吃 / 封神 / 顶级 / 曼谷第一 as a title hook.
 Never use the same stuffed pattern in all 3 titles (e.g. 曼谷超好吃泰餐 / 曼谷超地道泰餐 / 曼谷超温馨泰餐).

@@ -7,6 +7,7 @@ import {
   mentionsCoverDishName,
 } from "./dish-names";
 import { sanitizeCoverLine, toCoverGraphemes } from "./cover-title-text";
+import { formatCoverNaturalRules } from "./cover-natural";
 
 export const COVER_LOCATION_KEYWORDS = [
   "centralwOrld",
@@ -423,10 +424,12 @@ export function coverFallbackPairs(context: CoverTitleContext = {}) {
   const location = selectedCoverLocation(context.branch);
   const subtitle = subtitleFromCoverContext(context);
   const pairs = [
-    { title: "曼谷泰餐新体验", subtitle },
+    { title: "曼谷泰餐推荐", subtitle },
+    { title: "曼谷必吃泰菜", subtitle },
+    { title: "曼谷吃什么？", subtitle },
+    { title: "曼谷美食探店", subtitle },
     { title: "曼谷吃饭很舒服", subtitle },
     { title: "必吃泰式料理", subtitle },
-    { title: "曼谷隐藏泰餐", subtitle },
   ];
   if (location === "centralwOrld" && /逛|商场|方便/.test(context.diningNote ?? "")) {
     pairs.unshift(
@@ -463,11 +466,11 @@ Write a real Xiaohongshu cover headline: short, clickable, natural, one clear to
 Must include AT LEAST ONE pool keyword: 曼谷 / centralwOrld / 泰餐 / 美食 / 必吃
 The keyword must be woven into the experience hook. TWO are allowed only if it still reads as a headline. MAX 2 pool keywords. Never 3+.
 Priority: USER EXPERIENCE > specific food/scene > search keyword.
-GOOD: 曼谷泰餐遇到帅老板 / 曼谷吃饭被服务圈粉 / 曼谷逛街后来吃 / 曼谷泰餐咖喱蟹肉 / 曼谷这顿饭很放松
-BAD: 曼谷美食发现 / 曼谷泰餐推荐 / 曼谷美食推荐 / 曼谷泰餐美食必吃 / 曼谷centralwOrld泰餐美食必吃推荐
-Never use 曼谷美食发现 / 曼谷泰餐推荐 / 曼谷美食推荐 as a default or fallback template.
-Discovery covers (发现/推荐) are only one optional family — never the default when the dining note has a person, service, scene, atmosphere, or food reaction.
-Length: 4–7 units. Han=1. centralwOrld=1. Terminal 21 / Siam Center / One Bangkok=2. Baan Ying=2. Other Latin/digits=0.5 rounded up.
+GOOD: 曼谷泰餐遇到帅老板 / 老板很帅的曼谷泰餐 / 曼谷必吃泰菜 / 曼谷吃什么？ / 曼谷美食探店 / 曼谷泰餐推荐
+BAD: 曼谷超爱次来吃 / 曼谷很值得来吃 / 曼谷推荐来吃 / 曼谷好吃必吃 / 曼谷美食来打卡 / 曼谷超推荐吃 / 曼谷爱吃这家 / 曼谷泰餐美食必吃
+Never glue 曼谷 onto a broken stub to satisfy a keyword. If a phrase cannot sit naturally, switch phrase.
+Never use 曼谷美食发现 as a default when the dining note has a person, service, scene, atmosphere, or food reaction.
+Length: 4–10 units MAX. Not a target. Han=1. centralwOrld=1. Terminal 21 / Siam Center / One Bangkok=2. Baan Ying=2. Other Latin/digits=0.5 rounded up. Prefer a short complete line over padding to 10.
 Do not copy titles[]. Do not shorten a post title. Do not copy the previous cover formula (changing only 推荐/泰菜 is NOT a new title).
 Mall names only when location is the hook (mall KSP / shopping route). Food-led posts must not force a mall name. Never name a place the customer did not visit.
 Previous coverTitle (do not copy): ${previousMain}
@@ -515,12 +518,15 @@ FORBIDDEN except cover keyword 必吃: 第一 (except 第一次/第一道) / 唯
 
 ${formatCoverAbsoluteRules()}
 
+${formatCoverNaturalRules()}
+
 No hashtag, address, hours, emoji, Location & Time. Never invent a dish.
 
 QUALITY CHECK before return — if any item fails, rewrite from the same single evidence, do not output:
+1. Natural spoken Chinese? 2. Grammar OK? 3. No typo / missing / repeated character? 4. No keyword glue? 5. Tied to this customer's input? 6. Sounds like a Xiaohongshu cover? 7. ≤10 units and not padded? 8. If 曼谷 is used, is it natural?
 Ask: would a real Xiaohongshu user write this cover line? Would it spark a little curiosity while staying true?
-MainTitle: 4–7 units; ≥1 and ≤2 pool keywords; real headline not stuffing; not a shortened titles[] item; not previous cover formula; mall name only if true and relevant; no banned claims; no 最/第一/排名/全范围绝对化 (第一次/最近 OK); no hashtag/address/hours/emoji.
+MainTitle: 4–10 units MAX; ≥1 and ≤2 pool keywords; real headline not stuffing; not a shortened titles[] item; not previous cover formula; mall name only if true and relevant; no banned claims; no 最/第一/排名/全范围绝对化 (第一次/最近 OK); no hashtag/address/hours/emoji.
 SubTitle: 6–10 units; one complete natural sentence; one core reason from THIS visit; Xiaohongshu hook without new facts; approved dish shorts only; no concatenated evidence; no verbatim note; no mainTitle repeat; no fake praise, slang, or 让人惊艳 templates; no raw negatives; no 最爱 or other 最-ranking; no hashtag/address/hours/emoji.
 
-FALLBACK if mainTitle or subTitle fails: rebuild from diningExperienceNote first (person → service → scene → atmosphere → food), then selected dish, meal spend, first visit, enjoy-most, location convenience. Weave ONE pool keyword into the experience hook. Never concatenate 咖喱蟹肉600泰铢第一次来. Never fall back to 曼谷美食发现 / 曼谷泰餐推荐 / 曼谷美食推荐.`;
+FALLBACK if mainTitle or subTitle fails: rebuild from diningExperienceNote first (person → service → scene → atmosphere → food), then selected dish, meal spend, first visit, enjoy-most, location convenience. Weave ONE keyword phrase only if it stays natural. Never concatenate 咖喱蟹肉600泰铢第一次来. Never fall back to 曼谷超爱次来吃 / 曼谷美食发现. A complete short line such as 曼谷泰餐推荐 is allowed only when no stronger customer hook exists.`;
 }

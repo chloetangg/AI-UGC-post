@@ -4,6 +4,7 @@ import {
   isCoverKeywordStuffing,
   type CoverTitleContext,
 } from "@/lib/cover/cover-rules";
+import { isNaturalCoverChinese } from "@/lib/cover/cover-natural";
 import { sanitizeCoverLine } from "@/lib/cover/cover-title-text";
 import { chineseFullDishName, coverDishShortName } from "@/lib/cover/dish-names";
 import type { RecommendedDish } from "@/types/content";
@@ -113,7 +114,7 @@ export function extractExperienceFacts(context: CoverTitleContext = {}): Experie
       kind: "person",
       hookType: "personal-experience",
       markers: ["老板", "帅"],
-      coverMains: ["遇到帅老板", "这家老板好帅", "老板好帅"],
+      coverMains: ["老板很帅的曼谷泰餐", "遇到帅老板", "这家老板好帅", "老板好帅"],
       coverSubs: ["老板本人很有记忆点", "来吃饭被老板帅到了"],
       titleHooks: ["曼谷泰餐遇到帅老板", "这家泰餐老板也太帅了", "来吃饭居然被老板帅到了"],
       captionLine: "这顿还有个记忆点，老板本人真的很有印象。",
@@ -216,7 +217,7 @@ export function extractExperienceFacts(context: CoverTitleContext = {}): Experie
       kind: "food",
       hookType: "food",
       markers: [dishShort, ...(reasons ? [reasons.slice(0, 4)] : [])].filter(Boolean),
-      coverMains: [dishShort, "超爱这道", "这道真香"].filter(Boolean),
+      coverMains: ["曼谷必吃", dishShort, "这道真香"].filter(Boolean),
       coverSubs: [`这口${dishShort}很香`.slice(0, 20), "吃完还想再点", "这道真的很香"].filter(
         (line) => line.length >= 4,
       ),
@@ -310,9 +311,9 @@ export function extractExperienceFacts(context: CoverTitleContext = {}): Experie
       kind: "atmosphere",
       hookType: "atmosphere",
       markers: ["家人", "带娃", "小朋友"],
-      coverMains: ["带家人来吃", "很适合家庭"],
+      coverMains: ["曼谷吃什么？", "带家人来吃", "很适合家庭"],
       coverSubs: ["带家人吃饭很舒服", "很适合家庭用餐"],
-      titleHooks: ["带家人来吃泰餐很舒服", "很适合家庭用餐"],
+      titleHooks: ["曼谷吃什么？这家泰餐很适合带娃", "带家人来吃泰餐很舒服"],
       captionLine: "很适合带家人一起吃饭。",
     });
   } else if (partyKinds.has("family-suitable")) {
@@ -321,9 +322,9 @@ export function extractExperienceFacts(context: CoverTitleContext = {}): Experie
       kind: "atmosphere",
       hookType: "atmosphere",
       markers: ["家庭用餐"],
-      coverMains: ["很适合家庭用餐", "氛围很温馨"],
+      coverMains: ["曼谷吃什么？", "很适合家庭用餐", "氛围很温馨"],
       coverSubs: ["很适合家庭用餐", "氛围也比较温馨"],
-      titleHooks: ["很适合家庭用餐", "这家吃饭氛围很温馨"],
+      titleHooks: ["曼谷吃什么？这家泰餐很适合带娃", "很适合家庭用餐"],
       captionLine: "很适合家庭用餐，氛围也比较放松。",
     });
   }
@@ -361,21 +362,22 @@ function tryCoverMain(hook: string) {
   const cleaned = sanitizeCoverLine(hook);
   const candidates = [
     cleaned,
-    `曼谷${cleaned}`,
-    `泰餐${cleaned}`,
     `曼谷泰餐${cleaned}`,
-    `美食${cleaned}`,
+    `${cleaned}的曼谷泰餐`,
+    `泰餐${cleaned}`,
     cleaned.replace(/^这家/, "曼谷"),
+    `曼谷${cleaned}`,
+    `美食${cleaned}`,
   ];
   for (const raw of candidates) {
     const line = sanitizeCoverLine(raw);
     const units = countCoverUnits(line);
     if (
       units >= 4 &&
-      units <= 7 &&
+      units <= 10 &&
       hasCoverTitleKeyword(line) &&
       !isCoverKeywordStuffing(line) &&
-      !isBannedDiscoveryFallback(line)
+      isNaturalCoverChinese(line)
     ) {
       return line;
     }

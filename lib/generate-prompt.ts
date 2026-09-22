@@ -12,7 +12,9 @@ import { classifyCoverHookType, formatEvidencePriorityRules, previousPrimaryExpe
 import { formatGenerationVariationRules, planGenerationVariation, type GenerationMemory } from "@/lib/generation-variation";
 import { formatPartySizeRules } from "@/lib/party-size";
 import { allDishNameHints, chineseFullDishName, formatCaptionDishNameRules } from "@/lib/cover/dish-names";
-import { formatCaptionConsumerVoiceRules } from "@/lib/caption-voice";
+import { formatCaptionConsumerVoiceRules, formatNaturalHumanWritingRules } from "@/lib/caption-voice";
+import { buildEvidenceMap, formatContentLockRules } from "@/lib/content-lock";
+import { formatNarrativeFlowRules } from "@/lib/narrative-flow";
 import { formatStrategyLibrary, formatStrategySelection } from "@/lib/content-strategy/format";
 import type { ContentStrategyLibrary } from "@/lib/content-strategy/types";
 import type { BrandContext, Campaign } from "@/types/campaign";
@@ -68,7 +70,7 @@ export const generatePostJsonSchema = {
       mainTitle: {
         type: "string",
         description:
-          "Independent Xiaohongshu COVER mainTitle. Lived-experience headline first, then weave AT LEAST ONE and AT MOST TWO keywords from 曼谷 / centralwOrld / 泰餐 / 美食 / 必吃. Keyword is SEO, not the topic. Never default to 曼谷美食发现 / 曼谷泰餐推荐 / 曼谷美食推荐. 4–7 units. Han=1, centralwOrld=1, Terminal 21/Siam Center/One Bangkok=2. No emoji. No ranking/absolute language: 最 / 第一 / 最爱 / 天花板 / No.1 / 全曼谷 — rewrite to 超爱 / 很喜欢. If a dish is named, use the approved cover short only. Never shorten titles[]. Never copy the previous cover formula.",
+          "Independent Xiaohongshu COVER mainTitle. Must pass a natural Chinese check before output: complete grammar, native collocation, no typo/missing/repeated character, not keyword glue. Lived-experience headline first, then weave one natural phrase such as 曼谷必吃 / 曼谷美食 / 曼谷泰餐 / 曼谷吃什么 / 曼谷探店 only if it sits naturally. Never 曼谷超爱次来吃 / 曼谷很值得来吃 / 曼谷推荐来吃 / 曼谷好吃必吃. 4–10 units MAX, not a target — shorter complete lines win. Han=1, centralwOrld=1, Terminal 21/Siam Center/One Bangkok=2. No emoji. No ranking/absolute language: 最 / 第一 / 最爱 / 天花板 / No.1 / 全曼谷 — rewrite to a natural line, not 曼谷超爱. If a dish is named, use the approved cover short only. Never shorten titles[]. Never copy the previous cover formula.",
       },
       subTitle: {
         type: "string",
@@ -265,15 +267,16 @@ If they selected Fresh / Tender / Creamy / etc., weave those in. If they did not
 ${formatStrategyLibrary(library)}
 
 INTERNAL PROCESS (do not print KSP / Storyline / Content Angle / Search Keyword names in the post):
-1. Extract customer evidence. diningExperienceNote is Priority 1. Then enjoy-most / dishes / reasons. Then identity/scene. Brand/KSP/search keyword last.
-2. Form PRIMARY EXPERIENCE, SECONDARY EXPERIENCE, FOOD ANGLE, SEARCH KEYWORD. Search keyword is SEO only.
-3. Select KSP from evidence. Customer evidence > photos > brand context > compatibility matrix.
-4. Select a compatible Storyline as NARRATIVE INTENTION only. Never a fixed opening or paragraph template.
-5. Select the most natural Content Angle from the lived evidence — not a default dish-recommendation angle.
-6. Select a Search Keyword and weave it naturally into at least one title. Do not let it become the topic.
-7. Generate 3 titles, 1 caption, 5 hashtags, mainTitle, subTitle, photo selection, and return the chosen strategy ids in JSON.
-8. Choose 4 random hashtags from the approved pool. Always include #baanying曼谷. Shuffle all 5. Do not invent tags. Do not hard-code hashtags by Storyline.
-9. At most ONE small brand detail if it helps; otherwise omit brand history. KSP-03 is low-frequency.
+1. Extract ONE shared Evidence Map. diningExperienceNote is Priority 1. Then like/dislike/most memorable, favorite/recommended dish, reasons, enjoy-most, identity/scene. Brand/KSP/search keyword last.
+2. Lock Primary Content from that map. Title, caption, and cover must share it. Do not pick a new hero dish per field.
+3. Form PRIMARY EXPERIENCE, SECONDARY EXPERIENCE, FOOD ANGLE, SEARCH KEYWORD. Search keyword is SEO only.
+4. Select KSP from evidence. Customer evidence > photos > brand context > compatibility matrix.
+5. Select a compatible Storyline as NARRATIVE INTENTION only. Never a fixed opening or paragraph template.
+6. Select the most natural Content Angle from the lived evidence — not a default dish-recommendation angle.
+7. Select a Search Keyword and weave it naturally into at least one title. Do not let it become the topic.
+8. Group facts first (scene / primary dish / supporting / other / overall). Re-order into a natural story — never form-answer order. Same-dish facts stay in one stretch. Attributes stay on the correct dish. After Ending, do not open a new dish thread. Then write Caption around Primary Content, then Titles, then Cover. Then cross-check they agree. Return the chosen strategy ids in JSON.
+9. Choose 4 random hashtags from the approved pool. Always include #baanying曼谷. Shuffle all 5. Do not invent tags. Do not hard-code hashtags by Storyline.
+10. At most ONE small brand detail if it helps; otherwise omit brand history. KSP-03 is low-frequency.
 
 TITLES: Exactly 3 Simplified Chinese titles with different editorial angles AND different formats.
 Extract real customer facts FIRST, then write. Do not invent a trendy Xiaohongshu line and then justify it.
@@ -299,6 +302,8 @@ Forbidden: the same opening every time; intro+experience+recommend+summary every
 Do not always start with the restaurant name or 作为游客 / 来到曼谷 / 这次我选择 / 如果你也 / 最近在找.
 
 ${formatCaptionConsumerVoiceRules()}
+
+${formatNaturalHumanWritingRules()}
 
 CUSTOMER STORYTELLING:
 Customer-written notes are INTERNAL evidence AND the highest-priority content source for titles, caption, AND cover — not caption-only.
@@ -386,7 +391,7 @@ VALIDATE before returning:
 - if several customer selections exist, describe more than one of them; do not list tags; do not change their sentiment
 - caption reads like a diner who just ate, not a brand/travel-media script; keep mixed like/so-so/dislike from evidence; no invented flaws; no forced summary CTA; no copied reference-review sentences
 - 5 hashtags: always #baanying曼谷 plus 4 different tags from the approved pool, shuffled into random order
-- 1 independent mainTitle: lived-experience hook first, then 1–2 pool keywords (曼谷 / centralwOrld / 泰餐 / 美食 / 必吃), never 曼谷美食发现 / 曼谷泰餐推荐 / 曼谷美食推荐 as the whole idea, a real headline not a keyword dump, 4–7 units (centralwOrld=1; Terminal 21/Siam Center/One Bangkok=2); subTitle is one Xiaohongshu hook from a DIFFERENT slice of the same visit, 6–10 units, not concatenated, not 招牌泰式料理 / 让人惊艳 / 菜名很好吃, not slang. No 最/第一/最爱/天花板/冠军/全曼谷 ranking language — rewrite to 超爱 / 很喜欢 / 很想再吃. Approved cover dish shorts only. No emoji. Never a broken sentence. Not copied from titles[]. Do not reuse the previous cover formula.
+- 1 independent mainTitle that passed the natural Chinese check: lived-experience hook first; one keyword phrase only if natural; never 曼谷超爱次来吃 / 曼谷很值得来吃 / 曼谷推荐来吃; 4–10 units MAX (centralwOrld=1; Terminal 21/Siam Center/One Bangkok=2), do not pad; subTitle is one Xiaohongshu hook from a DIFFERENT slice of the same visit, 6–10 units, not concatenated, not 招牌泰式料理 / 让人惊艳 / 菜名很好吃, not slang. No 最/第一/最爱/天花板/冠军/全曼谷 ranking language — rewrite to a natural line, not 曼谷超爱. Approved cover dish shorts only. No emoji. Never a broken sentence. Not copied from titles[]. Do not reuse the previous cover formula.
 - selectedPhotoIndex in range; selectedPhotoIndexes unique and in range
 - suitableTemplateIds lists ONLY styles that pass composition fit (not all 6 by default); if none fit, ["photo-only"]; selectedTemplateId is one of those IDs and is not copied from the sample JSON
 - remainingPhotoOrder uses original uploads only: four-grid re-sorts ALL photos; non-grid excludes the cover source and never repeats it
@@ -486,6 +491,15 @@ export function buildUserPrompt(input: GenerateRequestBody) {
     previousTitles: input.previousTitles ?? [],
     previousMemories: input.previousGenerationMemories as GenerationMemory[] | undefined,
   });
+  const lockContext = {
+    diningNote,
+    dishes: dishNames,
+    enjoyMost: [...input.enjoyMost.filter((item) => item !== "其他"), input.enjoyMostOther?.trim() ?? ""].filter(Boolean),
+    recommendTo: reasonNames,
+    visitFrequency: input.visitFrequency,
+    customerType: input.customerType,
+  };
+  const evidenceMap = buildEvidenceMap(lockContext);
 
   const previousBlock =
     previousTitle || previousCaption
@@ -575,6 +589,8 @@ ${formatEvidencePriorityRules(
   input.previousTitles ?? [],
 )}
 ${formatGenerationVariationRules(variationPlan, input.previousGenerationMemories as GenerationMemory[] | undefined)}
+${formatContentLockRules(evidenceMap)}
+${formatNarrativeFlowRules(lockContext, evidenceMap)}
 ${formatPartySizeRules({
   diningNote,
   enjoyMost: [...input.enjoyMost.filter((item) => item !== "其他"), input.enjoyMostOther?.trim() ?? ""].filter(Boolean),
@@ -600,7 +616,7 @@ ${formatCoverTitleRules({
   visitFrequency: input.visitFrequency,
   customerType: input.customerType,
 })}
-Cover overlay: write mainTitle + subTitle in THIS JSON. No extra API call. No emoji. Lived experience first, then one pool keyword woven in, then length. Never default to 曼谷美食发现 / 曼谷泰餐推荐 / 曼谷美食推荐. mainTitle: 1–2 pool keywords from 曼谷 / centralwOrld / 泰餐 / 美食 / 必吃, real headline not a dump, 4–7 units (Han=1, centralwOrld=1, Terminal 21/Siam Center/One Bangkok=2). subTitle: a DIFFERENT slice of the same visit — curiosity / scene / emotion, not a flat description. Never glue dish+price+first-visit. Never 招牌泰式料理 / 让人惊艳 / 绝绝子. Never invent 彻底爱上 / 吃到撑. 6–10 units without breaking grammar. GOOD: 曼谷泰餐遇到帅老板 + 服务也很舒服 / 曼谷逛街后来吃 + 店里坐着很舒服 / 曼谷泰餐咖喱蟹肉 + 这口很合口味. BAD: 曼谷美食发现 + 这几道菜还想再点 / 曼谷centralwOrld泰餐美食必吃推荐. 必吃 is allowed on the COVER only. No hashtag, address, hours.
+Cover overlay: write mainTitle + subTitle in THIS JSON. No extra API call. No emoji. Lived experience first. mainTitle must pass the natural Chinese check before output. Weave one keyword phrase only if it sits naturally. Never 曼谷超爱次来吃 / 曼谷很值得来吃 / 曼谷推荐来吃 / 曼谷好吃必吃. 4–10 units MAX, not a target. GOOD: 老板很帅的曼谷泰餐 + 服务也很舒服 / 曼谷必吃泰菜 + 这口很合口味 / 曼谷吃什么？ + 逛完街来吃刚刚好. BAD: 曼谷超爱次来吃 + 这几道菜还想再点 / 曼谷centralwOrld泰餐美食必吃推荐. 必吃 is allowed on the COVER only. No hashtag, address, hours.
 Cover photo: pick ONE selectedPhotoIndex from 0 to ${Math.max((input.photoCount || 1) - 1, 0)}. selectedPhotoIndexes[0] must equal selectedPhotoIndex. If photoCount >= 4 and the cover style is top-stroke or dual-line, also return 3 more unique indexes so selectedPhotoIndexes has the best 4 photos for the 2x2 grid.
 Cover style: analyze ALL attached photos (subject, position, safe area, crop risk, faces, dishes, storefronts). Return suitableTemplateIds with ONLY styles that can sit on the photos without covering or cropping the main subject. Do not list all 6 unless they all fit. If none fully fit, return ["photo-only"]. selectedTemplateId must be inside that list; the website then picks the final Style with history avoidance. Do not copy sample JSON template IDs. Diversity seed: ${input.variantIndex}.
 Body photos: original uploads only, never the composed cover file. Non-grid: exclude the cover source, then sort remainingPhotoOrder with one of the 6 patterns. Four-grid (photoCount >= 4 AND top-stroke / dual-line): keep ALL originals in the pool — including the 4 grid photos — and re-sort remainingPhotoOrder with the same 6 patterns. Do not copy the 2x2 order.

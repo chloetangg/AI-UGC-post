@@ -5,7 +5,8 @@
 const COVER_ABSOLUTE_REPLACEMENTS: Array<{ phrase: string; replacement: string }> = [
   { phrase: "必吃第一名", replacement: "很想再吃" },
   { phrase: "曼谷最好吃的泰餐", replacement: "超爱这家泰餐" },
-  { phrase: "曼谷最好吃", replacement: "曼谷超爱" },
+  { phrase: "曼谷最好吃泰餐", replacement: "曼谷泰餐" },
+  { phrase: "曼谷最好吃", replacement: "曼谷美食" },
   { phrase: "泰国最好吃", replacement: "超爱这家" },
   { phrase: "最好吃的", replacement: "超爱" },
   { phrase: "最好吃", replacement: "超爱" },
@@ -30,8 +31,8 @@ const COVER_ABSOLUTE_REPLACEMENTS: Array<{ phrase: string; replacement: string }
   { phrase: "天花板", replacement: "超爱" },
   { phrase: "无敌", replacement: "超爱" },
   { phrase: "全网第一", replacement: "超爱这家" },
-  { phrase: "曼谷第一泰餐", replacement: "曼谷超爱泰餐" },
-  { phrase: "曼谷第一", replacement: "曼谷超爱" },
+  { phrase: "曼谷第一泰餐", replacement: "曼谷泰餐" },
+  { phrase: "曼谷第一", replacement: "曼谷泰餐" },
   { phrase: "泰国第一", replacement: "超爱这家" },
   { phrase: "第一名", replacement: "超爱" },
   { phrase: "第一梯队", replacement: "超爱" },
@@ -56,6 +57,10 @@ export function sanitizeCoverAbsoluteLanguage(text: string) {
   next = next.replace(/100\s*%/g, "真的");
   next = next.replace(/第一(?!次|道)/g, "超爱");
   next = next.replace(/最(?!近|后|终)\S{0,2}/g, "超爱");
+  next = next.replace(/曼谷超爱次来吃/g, "曼谷泰餐");
+  next = next.replace(/超爱次来吃/g, "超爱这家");
+  next = next.replace(/曼谷超爱泰餐/g, "曼谷泰餐");
+  next = next.replace(/曼谷超爱/g, "曼谷");
   return next;
 }
 
@@ -80,7 +85,7 @@ Do not invent 一口就爱上 / 很惊喜 unless the evidence has that feeling.
 
 REWRITE:
 ❌ 曼谷最好吃的泰餐 → ✅ 超爱这家泰餐
-❌ 曼谷第一泰餐 → ✅ 曼谷超爱泰餐
+❌ 曼谷第一泰餐 → ✅ 曼谷泰餐
 ❌ 最好吃的蟹肉滑蛋 → ✅ 超爱蟹肉滑蛋
 ❌ 必吃的泰餐 → ✅ 很想再吃的泰餐
 ❌ 最正宗的泰餐 → ✅ 很有泰式风味

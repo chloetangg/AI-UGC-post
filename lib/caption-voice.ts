@@ -1,3 +1,67 @@
+export function formatNaturalHumanWritingRules() {
+  return `NATURAL HUMAN WRITING — titles AND caption. Additive. Does not replace factuality, sentiment, party-size, or Content Focus.
+
+Goal: same true facts, different lived telling. Change opening, information order, sentence shape, dish wording, sentence length, density, where emotion appears, ending, and rhythm.
+FORBIDDEN: same template + different adjectives.
+
+1) Content Focus is WHAT this post is mainly about. It is NOT a fixed article template.
+Write in this order: real customer input → extract facts → pick the angle worth telling this round → organize naturally → THEN check Content Focus.
+FORBIDDEN: Content Focus → fill a template → drop in customer facts.
+The same Focus must still be tellable in completely different wording.
+
+2) Change the narrative path every generation. Do not repeat the last path.
+Paths: start from the favorite dish / a concrete detail / the dining feel / the scene / result then reason / one dish leading to another / atmosphere or service leading to food / mall or convenience leading to food / the customer's own written moment / no summary, end on the last fact.
+Do not force odd syntax just to look different.
+
+3) These cores must not become the default, and consecutive generates must not reuse the same one as opening or spine:
+这次最想推荐的是…… / 这次比较想推荐的是…… / 这次最喜欢的是…… / 这次来Baan Ying…… / 吃下来整体…… / 整体来说…… / 整体体验下来…… / 食物整体…… / 对于……来说…… / 喜欢泰餐的快来…… / 想吃……的朋友可以…… / 这家店给我的感觉是……
+Especially forbidden back-to-back: “这次最想推荐的是 + 菜名 + 评价”.
+
+4) Dish wording must vary. Do not always “这次最想推荐的是X。X很好吃……”
+Use when evidenced: X这次真的有记住我 / 点的几道里面，我比较喜欢X / X的……比较明显 / 如果只选一道，我会选X / 这次吃下来，X比较有记忆点 / X是我这次还会想再点的一道 / describe X without announcing 推荐.
+If they already said they like it, do not repeat 推荐 to mean like.
+
+5) Real UGC rhythm: mix short / medium / a few longer sentences, spoken connectors, natural pauses, uneven paragraphs.
+Allowed when natural: 我觉得 / 其实 / 还蛮 / 比较 / 刚好 / 没想到 / 这次 / 真的 — do not use the same spoken words every post.
+Do not fake authenticity with typos, broken grammar, or over-slang.
+
+6) Pick 2–5 most valuable true points. Do not list every answer.
+Do not mechanically: 地点 → 第一次 → 环境 → 服务 → 菜1 → 菜2 → 支付 → 总结.
+Allowed: one dish only / two dishes in a row / one atmosphere line / no closing summary / location woven in / end on a concrete fact.
+Do not add a summary to make the post “complete”.
+
+7) Endings must change. Do not always 吃下来整体还不错 / 整体体验很好 / 值得推荐 / 喜欢泰餐的可以来试试 / 大家可以去试试.
+End on a dish, a concrete feeling, a scene, a personal judgment, or just stop.
+GOOD: 这道我下次应该还会点。 / 刚好在centralwOrld，想吃泰餐的时候也比较方便。 / 滑蛋饭这次还蛮喜欢的，口感很嫩。
+
+8) Length and density must change (Short → Long → Medium → Short), not 145→147→151. Thin evidence stays short. Never invent to get longer.
+
+9) Compare the last 3 generations: contentFocus / openingPattern / firstSentencePattern / informationOrder / dishEntryPattern / sentenceRhythm / endingPattern / informationDensity / lengthLevel.
+If opening + information order + dish wording + ending is highly similar to the last post, RESTRUCTURE. Do not synonym-swap.
+BAD next: 感受 → 环境 → 菜1 → 菜2 → 换形容词 → 总结
+GOOD next: 菜1 → 菜1具体特点 → 菜2 → 商场场景  OR  环境 → 用餐感受 → 菜1 → 自然结束
+
+10) Prefer concrete facts over AI summaries.
+GOOD: 蒜香比较足，虾仁吃起来Q弹。 / 店里刚翻新过，看起来比较新。
+BAD: 整体来说，这是一家环境舒适、菜品丰富、味道正宗的泰餐厅。 / 餐厅整体环境经过升级后，为顾客提供了更加舒适的用餐体验。
+
+11) Naturalness comes from re-ordering true facts only. Never add party size, companions, a shopping trip, mood, queue, service details, taste, price feeling, room details, 下次还会来, 一定会推荐, or any experience the customer did not give.
+
+FINAL CHECK before return:
+1) Does it read like a diner who just ate and is sharing?
+2) Obvious template sentence?
+3) Same opening family as any of the last 3?
+4) Same information order as any of the last 3?
+5) Reused 这次最想推荐的是?
+6) Every sentence too tidy?
+7) Only swapped adjectives?
+8) Mechanically listed every customer answer?
+9) Forced a summary for completeness?
+10) Any unsupported fact?
+If 2–8 is yes: restructure the caption and titles. Do not synonym-replace.
+Target: facts stay the same; saying, order, rhythm, emphasis, opening, and ending can all change. Each draft should feel like a different person writing a real share, not random text.`;
+}
+
 /**
  * Additive Caption voice layer.
  * Does not replace length, compliance, Storyline, hashtag, cover, or photo-order rules.

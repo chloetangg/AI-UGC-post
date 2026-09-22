@@ -25,6 +25,7 @@ import { aggregateGenerationCost, logGenerationCost, usageFromCompletion } from 
 import { ensureTitleFormats } from "@/lib/title-formats";
 import { enforceXiaohongshuCompliance } from "@/lib/compliance";
 import { ensureGenerationVariation, planGenerationVariation, type GenerationMemory } from "@/lib/generation-variation";
+import { ensureContentLock } from "@/lib/content-lock";
 
 export const maxDuration = 60;
 
@@ -311,15 +312,27 @@ export async function POST(request: Request) {
         sourceTexts: [...variedTitles, varied.caption],
       },
     });
-    const outputTitles = groundedVaried.titles.some((title, index) => title !== variedTitles[index])
-      ? fixFruitEmojisInTitles(ensureTitleFormats(groundedVaried.titles, previousTitles))
-      : groundedVaried.titles;
+    const locked = ensureContentLock({
+      titles: groundedVaried.titles.some((title, index) => title !== variedTitles[index])
+        ? fixFruitEmojisInTitles(ensureTitleFormats(groundedVaried.titles, previousTitles))
+        : groundedVaried.titles,
+      caption: varied.caption,
+      coverTitle: groundedVaried.coverTitle,
+      coverSubtitle: groundedVaried.coverSubtitle,
+      context: {
+        ...coverContext,
+        sourceTexts: [...groundedVaried.titles, varied.caption],
+      },
+    });
+    const outputTitles = locked.titles.some((title, index) => title !== groundedVaried.titles[index])
+      ? fixFruitEmojisInTitles(ensureTitleFormats(locked.titles, previousTitles))
+      : locked.titles;
     const outputCover = {
-      title: groundedVaried.coverTitle,
-      subtitle: groundedVaried.coverSubtitle,
+      title: locked.coverTitle,
+      subtitle: locked.coverSubtitle,
     };
     const located = attachOfficialLocationTime(
-      ensureCaptionEmojis(varied.caption),
+      ensureCaptionEmojis(locked.caption),
       payload.branch,
       payload.requiredLocationFormat,
       payload.previousLocationFormat,

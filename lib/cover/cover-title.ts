@@ -23,6 +23,7 @@ import {
   type CoverTitleContext,
 } from "./cover-rules";
 import { sanitizeCoverAbsoluteLanguage } from "./cover-absolute";
+import { isNaturalCoverChinese, naturalCoverFallback } from "./cover-natural";
 import { collectFullDishNames, applyCoverDishShortNames, coverDishShortName, hasIllegalCoverDishShort } from "./dish-names";
 import {
   evidenceLedCoverPairs,
@@ -45,7 +46,7 @@ export {
 
 export const MIN_MAIN_TITLE_CHARS = 4;
 export const PREFERRED_MAIN_TITLE_CHARS = 6;
-export const MAX_MAIN_TITLE_CHARS = 7;
+export const MAX_MAIN_TITLE_CHARS = 10;
 export const MIN_SUB_TITLE_CHARS = 6;
 export const MAX_SUB_TITLE_CHARS = 10;
 
@@ -146,6 +147,7 @@ export function isAcceptableMainTitle(
   const cleaned = prepareCoverLine(title);
   const units = countCoverUnits(cleaned);
   if (units < MIN_MAIN_TITLE_CHARS || units > MAX_MAIN_TITLE_CHARS) return false;
+  if (!isNaturalCoverChinese(cleaned)) return false;
   if (looksIncompleteCover(cleaned)) return false;
   if (FORBIDDEN_COVER_CLAIMS.test(cleaned)) return false;
   if (containsHarshNegative(cleaned)) return false;
@@ -222,7 +224,15 @@ function pickFallbackPair(postTitles: string[], context: CoverTitleContext = {})
   });
   const use = diverse.length > 0 ? diverse : valid.length > 0 ? valid : choices;
   const seed = (context.variantIndex ?? 0) + postTitles.reduce((sum, title) => sum + title.length, 0);
-  return use[seed % use.length] ?? FALLBACK_COVER_PAIRS[seed % FALLBACK_COVER_PAIRS.length];
+  const picked = use[seed % use.length] ?? FALLBACK_COVER_PAIRS[seed % FALLBACK_COVER_PAIRS.length];
+  if (isNaturalCoverChinese(picked.title) && isAcceptableMainTitle(picked.title, postTitles, context)) {
+    return picked;
+  }
+  const rebuilt = naturalCoverFallback(context, seed);
+  if (isAcceptableCoverOverlay(rebuilt, picked.subtitle, postTitles, context)) {
+    return { title: rebuilt, subtitle: picked.subtitle };
+  }
+  return { title: rebuilt, subtitle: "这顿吃下来很满足" };
 }
 
 export function splitCoverTitleSemantically(title: string, subtitle = "") {

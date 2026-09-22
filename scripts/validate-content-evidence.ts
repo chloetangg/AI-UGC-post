@@ -10,10 +10,12 @@ import {
   isLowDiversityDiscoveryTitles,
   isWeakSeoCover,
 } from "../lib/content-evidence";
+import { buildEvidenceMap, ensureContentLock } from "../lib/content-lock";
 import {
   availableContentFocuses,
   detectContentFocus,
   ensureGenerationVariation,
+  firstSentencePattern,
   hasUnnaturalChinese,
   isCaptionTooSimilar,
   openingFamily,
@@ -313,6 +315,14 @@ for (let index = 0; index < 4; index += 1) {
   if (baanFocuses.length > 0) {
     assert(plan.contentFocus !== baanFocuses.at(-1), `Baan Ying generate ${index + 1} reused focus ${plan.contentFocus}`);
     assert(!isCaptionTooSimilar(output.caption, lastBaan), `Baan Ying generate ${index + 1} too similar: ${output.caption}`);
+    assert(
+      firstSentencePattern(output.caption) !== firstSentencePattern(lastBaan),
+      `Baan Ying generate ${index + 1} reused first-sentence pattern: ${output.caption}`,
+    );
+    assert(
+      !(/这次最想推荐的是/.test(output.caption) && /这次最想推荐的是/.test(lastBaan)),
+      `Baan Ying generate ${index + 1} reused 这次最想推荐的是: ${output.caption}`,
+    );
   }
   baanFocuses.push(plan.contentFocus);
   baanMemories.push(output.memory);
@@ -321,6 +331,10 @@ for (let index = 0; index < 4; index += 1) {
   console.log(`baan ying ${index + 1} [${plan.contentFocus}]: ${output.caption}`);
 }
 assert(new Set(baanFocuses).size >= 3, `Baan Ying focuses too repeated: ${baanFocuses.join(" → ")}`);
+assert(
+  baanCaptions.filter((caption) => /吃下来整体|整体来说|整体体验下来/.test(caption)).length <= 1,
+  `too many summary endings: ${baanCaptions.join(" || ")}`,
+);
 
 const noParty = ensureGroundedHeadlineCopy({
   titles: ["两个人来曼谷吃泰餐", "和朋友一起吃真的很舒服", "一家三口来这里很方便"],
@@ -359,5 +373,122 @@ assert(
   "explicit 两个人 should create for-two",
 );
 console.log(`party two-person titles: ${twoParty.titles.join(" / ")}`);
+
+const tomYumLockContext = {
+  diningNote: "最喜欢河虾冬阴功汤，酸辣开胃，虾很大。芒果糯米饭也点了。",
+  dishes: ["River Prawn Tom Yum", "Mango Sticky Rice"],
+  recommendTo: ["酸辣开胃", "虾很大"],
+};
+const tomYumMap = buildEvidenceMap(tomYumLockContext);
+assert(tomYumMap.primaryContent === "河虾冬阴功汤", `primary should be 河虾冬阴功汤, got ${tomYumMap.primaryContent}`);
+const mismatched = ensureContentLock({
+  titles: ["centralwOrld的芒果糯米饭值得一试！", "曼谷泰餐味道很正宗", "中文菜单点餐太方便"],
+  caption: "点的几道里面，我比较喜欢菠萝炒饭。",
+  coverTitle: "曼谷芒果糯米饭",
+  coverSubtitle: "这口芒果糯米饭很香",
+  context: tomYumLockContext,
+});
+assert(/河虾冬阴功汤|冬阴功/.test(mismatched.titles[0]), `title hero not locked: ${mismatched.titles[0]}`);
+assert(/河虾冬阴功汤/.test(mismatched.caption), `caption missing primary: ${mismatched.caption}`);
+assert(!/菠萝炒饭/.test(mismatched.caption), `caption kept unevidenced dish: ${mismatched.caption}`);
+assert(!/芒果糯米饭/.test(mismatched.titles[0]), `title still isolated mango: ${mismatched.titles[0]}`);
+assert(!/菠萝炒饭/.test(`${mismatched.titles.join("")}${mismatched.coverTitle}`), `isolated pineapple remains`);
+const wording = ensureContentLock({
+  titles: ["曼谷泰餐芒果糯米饭", "中文菜单点餐太方便", "环境够大吃饭也舒服"],
+  caption: "芒果糯米饭很好吃，味道不错。",
+  coverTitle: "曼谷泰餐味道正宗",
+  coverSubtitle: "这顿吃下来很满足",
+  context: { diningNote: "芒果糯米饭，粘度刚好，不会太甜，很合我口味。", dishes: ["Mango Sticky Rice"] },
+});
+assert(/粘度刚好|不会太甜|很合我口味/.test(wording.caption), `lost customer wording: ${wording.caption}`);
+assert(!/上次这次来|与个人预期有所不同/.test(
+  ensureContentLock({
+    titles: ["曼谷泰餐味道很正宗", "中文菜单点餐太方便", "环境够大吃饭也舒服"],
+    caption: "上次这次来，果然没有与个人预期有所不同。",
+    coverTitle: "曼谷泰餐味道正宗",
+    coverSubtitle: "这顿吃下来很满足",
+    context: tomYumLockContext,
+  }).caption,
+), "semantic conflict left in caption");
+console.log(`content lock titles: ${mismatched.titles.join(" / ")}`);
+console.log(`content lock caption: ${mismatched.caption}`);
+console.log(`content lock wording: ${wording.caption}`);
+
+const narrativeContext = {
+  diningNote: "今天第一次来到centralwOrld。咖喱蟹肉份量很足，搭配米饭下饭。蒜炒虾仁蒜香足，蒜末酥脆。整体用餐体验很好。",
+  dishes: ["Crab Meat Curry", "Garlic Shrimp", "Pineapple Fried Rice"],
+  recommendTo: ["份量足", "搭配米饭下饭"],
+};
+const misplacedAttr = ensureContentLock({
+  titles: ["曼谷泰餐咖喱蟹肉", "中文菜单点餐太方便", "环境够大吃饭也舒服"],
+  caption: "咖喱蟹肉蒜香味很足，这个口味我比较喜欢。",
+  coverTitle: "曼谷泰餐味道正宗",
+  coverSubtitle: "这顿吃下来很满足",
+  context: narrativeContext,
+});
+assert(!/咖喱蟹肉蒜香/.test(misplacedAttr.caption), `cross-dish attribute left: ${misplacedAttr.caption}`);
+assert(/蒜炒虾仁/.test(misplacedAttr.caption) && /蒜香/.test(misplacedAttr.caption), `garlic attr not rebound: ${misplacedAttr.caption}`);
+const splitDish = ensureContentLock({
+  titles: ["曼谷泰餐咖喱蟹肉", "中文菜单点餐太方便", "环境够大吃饭也舒服"],
+  caption: "咖喱蟹肉份量很足，搭配米饭很下饭。蒜炒虾仁蒜香很足。咖喱蟹肉我很喜欢。",
+  coverTitle: "曼谷泰餐味道正宗",
+  coverSubtitle: "这顿吃下来很满足",
+  context: narrativeContext,
+});
+assert((splitDish.caption.match(/咖喱蟹肉/g) ?? []).length === 1, `same dish split/restated: ${splitDish.caption}`);
+assert(/份量/.test(splitDish.caption), `lost curry portion: ${splitDish.caption}`);
+const lateDish = ensureContentLock({
+  titles: ["曼谷泰餐咖喱蟹肉", "中文菜单点餐太方便", "环境够大吃饭也舒服"],
+  caption: "今天第一次来到centralwOrld逛街后适合休息。咖喱蟹肉份量很足，搭配米饭很下饭。整体用餐体验很好，下次还想来试试其他菜色。蒜炒虾仁蒜香味很足，这个口味我比较喜欢。",
+  coverTitle: "曼谷泰餐味道正宗",
+  coverSubtitle: "这顿吃下来很满足",
+  context: narrativeContext,
+});
+const endingAt = lateDish.caption.search(/整体用餐|下次还/);
+const shrimpAt = lateDish.caption.indexOf("蒜炒虾仁");
+assert(shrimpAt >= 0 && endingAt >= 0 && shrimpAt < endingAt, `new dish after ending: ${lateDish.caption}`);
+console.log(`narrative flow caption: ${misplacedAttr.caption}`);
+console.log(`narrative merge caption: ${splitDish.caption}`);
+console.log(`narrative ending caption: ${lateDish.caption}`);
+
+const greenCurryContext = {
+  diningNote: "蒜炒虾仁Q弹。青咖喱牛肉浓厚的椰香味，牛肉很软烂。",
+  dishes: ["Garlic Shrimp", "Green Curry Beef"],
+  recommendTo: ["蒜炒虾仁很Q弹", "青咖喱牛肉椰香味很足"],
+};
+const gluedCurry = ensureContentLock({
+  titles: ["曼谷泰餐蒜炒虾仁", "中文菜单点餐太方便", "环境够大吃饭也舒服"],
+  caption: "蒜炒虾仁Q弹，浓厚的椰香味，牛肉很软烂。",
+  coverTitle: "曼谷泰餐味道正宗",
+  coverSubtitle: "这顿吃下来很满足",
+  context: greenCurryContext,
+});
+assert(!/蒜炒虾仁[^。]*椰香/.test(gluedCurry.caption), `coconut stuck on shrimp: ${gluedCurry.caption}`);
+assert(!/蒜炒虾仁[^。]*软烂/.test(gluedCurry.caption), `tender beef stuck on shrimp: ${gluedCurry.caption}`);
+assert(/青咖喱牛肉/.test(gluedCurry.caption) && /椰香/.test(gluedCurry.caption), `green curry lost coconut: ${gluedCurry.caption}`);
+assert(/青咖喱牛肉/.test(gluedCurry.caption) && /软烂/.test(gluedCurry.caption), `green curry lost tender beef: ${gluedCurry.caption}`);
+const misnamedCurry = ensureContentLock({
+  titles: ["曼谷泰餐蒜炒虾仁", "中文菜单点餐太方便", "环境够大吃饭也舒服"],
+  caption: "蒜炒虾仁浓厚的椰香味，牛肉很软烂。",
+  coverTitle: "曼谷泰餐味道正宗",
+  coverSubtitle: "这顿吃下来很满足",
+  context: greenCurryContext,
+});
+assert(!/蒜炒虾仁[^。]*椰香/.test(misnamedCurry.caption), `renamed curry still on shrimp: ${misnamedCurry.caption}`);
+assert(/青咖喱牛肉/.test(misnamedCurry.caption), `misnamed coconut not rebound: ${misnamedCurry.caption}`);
+const restoreCurry = ensureContentLock({
+  titles: ["曼谷泰餐蒜炒虾仁", "中文菜单点餐太方便", "环境够大吃饭也舒服"],
+  caption: "点的几道里面，我比较喜欢蒜炒虾仁。",
+  coverTitle: "曼谷泰餐味道正宗",
+  coverSubtitle: "这顿吃下来很满足",
+  context: baanYingContext,
+});
+assert(!/蒜炒虾仁[^。]*椰香/.test(restoreCurry.caption), `restore glued coconut onto shrimp: ${restoreCurry.caption}`);
+if (/椰香/.test(restoreCurry.caption)) {
+  assert(/青咖喱牛肉[^。]*椰香/.test(restoreCurry.caption), `coconut not on green curry: ${restoreCurry.caption}`);
+}
+console.log(`green curry split: ${gluedCurry.caption}`);
+console.log(`green curry rebound: ${misnamedCurry.caption}`);
+console.log(`green curry restore: ${restoreCurry.caption}`);
 
 console.log("content-evidence cases passed");

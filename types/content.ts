@@ -290,8 +290,15 @@ export type GeneratePostInput = {
   previousGenerationMemories?: Array<{
     contentFocus: string;
     openingStyle: string;
+    openingPattern?: string;
+    firstSentencePattern?: string;
     informationPriority: string[];
+    informationOrder?: string[];
     dishOrder: string[];
+    dishEntryPattern?: string;
+    sentenceRhythm?: string;
+    endingPattern?: string;
+    informationDensity?: string;
     structureType: string;
     lengthLevel: string;
   }>;

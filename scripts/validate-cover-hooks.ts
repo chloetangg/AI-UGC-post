@@ -12,6 +12,7 @@ import {
 } from "../lib/cover/cover-rules";
 import { applyCoverDishShortNames, hasIllegalCoverDishShort } from "../lib/cover/dish-names";
 import { sanitizeCoverAbsoluteLanguage } from "../lib/cover/cover-absolute";
+import { isNaturalCoverChinese, isMechanicalKeywordGlue } from "../lib/cover/cover-natural";
 
 if (countCoverUnits("centralwOrld") !== 1) {
   throw new Error(`centralwOrld must count as 1 unit, got ${countCoverUnits("centralwOrld")}`);
@@ -110,8 +111,8 @@ if (sanitizeCoverAbsoluteLanguage("最爱的一家泰餐") !== "超爱的一家�
 if (sanitizeCoverAbsoluteLanguage("我最爱这道") !== "我超爱这道") {
   throw new Error("我最爱这道 must become 我超爱这道");
 }
-if (sanitizeCoverAbsoluteLanguage("曼谷第一泰餐") !== "曼谷超爱泰餐") {
-  throw new Error("曼谷第一泰餐 must become 曼谷超爱泰餐");
+if (sanitizeCoverAbsoluteLanguage("曼谷第一泰餐") !== "曼谷泰餐") {
+  throw new Error("曼谷第一泰餐 must become 曼谷泰餐");
 }
 if (sanitizeCoverAbsoluteLanguage("没想到最喜欢这道") !== "没想到超爱这道") {
   throw new Error("没想到最喜欢这道 must become 没想到超爱这道");
@@ -130,3 +131,34 @@ if (/最(?!近|后|终)|第一(?!次|道)/.test(`${rewrittenCover.title}${rewrit
   throw new Error(`cover still has ranking language: ${rewrittenCover.title} | ${rewrittenCover.subtitle}`);
 }
 console.log(`rewritten ranking cover: ${rewrittenCover.title} | ${rewrittenCover.subtitle}`);
+
+const mechanical = [
+  "曼谷超爱次来吃",
+  "曼谷很值得来吃",
+  "曼谷推荐来吃",
+  "曼谷好吃必吃",
+  "曼谷美食来打卡",
+  "曼谷超推荐吃",
+  "曼谷爱吃这家",
+];
+for (const title of mechanical) {
+  if (isNaturalCoverChinese(title) || !isMechanicalKeywordGlue(title)) {
+    throw new Error(`mechanical cover must fail natural check: ${title}`);
+  }
+}
+const naturalShorts = ["曼谷泰餐推荐", "曼谷必吃泰菜", "曼谷吃什么？", "曼谷美食探店", "老板很帅的曼谷泰餐"];
+for (const title of naturalShorts) {
+  if (!isNaturalCoverChinese(title)) {
+    throw new Error(`natural cover rejected: ${title}`);
+  }
+}
+const rebuiltGlue = layoutCoverOverlay("曼谷超爱次来吃", "这顿吃下来很满足", [], {
+  diningNote: "老板很帅，服务很好",
+});
+if (isMechanicalKeywordGlue(rebuiltGlue.title) || !isNaturalCoverChinese(rebuiltGlue.title)) {
+  throw new Error(`glued cover was not rebuilt: ${rebuiltGlue.title}`);
+}
+if (!/老板|帅/.test(`${rebuiltGlue.title}${rebuiltGlue.subtitle}`)) {
+  throw new Error(`rebuilt cover lost customer evidence: ${rebuiltGlue.title} | ${rebuiltGlue.subtitle}`);
+}
+console.log(`rebuilt glued cover: ${rebuiltGlue.title} | ${rebuiltGlue.subtitle}`);
