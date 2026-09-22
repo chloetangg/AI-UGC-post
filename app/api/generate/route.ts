@@ -8,6 +8,7 @@ import {
   type GenerateRequestBody,
 } from "@/lib/generate-prompt";
 import { insertGeneration } from "@/lib/generations";
+import { upsertSubmission } from "@/lib/submissions";
 import { trackServerEvent } from "@/lib/analytics/server";
 import { readAnalyticsSession } from "@/lib/analytics/session";
 import { normalizeHashtags } from "@/lib/hashtags";
@@ -375,6 +376,19 @@ export async function POST(request: Request) {
       console.error("[generations] save failed");
       const detail = error instanceof Error ? error.message : "";
       if (detail) console.error("[generations]", detail);
+    }
+    if (payload.submissionId && payload.campaignId) {
+      try {
+        await upsertSubmission({
+          submissionId: payload.submissionId,
+          campaignId: payload.campaignId,
+          diningExperienceNote: payload.diningExperienceNote,
+        });
+      } catch (error) {
+        console.error("[submissions] memorable note save failed");
+        const detail = error instanceof Error ? error.message : "";
+        if (detail) console.error("[submissions]", detail);
+      }
     }
 
     await Promise.all([

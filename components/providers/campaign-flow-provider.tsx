@@ -331,6 +331,7 @@ export function CampaignFlowProvider({
         visitFrequency: current.productFeedback.visitFrequency,
         mealExpenseThb: current.productFeedback.totalMealExpense,
         origin,
+        diningExperienceNote: current.productFeedback.diningExperienceNote,
       });
     } catch (error) {
       console.error("[submissions] origin save failed", error);

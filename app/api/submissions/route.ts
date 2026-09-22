@@ -51,6 +51,7 @@ export async function POST(request: Request) {
       visitFrequency: parseOptionalString(body.visitFrequency),
       mealExpenseThb: parseMealExpense(body.mealExpenseThb),
       origin: parseOptionalString(body.origin) || customer?.location,
+      diningExperienceNote: parseOptionalString(body.diningExperienceNote),
     });
 
     return NextResponse.json({ ok: true, submissionId });
