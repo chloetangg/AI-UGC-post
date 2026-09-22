@@ -141,12 +141,14 @@ export function ensureTitleKeywords(
 }
 
 export function formatTitleKeywordRules() {
-  return `TITLE SEARCH KEYWORDS — natural, not stuffed.
+  return `TITLE SEARCH KEYWORDS — auxiliary only, never the topic.
+Real customer input and confirmed restaurant facts outrank generic keywords. Keywords must not invent a story.
 Each of the 3 titles must naturally contain at least one Bangkok food search keyword from the strategy library (primary preferred; secondary allowed).
 Prefer 3 different keywords in the same generation. Integrate them as a real Xiaohongshu title, not SEO glue.
 Do NOT require the same keyword in every title.
 Do NOT use 必吃 / 最好吃 / 封神 / 顶级 / 曼谷第一 as a title hook.
 Never use the same stuffed pattern in all 3 titles (e.g. 曼谷超好吃泰餐 / 曼谷超地道泰餐 / 曼谷超温馨泰餐).
 Do not claim 明星 / 网红 / 排队 unless the customer wrote that.
-No hashtags in titles.`;
+No hashtags in titles.
+Across the 3 titles + cover title + cover subtitle, exact "centralwOrld" must appear once if the dining location is Baan Ying centralwOrld. Weave it; do not stuff.`;
 }

@@ -16,8 +16,11 @@ export function amountFromCents(cents: number) {
 }
 
 export function formatMealExpense(amount: number | null) {
-  if (amount == null) return "";
-  return amount.toFixed(2);
+  if (amount == null || !Number.isFinite(amount)) return "";
+  return amount.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 }
 
 export function parseMealExpenseBaht(text: string) {

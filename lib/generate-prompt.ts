@@ -9,6 +9,7 @@ import { formatCoverHookRules, suggestCoverHookFamily } from "@/lib/cover/cover-
 import { formatCoverStyleFitRules } from "@/lib/cover/style-fit";
 import { formatCoverTitleRules } from "@/lib/cover/cover-rules";
 import { classifyCoverHookType, formatEvidencePriorityRules, previousPrimaryExperienceId } from "@/lib/content-evidence";
+import { formatGenerationVariationRules, planGenerationVariation } from "@/lib/generation-variation";
 import { allDishNameHints, chineseFullDishName, formatCaptionDishNameRules } from "@/lib/cover/dish-names";
 import { formatCaptionConsumerVoiceRules } from "@/lib/caption-voice";
 import { formatStrategyLibrary, formatStrategySelection } from "@/lib/content-strategy/format";
@@ -53,7 +54,7 @@ export const generatePostJsonSchema = {
       caption: {
         type: "string",
         description:
-          "One Simplified Chinese story body. Length follows this visit's evidence — 2 sentences is valid. No fixed word/sentence/paragraph quota. No hashtags. No Location & Time block.",
+          "One Simplified Chinese story body. Follow THIS ROUND length band in the user prompt. Do not invent facts to hit a longer band. No hashtags. No Location & Time block.",
       },
       hashtags: {
         type: "array",
@@ -274,10 +275,13 @@ INTERNAL PROCESS (do not print KSP / Storyline / Content Angle / Search Keyword 
 9. At most ONE small brand detail if it helps; otherwise omit brand history. KSP-03 is low-frequency.
 
 TITLES: Exactly 3 Simplified Chinese titles with different editorial angles AND different formats.
-Title 1 = personal experience from the dining note when it has a specific detail.
-Title 2 = food / dish if a real selected dish exists.
-Title 3 = scene / atmosphere / first-visit. Discovery (发现/推荐) only if no stronger evidence.
+Extract real customer facts FIRST, then write. Do not invent a trendy Xiaohongshu line and then justify it.
+Title 1 = location + dining, or personal experience from customer-written input.
+Title 2 = a DIFFERENT customer experience / selected enjoy-most highlight.
+Title 3 = restaurant trait / dish / scene from the same real input.
 Forbidden same-angle trio: 曼谷美食发现 / 曼谷美食推荐 / 曼谷泰餐推荐.
+Each title must map to customer-written notes, selected enjoy-most, selected dishes/reasons, or confirmed restaurant facts. Never 曼谷今天也太好吃了 / 隐藏宝藏 / 本地人才知道 / 第一次来曼谷一定要吃 / 美食天花板 unless that exact idea is in the input.
+Across titles[0–2] + mainTitle + subTitle, the exact token "centralwOrld" must appear at least once. Only this spelling. Weave naturally in one place. Never CentralWorld / centralworld / Central World / 尚泰世界. Do not repeat or stuff it.
 Each title must feel like Xiaohongshu, reflect actual customer experience, and naturally contain at least one Bangkok food search keyword. Prefer 3 different keywords. Do not keyword-stuff. Do not sound like an advertisement.
 Unacceptable: 曼谷Baan Ying好好吃 / 真的好好吃 / 超好吃. Do not make the 3 titles the same sentence with different adjectives.
 ZERO hashtags in titles.
@@ -286,14 +290,11 @@ Title emojis, if any, must be chosen from the same list as the caption. Title 1 
 ${formatTitleKeywordRules()}
 ${formatTitleFormatRules()}
 
-CAPTION: Express the selected Storyline naturally without naming it. Do not force one template. Change structure, sentence count, and length on regenerate.
-Narrative focus follows PRIMARY EXPERIENCE. If the dining note is about 老板 / 服务 / 逛街 / 舒服, the caption must naturally include at least one of those facts. Do not only write about dishes when the customer wrote a stronger personal detail.
-Keep the fact, rewrite into Xiaohongshu speech. Do not copy the note verbatim. Do not invent extra service/atmosphere/people.
-Length is decided by THIS visit: customer notes, Feel/enjoy-most, photo facts, Storyline, KSP, and how much is actually worth sharing.
-Priority: truth > useful detail > natural voice > length. Never pad to hit a quota. Never invent facts to look longer or different.
-A 2-sentence caption is fully valid when the evidence is simple. Allowed ranges, not targets: ultra-short 2 sentences / short 3–4 / medium 5–7 / longer 8+. Same facts can be told shorter or longer; never pad just to look different.
-Forbidden: every post 5 sentences; every post 100–120 characters; intro+experience+recommend+summary every time; the same opening or closing; repeating a point to fill space.
-Also vary naturally (from content, not random noise): sentence length, paragraph count, opening, order of facts, tone, emoji count, mix of statements/questions/exclamations.
+CAPTION: Express the selected Storyline naturally without naming it. Each Generate is an independent draft — new focus, new structure, new length, new sentence rhythm.
+Narrative focus follows THIS ROUND FOCUS, then other real customer points. If they selected several enjoy-most / dish / reason items, describe more than one in natural UGC — do not only write “食物很好吃”.
+Keep the fact, rewrite into complete Xiaohongshu sentences. Do not copy keyword stacks. Do not invent extra service/atmosphere/people.
+THIS ROUND length band is mandatory when the evidence can support it. Thin input → stay short. Rich input → you may write longer. Never invent to fill Long / Extended.
+Forbidden: the same opening every time; intro+experience+recommend+summary every time; listing every selected tag in one sentence; 145→147 character micro-edits on regenerate.
 Do not always start with the restaurant name or 作为游客 / 来到曼谷 / 这次我选择 / 如果你也 / 最近在找.
 
 ${formatCaptionConsumerVoiceRules()}
@@ -367,7 +368,7 @@ Then choose ONE of these 6 patterns that the pool can actually support. Do not f
 6: FOOD (fallback)
 remainingPhotoOrder = those original indexes in story order. If the pool is empty, return [].
 
-REGENERATION: If previous title/caption/strategy/hashtags are provided, keep all customer facts identical. Avoid the previous Content Angle when another valid angle exists; prefer a different Storyline and KSP when another naturally fits. Also avoid previousCoverHookType / previousPrimaryExperience / previousTitleAngle: if the last cover was Discovery, prefer Personal Experience / Food / Scene / Atmosphere; if it was Food, prefer Personal Experience / Scene / Atmosphere. Change title keywords, opening, narrative structure, sentence count, caption length/rhythm, dish emphasis where possible, emoji placement, and the 4 random pool hashtags. Do not copy the previous caption's length band (if the last one was medium, this one may be 2 sentences or longer if the evidence supports it). Variation must come from storytelling approach, not invented experience. Do not copy previous mainTitle or subTitle. Location & Time is chosen by the system.
+REGENERATION: If previous title/caption/strategy/hashtags are provided, keep all customer facts identical. This must read like a newly written post, not last time with swapped words. Avoid the previous Content Angle / Storyline / KSP when another valid set exists. Avoid previousCoverHookType / previousPrimaryExperience / previousTitleAngle. Follow THIS ROUND FOCUS, STRUCTURE, and LENGTH BAND. Change opening, fact order, which highlights get described, title angles, cover hook, and the 4 random pool hashtags. Do not copy the previous length band. Variation must come from storytelling approach, not invented experience. Do not copy previous mainTitle or subTitle. Location & Time is chosen by the system.
 
 OUTPUT: Return ONLY JSON matching the schema. No Markdown fences.
 {"titles":["标题1","标题2","标题3"],"caption":"正文 only. No Location & Time. No hashtags.","hashtags":["#曼谷美食","#baanying曼谷","#泰国菜","#曼谷打卡","#泰国"],"mainTitle":"曼谷泰餐遇到帅老板","subTitle":"服务也很舒服","selectedPhotoIndex":0,"selectedPhotoIndexes":[0],"photoSelectionReason":"...","selectedTemplateId":"<one of 10>","suitableTemplateIds":["<id>","<id>","<id>"],"remainingPhotoOrder":[1,2],"remainingOrderPattern":"5","selectedKspId":"KSP-01","selectedStorylineId":"ST-01","selectedContentAngleId":"CA-01","selectedSearchKeyword":"曼谷美食"}
@@ -376,7 +377,10 @@ The sample JSON is FORMAT ONLY. Do not copy its selectedTemplateId, suitableTemp
 
 VALIDATE before returning:
 - 3 different spoken titles, mixed formats, no hashtags, no 必吃/最好吃/封神/顶级 hard-sell
-- 1 personal caption that does not repeat the titles; length follows this visit (2 sentences OK); no Location & Time, no hashtags, Xiaohongshu-compliant wording; do not pad
+- Title 1 + Title 2 + Title 3 + mainTitle + subTitle contain exact "centralwOrld" at least once; if missing, rewrite one line naturally before return
+- every title / cover line is grounded in customer input, selected highlights, selected dishes/reasons, or confirmed restaurant facts — rewrite any generic ungrounded line
+- 1 personal caption that does not repeat the titles; follows THIS ROUND structure + length band when evidence allows; no Location & Time, no hashtags; complete natural Chinese, no keyword-stacking
+- if several customer selections exist, describe more than one of them; do not list tags; do not change their sentiment
 - caption reads like a diner who just ate, not a brand/travel-media script; keep mixed like/so-so/dislike from evidence; no invented flaws; no forced summary CTA; no copied reference-review sentences
 - 5 hashtags: always #baanying曼谷 plus 4 different tags from the approved pool, shuffled into random order
 - 1 independent mainTitle: lived-experience hook first, then 1–2 pool keywords (曼谷 / centralwOrld / 泰餐 / 美食 / 必吃), never 曼谷美食发现 / 曼谷泰餐推荐 / 曼谷美食推荐 as the whole idea, a real headline not a keyword dump, 4–7 units (centralwOrld=1; Terminal 21/Siam Center/One Bangkok=2); subTitle is one Xiaohongshu hook from a DIFFERENT slice of the same visit, 6–10 units, not concatenated, not 招牌泰式料理 / 让人惊艳 / 菜名很好吃, not slang. No 最/第一/最爱/天花板/冠军/全曼谷 ranking language — rewrite to 超爱 / 很喜欢 / 很想再吃. Approved cover dish shorts only. No emoji. Never a broken sentence. Not copied from titles[]. Do not reuse the previous cover formula.
@@ -429,7 +433,7 @@ export function buildUserPrompt(input: GenerateRequestBody) {
     {
       diningNote,
       dishes: dishNames,
-      enjoyMost: input.enjoyMost,
+      enjoyMost: [...input.enjoyMost.filter((item) => item !== "其他"), input.enjoyMostOther?.trim() ?? ""].filter(Boolean),
       recommendTo: reasonNames,
       visitFrequency: input.visitFrequency,
       previousCoverTitle,
@@ -461,10 +465,26 @@ export function buildUserPrompt(input: GenerateRequestBody) {
     diningNote,
     previousCoverHookType,
   });
+  const variationPlan = planGenerationVariation({
+    context: {
+      diningNote,
+      dishes: dishNames,
+      enjoyMost: [...input.enjoyMost.filter((item) => item !== "其他"), input.enjoyMostOther?.trim() ?? ""].filter(Boolean),
+      recommendTo: reasonNames,
+      visitFrequency: input.visitFrequency,
+      customerType: input.customerType,
+      mealAmount: input.totalMealExpense,
+      previousCoverTitle,
+    },
+    variantIndex: input.variantIndex,
+    previousCaption,
+    previousCoverTitle,
+    previousTitles: input.previousTitles ?? [],
+  });
 
   const previousBlock =
     previousTitle || previousCaption
-      ? `PREVIOUS GENERATION (do not paraphrase; change KSP/Storyline/Angle when another valid set exists; change opening, structure, caption length/sentence count, dish emphasis, rhythm, emoji pattern, random pool hashtags):
+      ? `PREVIOUS GENERATION (do not paraphrase or synonym-swap; write a new post with a different focus, structure, opening, fact order, and length band):
 Previous KSP: ${input.previousKspId?.trim() || "none"}
 Previous Storyline: ${input.previousStorylineId?.trim() || "none"}
 Previous content angle: ${previousAngle || "Not provided"}
@@ -542,13 +562,14 @@ ${formatEvidencePriorityRules(
     contentAngleId: suggestedStrategy.contentAngleId,
     diningNote,
     mealAmount: input.totalMealExpense,
-    enjoyMost: input.enjoyMost,
+    enjoyMost: [...input.enjoyMost.filter((item) => item !== "其他"), input.enjoyMostOther?.trim() ?? ""].filter(Boolean),
     recommendTo: reasonNames,
     visitFrequency: input.visitFrequency,
     customerType: input.customerType,
   },
   input.previousTitles ?? [],
 )}
+${formatGenerationVariationRules(variationPlan)}
 Previous mainTitle dish name: ${previousCoverDishHint}
 ${dishAngleHint}
 Suggested cover hook family: ${suggestedCoverHook}. Use it if the customer evidence supports it; otherwise pick another family from the library. Do not invent social proof or dishes.
@@ -565,7 +586,7 @@ ${formatCoverTitleRules({
   contentAngleId: suggestedStrategy.contentAngleId,
   diningNote,
   mealAmount: input.totalMealExpense,
-  enjoyMost: input.enjoyMost,
+  enjoyMost: [...input.enjoyMost.filter((item) => item !== "其他"), input.enjoyMostOther?.trim() ?? ""].filter(Boolean),
   recommendTo: reasonNames,
   visitFrequency: input.visitFrequency,
   customerType: input.customerType,

@@ -22,7 +22,12 @@ import {
   reasonsForDish,
   RECOMMENDATION_REASON_OTHER,
 } from "@/lib/recommendation-reasons";
-import { isMealExpenseRangeComplete, parseMealExpenseBaht } from "@/lib/meal-expense";
+import {
+  amountFromCents,
+  centsFromCurrencyInput,
+  formatMealExpense,
+  isMealExpenseRangeComplete,
+} from "@/lib/meal-expense";
 import {
   CUSTOMER_TYPES,
   ENJOY_MOST,
@@ -189,9 +194,10 @@ export default function ExperiencePage() {
   }
 
   function setOver2000Amount(text: string) {
+    const cents = centsFromCurrencyInput(text);
     patchFeedback({
       mealExpenseRange: "฿2,000+",
-      totalMealExpense: parseMealExpenseBaht(text),
+      totalMealExpense: cents == null || cents === 0 ? null : amountFromCents(cents),
     });
   }
 
@@ -364,9 +370,22 @@ export default function ExperiencePage() {
                     <Input
                       className="min-w-[16rem]"
                       inputMode="numeric"
+                      autoComplete="off"
                       placeholder={t.experience.qExpenseOverPlaceholder}
-                      value={feedback.totalMealExpense != null ? String(feedback.totalMealExpense) : ""}
+                      value={formatMealExpense(feedback.totalMealExpense)}
                       onChange={(event) => setOver2000Amount(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (
+                          event.key === "." ||
+                          event.key === "," ||
+                          event.key === "e" ||
+                          event.key === "E" ||
+                          event.key === "+" ||
+                          event.key === "-"
+                        ) {
+                          event.preventDefault();
+                        }
+                      }}
                     />
                   ) : null}
                 </div>

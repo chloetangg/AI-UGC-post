@@ -103,7 +103,7 @@ Follow this process inside the SAME JSON response:
 3. Select a compatible Storyline as narrative intention only. Suggested: ${suggested.storylineId} ${storyline?.name ?? ""} — ${storyline?.narrativeIntention ?? ""}
 4. Select a Content Angle. Suggested: ${suggested.contentAngleId} ${angle?.name ?? ""}
 5. Select a Search Keyword. Suggested: ${suggested.searchKeyword}
-6. Generate titles, caption, hashtags, mainTitle, subTitle, photo selection. Caption length follows this visit — 2 sentences is valid; do not pad.
+6. Generate titles, caption, hashtags, mainTitle, subTitle, photo selection. Follow THIS ROUND caption length band when evidence allows; do not invent to pad.
 
 If the suggestion conflicts with customer evidence, choose another supported combination from the library. Prefer not to reuse:
 - previous KSP: ${previous.previousKspId || "none"}

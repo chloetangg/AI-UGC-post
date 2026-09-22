@@ -436,7 +436,7 @@ export function formatCoverTitleRules(context: CoverTitleContext = {}) {
   const enjoy = (context.enjoyMost ?? []).filter(Boolean).join(", ") || "none";
   const dishes = (context.dishes ?? []).filter(Boolean).join(", ") || "none";
   const locationHint = location
-    ? `Dining location (system-provided): ${location}. Use it in mainTitle only when the mall itself is the hook. Never invent Terminal 21 / Siam Center / One Bangkok.`
+    ? `Dining location (system-provided): ${location}. Cover may use exact centralwOrld when the mall is the hook. Across Title 1–3 + Cover Title + Cover Subtitle, exact "centralwOrld" must appear once — not necessarily on the cover. Never invent Terminal 21 / Siam Center / One Bangkok.`
     : "No dining mall keyword is available. Do NOT invent centralwOrld, Terminal 21, Siam Center, or One Bangkok.";
 
   return `COVER OVERLAY — JSON "mainTitle" (= coverTitle) + "subTitle" (= coverSubtitle). Independent from titles[]. Never shorten titles[] into the cover. Generate both in THIS same JSON. No extra API call.

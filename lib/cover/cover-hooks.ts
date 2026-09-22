@@ -100,7 +100,7 @@ HOOK-04 Soft CTA lives in caption
 HOOK-05 Local identity ONLY with evidence. Never invent 泰国人爱吃.
 HOOK-06 Dish-led subtitle from a real selected dish or the dining note, using the approved cover short (冬阴功 not 河虾冬阴功汤; 青柠蒸鲈鱼 not 鲈鱼). Prefer a curiosity/scene hook over 菜名+很好吃. One dish reason only — never glue dish + price + first-visit. Use this when the dining note is actually about food.
 HOOK-07 Warm home-style / comfortable atmosphere in subTitle when the note supports it
-HOOK-08 Location or mall-stop in the title only when it is the hook, e.g. 逛街后来吃. Never force centralwOrld.
+HOOK-08 Location may use exact centralwOrld as the confirmed dining mall. Across Title 1–3 + Cover Title + Cover Subtitle, exact "centralwOrld" must appear once. Do not invent Terminal 21 / Siam Center / One Bangkok. Do not repeat centralwOrld in every field.
 
 DIVERSITY: do not repeat the previous coverTitle/subTitle formula. Changing only 推荐/泰菜 is NOT enough. Discovery is one family among many — never the default.`;
 }

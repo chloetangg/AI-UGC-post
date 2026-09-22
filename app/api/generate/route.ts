@@ -13,11 +13,17 @@ import { readAnalyticsSession } from "@/lib/analytics/session";
 import { normalizeHashtags } from "@/lib/hashtags";
 import { attachOfficialLocationTime, resolveDiningBranch, stripGeneratedLocationTime } from "@/lib/locations";
 import { parseGeneratedContent } from "@/lib/parse-generated";
-import { classifyCoverHookType, ensureEvidenceLedCopy, previousPrimaryExperienceId } from "@/lib/content-evidence";
+import {
+  classifyCoverHookType,
+  ensureEvidenceLedCopy,
+  ensureGroundedHeadlineCopy,
+  previousPrimaryExperienceId,
+} from "@/lib/content-evidence";
 import { layoutCoverOverlay } from "@/lib/cover/cover-title";
 import { aggregateGenerationCost, logGenerationCost, usageFromCompletion } from "@/lib/openai-usage";
 import { ensureTitleFormats } from "@/lib/title-formats";
 import { enforceXiaohongshuCompliance } from "@/lib/compliance";
+import { ensureGenerationVariation, planGenerationVariation } from "@/lib/generation-variation";
 
 export const maxDuration = 60;
 
@@ -139,6 +145,14 @@ export async function POST(request: Request) {
     });
 
     const text = completion.choices[0]?.message?.content ?? "";
+    const enjoyMost = [
+      ...payload.enjoyMost.filter((item) => item !== "其他"),
+      payload.enjoyMostOther?.trim() ?? "",
+    ].filter(Boolean);
+    const recommendTo = [
+      ...payload.recommendTo.filter((item) => item !== "其他"),
+      payload.recommendToOther?.trim() ?? "",
+    ].filter(Boolean);
     const coverContext = {
       branch: payload.branch,
       dishes: [
@@ -154,8 +168,8 @@ export async function POST(request: Request) {
             ...payload.recommendedDishes.filter((dish) => dish !== "Others"),
             payload.recommendedDishOther.trim(),
           ].filter(Boolean),
-          enjoyMost: payload.enjoyMost,
-          recommendTo: payload.recommendTo,
+          enjoyMost,
+          recommendTo,
           visitFrequency: payload.visitFrequency,
           previousCoverTitle: payload.previousCoverTitle,
         },
@@ -167,8 +181,8 @@ export async function POST(request: Request) {
       contentAngleId: payload.suggestedContentAngle,
       diningNote: payload.diningExperienceNote,
       mealAmount: payload.totalMealExpense,
-      enjoyMost: payload.enjoyMost,
-      recommendTo: payload.recommendTo,
+      enjoyMost,
+      recommendTo,
       visitFrequency: payload.visitFrequency,
       customerType: payload.customerType,
     };
@@ -222,8 +236,87 @@ export async function POST(request: Request) {
         sourceTexts: [...evidenceTitles, diversified.caption],
       },
     );
+    const grounded = ensureGroundedHeadlineCopy({
+      titles: evidenceTitles,
+      coverTitle: evidenceCover.title,
+      coverSubtitle: evidenceCover.subtitle,
+      context: {
+        ...coverContext,
+        sourceTexts: [...evidenceTitles, diversified.caption],
+      },
+    });
+    const titlesChanged = grounded.titles.some((title, index) => title !== evidenceTitles[index]);
+    const coverChanged =
+      grounded.coverTitle !== evidenceCover.title || grounded.coverSubtitle !== evidenceCover.subtitle;
+    const groundedTitles = titlesChanged
+      ? fixFruitEmojisInTitles(ensureTitleFormats(grounded.titles, previousTitles))
+      : grounded.titles;
+    let finalCover = { title: grounded.coverTitle, subtitle: grounded.coverSubtitle };
+    if (coverChanged) {
+      finalCover = layoutCoverOverlay(grounded.coverTitle, grounded.coverSubtitle, groundedTitles, {
+        ...coverContext,
+        sourceTexts: [...groundedTitles, diversified.caption],
+      });
+    }
+    const sealed = ensureGroundedHeadlineCopy({
+      titles: groundedTitles,
+      coverTitle: finalCover.title,
+      coverSubtitle: finalCover.subtitle,
+      context: {
+        ...coverContext,
+        sourceTexts: [...groundedTitles, diversified.caption],
+      },
+    });
+    const finalTitles = sealed.titles.some((title, index) => title !== groundedTitles[index])
+      ? fixFruitEmojisInTitles(ensureTitleFormats(sealed.titles, previousTitles))
+      : sealed.titles;
+    const variationPlan = planGenerationVariation({
+      context: coverContext,
+      variantIndex: payload.variantIndex,
+      previousCaption: payload.previousCaption,
+      previousCoverTitle: payload.previousCoverTitle,
+      previousTitles,
+    });
+    const varied = ensureGenerationVariation({
+      titles: finalTitles,
+      caption: diversified.caption,
+      coverTitle: finalCover.title,
+      coverSubtitle: finalCover.subtitle,
+      plan: variationPlan,
+      context: coverContext,
+      previousCaption: payload.previousCaption,
+      previousCoverTitle: payload.previousCoverTitle,
+      previousTitles,
+      variantIndex: payload.variantIndex,
+    });
+    const variedTitles = varied.titles.some((title, index) => title !== finalTitles[index])
+      ? fixFruitEmojisInTitles(ensureTitleFormats(varied.titles, previousTitles))
+      : varied.titles;
+    let variedCover = { title: varied.coverTitle, subtitle: varied.coverSubtitle };
+    if (varied.coverTitle !== finalCover.title || varied.coverSubtitle !== finalCover.subtitle) {
+      variedCover = layoutCoverOverlay(varied.coverTitle, varied.coverSubtitle, variedTitles, {
+        ...coverContext,
+        sourceTexts: [...variedTitles, varied.caption],
+      });
+    }
+    const groundedVaried = ensureGroundedHeadlineCopy({
+      titles: variedTitles,
+      coverTitle: variedCover.title,
+      coverSubtitle: variedCover.subtitle,
+      context: {
+        ...coverContext,
+        sourceTexts: [...variedTitles, varied.caption],
+      },
+    });
+    const outputTitles = groundedVaried.titles.some((title, index) => title !== variedTitles[index])
+      ? fixFruitEmojisInTitles(ensureTitleFormats(groundedVaried.titles, previousTitles))
+      : groundedVaried.titles;
+    const outputCover = {
+      title: groundedVaried.coverTitle,
+      subtitle: groundedVaried.coverSubtitle,
+    };
     const located = attachOfficialLocationTime(
-      ensureCaptionEmojis(diversified.caption),
+      ensureCaptionEmojis(varied.caption),
       payload.branch,
       payload.requiredLocationFormat,
       payload.previousLocationFormat,
@@ -263,11 +356,11 @@ export async function POST(request: Request) {
         visitFrequency: payload.visitFrequency,
         mealExpenseThb: payload.totalMealExpense,
         origin: payload.dinerOrigin,
-        titles: evidenceTitles,
+        titles: outputTitles,
         caption: located.caption,
         hashtags,
-        coverTitle: evidenceCover.title,
-        coverSubtitle: evidenceCover.subtitle,
+        coverTitle: outputCover.title,
+        coverSubtitle: outputCover.subtitle,
         enjoyMost: payload.enjoyMost,
         recommendedDishes: payload.recommendedDishes,
         recommendedDishOther: payload.recommendedDishOther,
@@ -291,11 +384,11 @@ export async function POST(request: Request) {
     ]);
 
     return Response.json({
-      titles: evidenceTitles,
+      titles: outputTitles,
       caption: located.caption,
       hashtags,
-      coverTitle: evidenceCover.title,
-      coverSubtitle: evidenceCover.subtitle,
+      coverTitle: outputCover.title,
+      coverSubtitle: outputCover.subtitle,
       selectedPhotoIndex: parsed.selectedPhotoIndex,
       selectedPhotoIndexes: parsed.selectedPhotoIndexes,
       photoSelectionReason: parsed.photoSelectionReason,

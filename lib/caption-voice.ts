@@ -60,7 +60,9 @@ Before writing the caption, judge internally (do not print this list):
 3) Any like / so-so / dislike in the evidence?
 4) Any real price / queue / location / service detail?
 5) What opening is most natural this time?
-6) Short or long, from how much is worth sharing (existing length rule still applies; 2 sentences remain valid)?
-7) Is this too similar in structure, length, or tone to the previous caption?
+6) Does this follow THIS ROUND length band without inventing?
+7) Is this too similar in structure, opening, fact order, or length to the previous caption?
+8) If they selected several points, did I describe more than one in complete sentences — not a tag list?
+9) Is every sentence natural Chinese, not glued keywords (就是食材新鲜度感觉提升空间)?
 Final output must read like a consumer writing this meal in their own way — not an AI restaurant brochure.`;
 }
