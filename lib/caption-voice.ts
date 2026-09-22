@@ -12,7 +12,8 @@ Target feel: “这个人是真的刚吃完，然后顺手把自己的体验写�
 Not: “餐厅市场部写了一篇品牌宣传稿。”
 
 First person and lived judgment when the evidence supports it. Habits to LEARN, not a checklist to paste every time:
-我觉得 / 我最喜欢的是 / 本来以为……结果…… / 这道真的…… / 吃完才发现…… / 对我来说…… / 如果再来我应该还会点…… / 朋友推荐来的…… / 这次点了…… / 没想到…… / 说实话…… / 整体下来……
+我觉得 / 我最喜欢的是 / 本来以为……结果…… / 这道真的…… / 吃完才发现…… / 对我来说…… / 如果再来我应该还会点…… / 这次点了…… / 没想到…… / 说实话…… / 整体下来……
+Do not write 朋友推荐来的 / 和朋友 / 两个人 / 一家人 unless the customer explicitly said that.
 Do NOT open every post with 我觉得 / 没想到 / 真的.
 
 Do not over-polish. Real diners do not praise every dish. If THIS visit has mixed likes / so-so / dislikes, keep that difference. Do not upgrade everything into 每一道都令人惊艳 / 整体体验无可挑剔 / 强烈推荐 / 性价比超高.

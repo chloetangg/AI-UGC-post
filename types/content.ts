@@ -287,6 +287,14 @@ export type GeneratePostInput = {
   previousCoverHookType?: string;
   previousPrimaryExperience?: string;
   previousTitleAngle?: string;
+  previousGenerationMemories?: Array<{
+    contentFocus: string;
+    openingStyle: string;
+    informationPriority: string[];
+    dishOrder: string[];
+    structureType: string;
+    lengthLevel: string;
+  }>;
   campaignId?: string;
   submissionId?: string;
 };

@@ -7,6 +7,7 @@ import {
 import { sanitizeCoverLine } from "@/lib/cover/cover-title-text";
 import { chineseFullDishName, coverDishShortName } from "@/lib/cover/dish-names";
 import type { RecommendedDish } from "@/types/content";
+import { detectedPartyKinds, customerPartySource, neutralizeInventedPartyCopy } from "@/lib/party-size";
 
 export type CoverHookType =
   | "personal-experience"
@@ -192,7 +193,7 @@ export function extractExperienceFacts(context: CoverTitleContext = {}): Experie
     });
   }
 
-  if (/两个人|两人吃/.test(spoken)) {
+  if (/两个人|两人来|两人吃|两人用餐|两个人约会|二人世界|就我们俩/.test(spoken)) {
     add({
       id: "for-two",
       kind: "scene",
@@ -245,7 +246,7 @@ export function extractExperienceFacts(context: CoverTitleContext = {}): Experie
       markers: ["面积", "环境大", "够大", "很大", "空间"],
       coverMains: ["环境够大", "店里很大"],
       coverSubs: ["坐着不觉得挤", "环境大吃饭也舒服"],
-      titleHooks: ["环境够大，带家人吃泰餐很舒服", "这家泰餐环境大，吃饭也舒服"],
+      titleHooks: ["环境够大，吃泰餐很舒服", "这家泰餐环境大，吃饭也舒服"],
       captionLine: "店里的空间比想象中大很多，坐下来吃饭不会觉得挤。",
     });
   }
@@ -302,16 +303,28 @@ export function extractExperienceFacts(context: CoverTitleContext = {}): Experie
     });
   }
 
-  if (/餐厅风格有满满的家庭式温馨氛围/.test(enjoy) || /适合带小朋友|带娃|家庭用餐|适合家庭/.test(spoken)) {
+  const partyKinds = detectedPartyKinds(customerPartySource(context));
+  if (partyKinds.has("family") || partyKinds.has("kids")) {
     add({
       id: "family-friendly",
       kind: "atmosphere",
       hookType: "atmosphere",
-      markers: ["家庭", "带娃", "小朋友"],
-      coverMains: ["很适合家庭", "带家人来吃"],
+      markers: ["家人", "带娃", "小朋友"],
+      coverMains: ["带家人来吃", "很适合家庭"],
       coverSubs: ["带家人吃饭很舒服", "很适合家庭用餐"],
       titleHooks: ["带家人来吃泰餐很舒服", "很适合家庭用餐"],
       captionLine: "很适合带家人一起吃饭。",
+    });
+  } else if (partyKinds.has("family-suitable")) {
+    add({
+      id: "family-suitable",
+      kind: "atmosphere",
+      hookType: "atmosphere",
+      markers: ["家庭用餐"],
+      coverMains: ["很适合家庭用餐", "氛围很温馨"],
+      coverSubs: ["很适合家庭用餐", "氛围也比较温馨"],
+      titleHooks: ["很适合家庭用餐", "这家吃饭氛围很温馨"],
+      captionLine: "很适合家庭用餐，氛围也比较放松。",
     });
   }
 
@@ -499,6 +512,7 @@ USER DETAIL PRESERVATION: 老板很帅 ≠ 店员很亲切. 服务很好 ≠ 环
 centralwOrld RULE — Title 1 + Title 2 + Title 3 + Cover Title + Cover Subtitle must contain the exact token "centralwOrld" at least once. Only this spelling counts. Never CentralWorld / Centralworld / centralworld / Central World / central world / 尚泰世界 as a substitute. Weave it naturally in ONE place only. Do not repeat it. Do not stuff it. If a title already has a customer fact, prefer weaving into that line (e.g. centralwOrld逛街顺便吃泰餐) rather than a separate keyword dump.
 
 Forbidden unless the customer or confirmed data actually said it: 曼谷今天也太好吃了 / 隐藏在曼谷的宝藏餐厅 / 泰国本地人才知道的美食 / 第一次来曼谷一定要吃 / 曼谷美食天花板 / 隐藏宝藏 / 美食天花板.
+PARTY SIZE: mention 两个人 / 家人 / 朋友 / 小孩 / 一个人 only when the customer explicitly wrote that. Never infer from spend, dish count, photos, or tourist/local. If unknown, write 这次来吃 / 这顿吃下来.
 
 CONTENT ALLOCATION — same visit, different jobs. Do not paste the same sentence into title + caption + cover.
 TITLE = one hook from real input. CAPTION = the full true story. COVER = the shortest memorable line from the same real facts.
@@ -575,7 +589,16 @@ export function ensureEvidenceLedCopy(input: {
     titles = rewriteDiscoveryTitles(titles, facts, context);
   }
 
-  return { titles, caption, coverTitle, coverSubtitle };
+  return {
+    titles: [
+      neutralizeInventedPartyCopy(titles[0], context),
+      neutralizeInventedPartyCopy(titles[1], context),
+      neutralizeInventedPartyCopy(titles[2], context),
+    ] as [string, string, string],
+    caption: neutralizeInventedPartyCopy(caption, context),
+    coverTitle: neutralizeInventedPartyCopy(coverTitle, context),
+    coverSubtitle: neutralizeInventedPartyCopy(coverSubtitle, context),
+  };
 }
 
 const ENJOY_MARKERS: Record<string, string[]> = {
@@ -586,7 +609,7 @@ const ENJOY_MARKERS: Record<string, string[]> = {
   店员服务热情周到: ["服务", "热情"],
   店里菜品选择丰富: ["菜品", "选择"],
   食物味道正宗美味: ["正宗"],
-  餐厅风格有满满的家庭式温馨氛围: ["家庭", "温馨"],
+  餐厅风格有满满的家庭式温馨氛围: ["温馨"],
   支付可以使用支付宝: ["支付宝"],
 };
 
@@ -602,8 +625,7 @@ const NOTE_MARKERS = [
   "第一次",
   "正宗",
   "翻新",
-  "小朋友",
-  "家庭",
+  "家人",
 ] as const;
 
 export function normalizeExactCentralworld(text: string) {
@@ -797,5 +819,13 @@ export function ensureGroundedHeadlineCopy(input: {
     titles[index] = naturalCentralworldTitle(titles[index], context, facts);
   }
 
-  return { titles, coverTitle, coverSubtitle };
+  return {
+    titles: [
+      neutralizeInventedPartyCopy(titles[0], context),
+      neutralizeInventedPartyCopy(titles[1], context),
+      neutralizeInventedPartyCopy(titles[2], context),
+    ] as [string, string, string],
+    coverTitle: neutralizeInventedPartyCopy(coverTitle, context),
+    coverSubtitle: neutralizeInventedPartyCopy(coverSubtitle, context),
+  };
 }

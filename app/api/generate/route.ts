@@ -23,7 +23,7 @@ import { layoutCoverOverlay } from "@/lib/cover/cover-title";
 import { aggregateGenerationCost, logGenerationCost, usageFromCompletion } from "@/lib/openai-usage";
 import { ensureTitleFormats } from "@/lib/title-formats";
 import { enforceXiaohongshuCompliance } from "@/lib/compliance";
-import { ensureGenerationVariation, planGenerationVariation } from "@/lib/generation-variation";
+import { ensureGenerationVariation, planGenerationVariation, type GenerationMemory } from "@/lib/generation-variation";
 
 export const maxDuration = 60;
 
@@ -276,6 +276,7 @@ export async function POST(request: Request) {
       previousCaption: payload.previousCaption,
       previousCoverTitle: payload.previousCoverTitle,
       previousTitles,
+      previousMemories: payload.previousGenerationMemories as GenerationMemory[] | undefined,
     });
     const varied = ensureGenerationVariation({
       titles: finalTitles,
@@ -287,6 +288,7 @@ export async function POST(request: Request) {
       previousCaption: payload.previousCaption,
       previousCoverTitle: payload.previousCoverTitle,
       previousTitles,
+      previousMemories: payload.previousGenerationMemories as GenerationMemory[] | undefined,
       variantIndex: payload.variantIndex,
     });
     const variedTitles = varied.titles.some((title, index) => title !== finalTitles[index])
@@ -396,6 +398,7 @@ export async function POST(request: Request) {
       suitableTemplateIds: parsed.suitableTemplateIds,
       remainingPhotoIndexes: parsed.remainingPhotoIndexes,
       remainingOrderPattern: parsed.remainingOrderPattern,
+      generationMemory: varied.memory,
       selectedKspId: parsed.selectedKspId,
       selectedStorylineId: parsed.selectedStorylineId,
       selectedContentAngleId: parsed.selectedContentAngleId,

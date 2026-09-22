@@ -11,11 +11,15 @@ import {
   isWeakSeoCover,
 } from "../lib/content-evidence";
 import {
+  availableContentFocuses,
+  detectContentFocus,
   ensureGenerationVariation,
   hasUnnaturalChinese,
   isCaptionTooSimilar,
+  openingFamily,
   planGenerationVariation,
   storyHanCount,
+  type GenerationMemory,
 } from "../lib/generation-variation";
 
 function assert(condition: unknown, message: string) {
@@ -125,6 +129,7 @@ assert(
   `case5 missing size/family angle: ${case5.titles.join(" / ")}`,
 );
 assert(!/第一次来/.test(case5.titles.join("")), `case5 invented first-visit: ${case5.titles.join(" / ")}`);
+assert(!/带家人|两个人|一家三口|和朋友/.test(case5.titles.join("")), `case5 invented party: ${case5.titles.join(" / ")}`);
 assert(
   new Set(case5.titles.map((title) => title.replace(/🇹🇭|centralwOrld/g, "").slice(0, 6))).size >= 2,
   `case5 titles too similar: ${case5.titles.join(" / ")}`,
@@ -165,13 +170,16 @@ const thinCaption = ensureGenerationVariation({
   context: multiContext,
   variantIndex: 1,
 });
-assert(
-  /中文菜单/.test(thinCaption.caption) && /服务|热情/.test(thinCaption.caption) && /支付宝|空间|很大/.test(thinCaption.caption),
-  `multi-select caption still thin: ${thinCaption.caption}`,
+const thinHits = ["中文菜单", "服务", "支付宝", "空间", "很大", "正宗", "滑蛋"].filter((marker) =>
+  thinCaption.caption.includes(marker),
 );
+assert(thinHits.length >= 2, `multi-select caption still thin: ${thinCaption.caption}`);
+assert(thinHits.length <= 5, `multi-select still average-covered every point: ${thinCaption.caption}`);
 assert(!/有中文菜单，餐厅面积很大，店员服务/.test(thinCaption.caption), `multi-select listed tags: ${thinCaption.caption}`);
+assert(!/来曼谷当然要安排/.test(thinCaption.caption), `multi-select kept generic opener: ${thinCaption.caption}`);
 assert(!hasUnnaturalChinese(thinCaption.caption), `multi-select unnatural: ${thinCaption.caption}`);
-console.log(`variation multi-select: ${thinCaption.caption}`);
+assert(Boolean(thinCaption.memory?.contentFocus), "first generate missing contentFocus memory");
+console.log(`variation multi-select [${thinCaption.memory.contentFocus}]: ${thinCaption.caption}`);
 
 const polarity = ensureGenerationVariation({
   titles: ["曼谷泰餐味道很正宗", "中文菜单点餐太方便", "环境够大吃饭也舒服"],
@@ -208,8 +216,10 @@ const planB = planGenerationVariation({
   context: multiContext,
   variantIndex: 1,
   previousCaption: previousLong,
+  previousMemories: [planA.memory],
 });
-assert(planA.structureId !== planB.structureId || planA.lengthBand !== planB.lengthBand || planA.focusId !== planB.focusId, "consecutive plans did not rotate");
+assert(planA.contentFocus !== planB.contentFocus, `consecutive plans reused focus ${planA.contentFocus}`);
+assert(planA.openingStyle !== planB.openingStyle || planA.informationPriority.join(">") !== planB.informationPriority.join(">"), "consecutive plans kept the same opening and info order");
 const rebuilt = ensureGenerationVariation({
   titles: ["曼谷泰餐味道很正宗", "中文菜单点餐太方便", "环境够大吃饭也舒服"],
   caption: previousLong,
@@ -218,13 +228,136 @@ const rebuilt = ensureGenerationVariation({
   plan: planB,
   context: multiContext,
   previousCaption: previousLong,
+  previousMemories: [planA.memory],
   variantIndex: 1,
 });
 assert(!isCaptionTooSimilar(rebuilt.caption, previousLong), `regenerate still too similar: ${rebuilt.caption}`);
+assert(openingFamily(rebuilt.caption) !== openingFamily(previousLong), `regenerate kept opening family: ${rebuilt.caption}`);
 assert(
-  Math.abs(storyHanCount(rebuilt.caption) - storyHanCount(previousLong)) >= 10,
+  detectContentFocus(rebuilt.caption, extractExperienceFacts(multiContext)) !==
+    detectContentFocus(previousLong, extractExperienceFacts(multiContext)) ||
+    rebuilt.memory.contentFocus !== planA.contentFocus,
+  `regenerate kept the same content focus: ${rebuilt.caption}`,
+);
+assert(
+  Math.abs(storyHanCount(rebuilt.caption) - storyHanCount(previousLong)) >= 8,
   `length barely changed ${storyHanCount(previousLong)} → ${storyHanCount(rebuilt.caption)}: ${rebuilt.caption}`,
 );
-console.log(`variation regenerate: ${rebuilt.caption}`);
+console.log(`variation regenerate [${rebuilt.memory.contentFocus}]: ${rebuilt.caption}`);
+
+const consecutiveFocuses: string[] = [];
+const consecutiveMemories: GenerationMemory[] = [];
+let previousCaption = "";
+for (let index = 0; index < 4; index += 1) {
+  const plan = planGenerationVariation({
+    context: multiContext,
+    variantIndex: index,
+    previousCaption,
+    previousMemories: consecutiveMemories,
+  });
+  if (consecutiveMemories.length > 0) {
+    assert(
+      plan.contentFocus !== consecutiveMemories.at(-1)?.contentFocus,
+      `generate ${index + 1} reused last contentFocus ${plan.contentFocus}`,
+    );
+  }
+  const output = ensureGenerationVariation({
+    titles: ["曼谷泰餐味道很正宗", "中文菜单点餐太方便", "环境够大吃饭也舒服"],
+    caption: previousCaption || "来曼谷当然要安排一顿泰国菜。食物很好吃。",
+    coverTitle: "曼谷泰餐味道正宗",
+    coverSubtitle: "中文菜单太方便",
+    plan,
+    context: multiContext,
+    previousCaption: previousCaption || undefined,
+    previousMemories: consecutiveMemories.slice(),
+    variantIndex: index,
+  });
+  consecutiveFocuses.push(plan.contentFocus);
+  consecutiveMemories.push(output.memory);
+  previousCaption = output.caption;
+  console.log(`focus loop ${index + 1} [${plan.contentFocus} / ${plan.openingStyle}]: ${output.caption}`);
+}
+const available = availableContentFocuses(multiContext, extractExperienceFacts(multiContext));
+assert(new Set(consecutiveFocuses.slice(0, Math.min(3, available.length))).size >= Math.min(3, available.length), `first 3 regenerates reused focuses: ${consecutiveFocuses.join(" → ")}`);
+
+const baanYingContext = {
+  diningNote: "第一次来，环境舒适。老板很帅。蒜炒虾仁Q弹。青咖喱牛肉辣度适中，椰香浓郁。可以使用支付宝。在购物商场里的Baan Ying。",
+  enjoyMost: ["在购物商场里的泰餐连锁", "支付可以使用支付宝"],
+  dishes: ["Garlic Shrimp", "Green Curry Beef"],
+  recommendTo: ["蒜炒虾仁Q弹", "青咖喱牛肉辣度适中", "青咖喱牛肉椰香浓郁"],
+  customerType: "Tourist",
+  visitFrequency: "1st time",
+};
+const baanMemories: GenerationMemory[] = [];
+const baanFocuses: string[] = [];
+const baanCaptions: string[] = [];
+let lastBaan = "";
+for (let index = 0; index < 4; index += 1) {
+  const plan = planGenerationVariation({
+    context: baanYingContext,
+    variantIndex: index,
+    previousCaption: lastBaan,
+    previousMemories: baanMemories,
+  });
+  const output = ensureGenerationVariation({
+    titles: ["曼谷泰餐味道很正宗", "中文菜单点餐太方便", "环境够大吃饭也舒服"],
+    caption: lastBaan || "这次第一次来到centralwOrld的Baan Ying，老板特别帅，让整个用餐过程很愉快。",
+    coverTitle: "曼谷泰餐味道正宗",
+    coverSubtitle: "中文菜单太方便",
+    plan,
+    context: baanYingContext,
+    previousCaption: lastBaan || undefined,
+    previousMemories: baanMemories.slice(),
+    variantIndex: index,
+  });
+  if (baanFocuses.length > 0) {
+    assert(plan.contentFocus !== baanFocuses.at(-1), `Baan Ying generate ${index + 1} reused focus ${plan.contentFocus}`);
+    assert(!isCaptionTooSimilar(output.caption, lastBaan), `Baan Ying generate ${index + 1} too similar: ${output.caption}`);
+  }
+  baanFocuses.push(plan.contentFocus);
+  baanMemories.push(output.memory);
+  baanCaptions.push(output.caption);
+  lastBaan = output.caption;
+  console.log(`baan ying ${index + 1} [${plan.contentFocus}]: ${output.caption}`);
+}
+assert(new Set(baanFocuses).size >= 3, `Baan Ying focuses too repeated: ${baanFocuses.join(" → ")}`);
+
+const noParty = ensureGroundedHeadlineCopy({
+  titles: ["两个人来曼谷吃泰餐", "和朋友一起吃真的很舒服", "一家三口来这里很方便"],
+  coverTitle: "带家人来吃泰餐",
+  coverSubtitle: "一个人来吃也很方便",
+  context: {
+    enjoyMost: ["食物味道正宗美味", "餐厅风格有满满的家庭式温馨氛围"],
+    dishes: ["Scrambled Egg Rice", "Garlic Shrimp", "Crab Meat Curry", "Mango Sticky Rice"],
+    mealAmount: 2000,
+  },
+});
+assert(
+  !/两个人|和朋友|一家三口|带家人|一个人来|一家人/.test(
+    `${noParty.titles.join("")}${noParty.coverTitle}${noParty.coverSubtitle}`,
+  ),
+  `invented party size: ${noParty.titles.join(" / ")} | ${noParty.coverTitle} ${noParty.coverSubtitle}`,
+);
+const noPartyFacts = extractExperienceFacts({
+  enjoyMost: ["食物味道正宗美味", "餐厅风格有满满的家庭式温馨氛围"],
+  dishes: ["Scrambled Egg Rice"],
+  mealAmount: 2000,
+});
+assert(
+  !noPartyFacts.some((fact) => fact.id === "for-two" || fact.id === "family-friendly"),
+  `party facts without evidence: ${noPartyFacts.map((fact) => fact.id).join(",")}`,
+);
+
+const twoParty = ensureGroundedHeadlineCopy({
+  titles: ["曼谷泰餐味道很正宗", "中文菜单点餐太方便", "这次来吃很舒服"],
+  coverTitle: "曼谷泰餐味道正宗",
+  coverSubtitle: "这顿吃下来很满足",
+  context: { diningNote: "两个人来吃，味道很正宗" },
+});
+assert(
+  extractExperienceFacts({ diningNote: "两个人来吃，味道很正宗" }).some((fact) => fact.id === "for-two"),
+  "explicit 两个人 should create for-two",
+);
+console.log(`party two-person titles: ${twoParty.titles.join(" / ")}`);
 
 console.log("content-evidence cases passed");

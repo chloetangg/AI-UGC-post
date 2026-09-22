@@ -9,7 +9,8 @@ import { formatCoverHookRules, suggestCoverHookFamily } from "@/lib/cover/cover-
 import { formatCoverStyleFitRules } from "@/lib/cover/style-fit";
 import { formatCoverTitleRules } from "@/lib/cover/cover-rules";
 import { classifyCoverHookType, formatEvidencePriorityRules, previousPrimaryExperienceId } from "@/lib/content-evidence";
-import { formatGenerationVariationRules, planGenerationVariation } from "@/lib/generation-variation";
+import { formatGenerationVariationRules, planGenerationVariation, type GenerationMemory } from "@/lib/generation-variation";
+import { formatPartySizeRules } from "@/lib/party-size";
 import { allDishNameHints, chineseFullDishName, formatCaptionDishNameRules } from "@/lib/cover/dish-names";
 import { formatCaptionConsumerVoiceRules } from "@/lib/caption-voice";
 import { formatStrategyLibrary, formatStrategySelection } from "@/lib/content-strategy/format";
@@ -252,7 +253,7 @@ WRITING: Conversational Chinese. Warm, personal, slightly playful, specific. Sen
 Avoid: 作为一家 / 值得一提的是 / 不得不说 / 整体来说 / 这是一家非常值得 / 如果你正在寻找 / 无论是...还是...
 Avoid corporate, ad, and overly polished language. Caption must NOT simply repeat the titles.
 
-SAFETY: Do not invent experiences, opinions, dishes, prices, promotions, ingredients, locations, awards, hours, events, spice, texture, cooking methods, celebrity visits, Michelin, rankings, or “best/No.1” claims.
+SAFETY: Do not invent experiences, opinions, dishes, prices, promotions, ingredients, locations, awards, hours, events, spice, texture, cooking methods, celebrity visits, Michelin, rankings, party size, companions, or “best/No.1” claims.
 Photos are evidence, not permission to hallucinate. Only mention visuals you can actually see AND that customer data can support.
 ${complianceGenerationRules()}
 
@@ -308,7 +309,9 @@ Do NOT write 第一次美食冒险 / 美食冒险 / 味蕾冒险 / 美食探险 
 Do not force 第一次来尝试Baan Ying into every first-visit post, and do not open every post with 第一次来曼谷. Use it only when the story actually mentions first time.
 Not first visit (No): they have been before. Do not write as a first-time discovery. Do not invent 每次来 / 又来了 unless the dining note says they return often.
 Local: do not explain basic Bangkok tourist info.
-Favorite = food → food is central. Atmosphere → environment may appear. Variety → ordering several dishes. Sharing → sharing/group, but do not invent companions.
+Favorite = food → food is central. Atmosphere → environment may appear. Variety → ordering several dishes. Never invent companions or headcount.
+If the customer did not write 几个人 / 一家几口 / 和朋友 / 和家人 / 和孩子 / 和伴侣 / 一个人 / 两个人 / 聚餐, do not mention any of those. Use 这次来吃 / 这顿吃下来.
+Never infer party size from tourist/local, dish count, photo count, spend, or other answers. 4 dishes ≠ 几个人. ฿2,000 ≠ 一家人.
 Avoid empty lines like “这里提供丰富的泰式料理，适合朋友聚餐，整体体验非常不错。”
 
 EMOJI — titles and caption story body may use them. Cover overlay never uses emoji. Location 📍/⏰ do not count.
@@ -388,7 +391,8 @@ VALIDATE before returning:
 - suitableTemplateIds lists ONLY styles that pass composition fit (not all 6 by default); if none fit, ["photo-only"]; selectedTemplateId is one of those IDs and is not copied from the sample JSON
 - remainingPhotoOrder uses original uploads only: four-grid re-sorts ALL photos; non-grid excludes the cover source and never repeats it
 - selectedKspId / selectedStorylineId / selectedContentAngleId / selectedSearchKeyword are internal only and never appear in the consumer post
-- no invented facts; brand used only if it strengthens THIS story
+- no invented facts, party size, or companions; brand used only if it strengthens THIS story
+- if the customer did not write who they dined with, titles/caption/cover use 这次来吃 / 这顿吃下来 and never 两个人 / 和朋友 / 一家三口 / 带家人 / 一个人来
 - rewrite any risky sentence into neutral personal experience before return; never output internal compliance notes
 - never copy customer negative wording (贵/难吃/踩雷/不推荐/失望/抽奖送东西/服务不好 etc.) into titles, caption, hashtags, or cover; keep meaning as neutral wording, never as false praise`;
 }
@@ -480,6 +484,7 @@ export function buildUserPrompt(input: GenerateRequestBody) {
     previousCaption,
     previousCoverTitle,
     previousTitles: input.previousTitles ?? [],
+    previousMemories: input.previousGenerationMemories as GenerationMemory[] | undefined,
   });
 
   const previousBlock =
@@ -569,7 +574,11 @@ ${formatEvidencePriorityRules(
   },
   input.previousTitles ?? [],
 )}
-${formatGenerationVariationRules(variationPlan)}
+${formatGenerationVariationRules(variationPlan, input.previousGenerationMemories as GenerationMemory[] | undefined)}
+${formatPartySizeRules({
+  diningNote,
+  enjoyMost: [...input.enjoyMost.filter((item) => item !== "其他"), input.enjoyMostOther?.trim() ?? ""].filter(Boolean),
+})}
 Previous mainTitle dish name: ${previousCoverDishHint}
 ${dishAngleHint}
 Suggested cover hook family: ${suggestedCoverHook}. Use it if the customer evidence supports it; otherwise pick another family from the library. Do not invent social proof or dishes.

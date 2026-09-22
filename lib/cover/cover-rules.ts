@@ -320,6 +320,14 @@ export function inventsUnsupportedCoverClaim(text: string, context: CoverTitleCo
   if (/帅老板|老板好帅|老板很帅|被老板帅/.test(text) && !/帅/.test(evidence)) return true;
   if (/老板很亲切|老板本人很亲切/.test(text) && !/老板/.test(evidence)) return true;
   if (/被服务圈粉|服务真的很好|服务也很舒服/.test(text) && !/服务|店员服务/.test(evidence)) return true;
+  if (
+    /两个人|和朋友|一家[三四五]口|一家人|带家人|一个人来|我们几个/.test(text) &&
+    !/两个人|两人来|两人吃|和朋友|家人一起|带家人|一家[三四五]口|一个人来|几个人/.test(
+      `${context.diningNote ?? ""} ${(context.enjoyMost ?? []).join(" ")}`,
+    )
+  ) {
+    return true;
+  }
   return false;
 }
 
@@ -392,9 +400,13 @@ export function subtitleFromCoverContext(context: CoverTitleContext = {}) {
   }
   const amount = context.mealAmount;
   if (typeof amount === "number" && Number.isFinite(amount) && amount > 0) {
-    const withAmount = `两人${Math.round(amount)}泰铢很满足`;
+    const party = /两个人|两人来|两人吃|两人用餐/.test(context.diningNote ?? "");
+    const withAmount = party
+      ? `两人${Math.round(amount)}泰铢很满足`
+      : `${Math.round(amount)}泰铢这顿很满足`;
     if (fitsSubtitleUnits(withAmount)) return withAmount;
-    if (fitsSubtitleUnits("两个人吃下来很满足")) return "两个人吃下来很满足";
+    if (party && fitsSubtitleUnits("两个人吃下来很满足")) return "两个人吃下来很满足";
+    if (fitsSubtitleUnits("这顿吃下来很满足")) return "这顿吃下来很满足";
   }
   if (/1st time|first/i.test(context.visitFrequency ?? "")) {
     return "第一次来尝试Baan Ying";
@@ -475,12 +487,12 @@ Pick ONE core evidence only. Then choose the highest style the evidence actually
 2 contrast/surprise ONLY if the customer said something unexpected
 3 scene (逛完街来吃刚刚好 / 自己动手拌打抛饭)
 4 emotion already in the evidence (这顿吃下来很满足)
-5 information last (两人600泰铢吃得满足 / 咖喱蟹肉很有家常味)
+5 information last (这顿吃下来很满足 / 咖喱蟹肉很有家常味). Mention 两人 only if the customer wrote they dined as two.
 Never glue dish + price + first-visit. Never 咖喱蟹肉味道很像泰式家常菜而且两个人吃600泰铢.
 Do not default to 菜名+很好吃 / 菜名+很有家常味 when a supported hook exists.
 Do not inflate: 不错 ≠ 惊艳到不行; 价格还可以 ≠ 吃到撑; 第一次来 ≠ 狠狠圈粉 / 彻底爱上; 喜欢 ≠ 直接封神.
 
-GOOD: 这口咖喱蟹肉像家的味道 / 没想到超爱的是这道 / 原来打抛饭也可以DIY / 逛完街来吃刚刚好 / 两个人吃下来很满足 / 老板本人很有记忆点 / 服务也很舒服
+GOOD: 这口咖喱蟹肉像家的味道 / 没想到超爱的是这道 / 原来打抛饭也可以DIY / 逛完街来吃刚刚好 / 这顿吃下来很满足 / 老板本人很有记忆点 / 服务也很舒服
 BAD: 咖喱蟹肉很有家常味 (too flat if a hook exists) / 咖喱蟹肉很好吃 / 第一次来咖喱蟹肉很好吃 / 第一次来就被狠狠圈粉 / 精选泰式家常料理 / 老板很帅服务很好 (two facts glued)
 Length: 6–10 units, never empty, never a broken sentence. Do not copy the dining note verbatim. Do not repeat mainTitle.
 

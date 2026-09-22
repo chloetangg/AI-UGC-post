@@ -17,6 +17,7 @@ import { pickSuggestedStrategy, resolveStrategySelection } from "@/lib/content-s
 import { BAAN_YING_CONTENT_STRATEGY } from "@/lib/brand/baan-ying-strategy";
 import { keywordsFromTitles } from "@/lib/title-keywords";
 import { buildGenerateRequest } from "@/lib/generate-prompt";
+import type { GenerationMemory } from "@/lib/generation-variation";
 import { emptyCustomerInfo, type CustomerInfo } from "@/types/customer";
 import { isMealExpenseRangeComplete } from "@/lib/meal-expense";
 import { isKnownOriginCity } from "@/lib/world-cities";
@@ -78,6 +79,7 @@ type PersistedFlow = {
   storylineHistory: string[];
   searchKeywordHistory: string[];
   coverTemplateHistory: string[];
+  generationMemoryHistory: GenerationMemory[];
 };
 
 export type GeneratePhase = "post" | "cover";
@@ -143,6 +145,7 @@ function defaultPersisted(): PersistedFlow {
     storylineHistory: [],
     searchKeywordHistory: [],
     coverTemplateHistory: [],
+    generationMemoryHistory: [],
   };
 }
 
@@ -512,6 +515,8 @@ export function CampaignFlowProvider({
       previousCoverTitle: [current.cover?.coverTitle || current.generated?.coverTitle, current.cover?.coverSubtitle || current.generated?.coverSubtitle]
         .filter((part) => Boolean(part?.trim()))
         .join(" / "),
+      previousGenerationMemories:
+        current.generationMemoryHistory?.length > 0 ? current.generationMemoryHistory : undefined,
       campaignId,
       submissionId: ensureSubmissionId(campaignId),
     });
@@ -532,6 +537,7 @@ export function CampaignFlowProvider({
       locationFormat?: string;
       cost?: GenerationCostReport;
       generationId?: string;
+      generationMemory?: GenerationMemory;
     };
     try {
       data = (await response.json()) as GeneratedContent & {
@@ -539,6 +545,7 @@ export function CampaignFlowProvider({
         locationFormat?: string;
         cost?: GenerationCostReport;
         generationId?: string;
+        generationMemory?: GenerationMemory;
       };
     } catch {
       if (response.status === 413) {
@@ -671,6 +678,10 @@ export function CampaignFlowProvider({
     const storylineHistory = [...(current.storylineHistory ?? []), selectedStrategy.storylineId].slice(-8);
     const searchKeywordHistory = [...(current.searchKeywordHistory ?? []), selectedStrategy.searchKeyword].slice(-8);
     const coverTemplateHistory = [...(current.coverTemplateHistory ?? []), selectedTemplateId].slice(-9);
+    const generationMemoryHistory = [
+      ...(current.generationMemoryHistory ?? []),
+      data.generationMemory,
+    ].filter((item): item is GenerationMemory => Boolean(item?.contentFocus)).slice(-3);
     const generationId = data.generationId?.trim() || "";
     patchFlow(campaignId, {
       generationId,
@@ -690,6 +701,7 @@ export function CampaignFlowProvider({
       storylineHistory,
       searchKeywordHistory,
       coverTemplateHistory,
+      generationMemoryHistory,
       selectedCoverTemplateId: selectedTemplateId,
     });
 

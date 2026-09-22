@@ -3,7 +3,10 @@ import {
   type ExperienceFact,
 } from "@/lib/content-evidence";
 import type { CoverTitleContext } from "@/lib/cover/cover-rules";
+import { chineseFullDishName } from "@/lib/cover/dish-names";
 import { stripGeneratedLocationTime } from "@/lib/locations";
+import { neutralizeInventedPartyCopy } from "@/lib/party-size";
+import type { RecommendedDish } from "@/types/content";
 
 export const CAPTION_STRUCTURES = ["A", "B", "C", "D", "E", "F"] as const;
 export type CaptionStructureId = (typeof CAPTION_STRUCTURES)[number];
@@ -11,18 +14,35 @@ export type CaptionStructureId = (typeof CAPTION_STRUCTURES)[number];
 export const CAPTION_LENGTH_BANDS = ["short", "medium", "long", "extended"] as const;
 export type CaptionLengthBand = (typeof CAPTION_LENGTH_BANDS)[number];
 
-export const CAPTION_FOCUSES = [
-  "food",
-  "atmosphere",
-  "service",
-  "highlight",
-  "experience",
-  "custom",
-  "dish",
-  "location",
-  "spend",
+export const CONTENT_FOCUSES = [
+  "FOOD",
+  "CONVENIENCE",
+  "EXPERIENCE",
+  "FIRST_VISIT",
+  "SHOPPING",
+  "SIGNATURE_DISH",
 ] as const;
-export type CaptionFocusId = (typeof CAPTION_FOCUSES)[number];
+export type ContentFocusId = (typeof CONTENT_FOCUSES)[number];
+export type CaptionFocusId = ContentFocusId;
+
+export const OPENING_STYLES = [
+  "dish-first",
+  "shopping-first",
+  "experience-first",
+  "convenience-first",
+  "first-visit-first",
+  "owner-first",
+] as const;
+export type OpeningStyleId = (typeof OPENING_STYLES)[number];
+
+export type GenerationMemory = {
+  contentFocus: ContentFocusId;
+  openingStyle: OpeningStyleId | string;
+  informationPriority: string[];
+  dishOrder: string[];
+  structureType: string;
+  lengthLevel: CaptionLengthBand;
+};
 
 export const LENGTH_BAND_RANGE: Record<CaptionLengthBand, { min: number; max: number }> = {
   short: { min: 80, max: 120 },
@@ -32,38 +52,64 @@ export const LENGTH_BAND_RANGE: Record<CaptionLengthBand, { min: number; max: nu
 };
 
 export type GenerationVariationPlan = {
+  contentFocus: ContentFocusId;
+  openingStyle: OpeningStyleId;
+  informationPriority: string[];
+  selectedFactIds: string[];
+  dishOrder: string[];
+  structureType: string;
   structureId: CaptionStructureId;
   lengthBand: CaptionLengthBand;
   lengthMin: number;
   lengthMax: number;
-  focusId: CaptionFocusId;
-  coverFocusId: CaptionFocusId;
-  titleFocuses: [CaptionFocusId, CaptionFocusId, CaptionFocusId];
+  focusId: ContentFocusId;
+  coverFocusId: ContentFocusId;
+  titleFocuses: [ContentFocusId, ContentFocusId, ContentFocusId];
+  memory: GenerationMemory;
 };
 
-const STRUCTURE_COPY: Record<CaptionStructureId, string> = {
-  A: "Structure A — food-led: opening → dishes/food → restaurant experience → other selected points → light recommend",
-  B: "Structure B — visit-led: opening → restaurant trait → environment/service → food → recommend",
-  C: "Structure C — visitor-led: opening → tourist-helpful points (Chinese menu / payment / service) → food → overall feel",
-  D: "Structure D — dish-led: opening → recommended dish → why they recommend it → other restaurant experience → close",
-  E: "Structure E — experience-led: opening → first-impression / this visit feel → restaurant traits → food → other details",
-  F: "Structure F — light share: short opening → 2–3 strongest real highlights → brief close. Do not list every tag.",
+const STRUCTURE_COPY: Record<ContentFocusId, string> = {
+  FOOD: "FOOD — 这家吃什么？ dish → taste/texture → second dish → light restaurant close. Do NOT open from first-visit/mall.",
+  CONVENIENCE: "CONVENIENCE — 去这里吃饭方便吗？ mall/pay/menu → dining ease → food last.",
+  EXPERIENCE: "EXPERIENCE — 这家有什么特别？ atmosphere/owner/service → overall feel → food last.",
+  FIRST_VISIT: "FIRST_VISIT — 第一次来是什么感觉？ first try → restaurant → one or two dishes → close.",
+  SHOPPING: "SHOPPING — 逛街顺便吃。 centralwOrld/mall → sit down → food → convenience.",
+  SIGNATURE_DISH: "SIGNATURE_DISH — 一道菜讲透。 one dish → why they liked it → one other detail only.",
 };
 
-const FOCUS_COPY: Record<CaptionFocusId, string> = {
-  food: "food / overall taste",
-  atmosphere: "space / atmosphere",
-  service: "service / staff",
-  highlight: "a selected restaurant highlight",
-  experience: "the overall dining feel",
-  custom: "the customer's own written note",
-  dish: "a selected recommended dish",
-  location: "mall / location scene",
-  spend: "spend / value only if the customer gave an amount",
+const FOCUS_COPY: Record<ContentFocusId, string> = {
+  FOOD: "food / dishes / taste",
+  CONVENIENCE: "tourist convenience: pay / Chinese menu / mall dining",
+  EXPERIENCE: "restaurant experience: owner / space / service / feel",
+  FIRST_VISIT: "first visit at Baan Ying",
+  SHOPPING: "mall-stop / centralwOrld shopping then eat",
+  SIGNATURE_DISH: "one signature dish in depth",
+};
+
+const FOCUS_TO_STRUCTURE: Record<ContentFocusId, CaptionStructureId> = {
+  FOOD: "A",
+  CONVENIENCE: "C",
+  EXPERIENCE: "B",
+  FIRST_VISIT: "E",
+  SHOPPING: "B",
+  SIGNATURE_DISH: "D",
+};
+
+const FOCUS_TO_OPENING: Record<ContentFocusId, OpeningStyleId> = {
+  FOOD: "dish-first",
+  CONVENIENCE: "convenience-first",
+  EXPERIENCE: "experience-first",
+  FIRST_VISIT: "first-visit-first",
+  SHOPPING: "shopping-first",
+  SIGNATURE_DISH: "dish-first",
 };
 
 const FACT_DESCRIPTIONS: Record<string, string[]> = {
-  "handsome-owner": ["这顿还有个记忆点，老板本人真的很有印象。", "老板本人很帅，见面就会记住。"],
+  "handsome-owner": [
+    "老板很帅这一点真的很难不注意到，整体用餐氛围也很轻松。",
+    "还有一个很容易让人记住的小细节，就是老板很帅。",
+    "这顿还有个记忆点，老板本人真的很有印象。",
+  ],
   "friendly-owner": ["老板本人很亲切，吃饭时感觉很自然。", "老板很好说话，整个人会放松下来。"],
   "good-service": [
     "店员服务很热情，整个用餐过程都让人觉得很舒服。",
@@ -72,7 +118,7 @@ const FACT_DESCRIPTIONS: Record<string, string[]> = {
   "mall-stop": ["逛完街之后刚好过来吃，行程上刚刚好。", "逛街后来吃这顿，时间上刚刚好。"],
   comfortable: ["店里坐着很舒服，整个人都放松下来了。", "店里氛围比较放松，适合慢慢吃。"],
   "first-visit": ["第一次来，原本只是想试试看。", "第一次来尝试Baan Ying，没有想太多。"],
-  "for-two": ["两个人吃下来很满足。", "两个人点，份量刚刚好。"],
+  "for-two": ["两个人吃下来很满足。", "两个人来吃，份量刚刚好。"],
   "featured-dish": [],
   "chinese-menu": [
     "店里有中文菜单，点菜不会有太大压力。",
@@ -87,6 +133,7 @@ const FACT_DESCRIPTIONS: Record<string, string[]> = {
   variety: ["店里菜品选择很多，点餐不纠结。", "想吃的泰餐基本都点得到。"],
   alipay: ["结账可以用支付宝，付款方便很多。", "对中国游客来说，支付宝也可以使用，付款的时候会方便很多。"],
   "family-friendly": ["很适合带家人一起吃饭，氛围也比较温馨。", "带家人来吃，整体感觉很轻松。"],
+  "family-suitable": ["很适合家庭用餐，氛围也比较放松。", "这家吃饭氛围很温馨。"],
   "authentic-taste": [
     "食物整体味道很正宗，吃起来就是很熟悉的泰式风味。",
     "这顿味道很正宗，吃着很满足。",
@@ -140,29 +187,88 @@ export function evidenceRichness(context: CoverTitleContext = {}) {
   return score;
 }
 
-function availableFocuses(context: CoverTitleContext, facts: ExperienceFact[]): CaptionFocusId[] {
-  const focuses = new Set<CaptionFocusId>();
+function selectedDishNames(context: CoverTitleContext) {
+  return (context.dishes ?? [])
+    .filter((item) => item && item !== "Others")
+    .map((item) => chineseFullDishName(item as RecommendedDish) || item)
+    .filter(Boolean);
+}
+
+function dishFactId(name: string) {
+  return `dish:${name}`;
+}
+
+function dishFactsFromContext(context: CoverTitleContext): ExperienceFact[] {
+  const reasons = (context.recommendTo ?? []).filter((item) => item && item !== "其他");
+  return selectedDishNames(context).map((name) => {
+    const matched = reasons.find((reason) => reason.includes(name) || name.includes(reason.replace(/[^\u4e00-\u9fffA-Za-z]/g, "").slice(0, 2)));
+    const detail = matched
+      ? matched.includes(name)
+        ? matched.replace(name, "").replace(/^[，,、\s]+/, "")
+        : matched
+      : "";
+    return {
+      id: dishFactId(name),
+      kind: "food",
+      hookType: "food",
+      markers: [name],
+      coverMains: [name],
+      coverSubs: [`这口${name}很香`],
+      titleHooks: [`曼谷泰餐${name}很满足`],
+      captionLine: detail
+        ? `${name}${detail}，吃起来很有记忆点。`.replace(/，+/g, "，")
+        : `${name}很好吃，吃完还想再点。`,
+    };
+  });
+}
+
+function workingFacts(context: CoverTitleContext) {
+  const extracted = extractExperienceFacts(context);
+  const dishes = dishFactsFromContext(context);
+  if (dishes.length === 0) return extracted;
+  return [...dishes, ...extracted.filter((fact) => fact.id !== "featured-dish")];
+}
+
+function resolveFactId(item: string, facts: ExperienceFact[]) {
+  if (facts.some((fact) => fact.id === item)) return item;
+  const dish = facts.find((fact) => fact.id === dishFactId(item) || fact.markers.includes(item));
+  return dish?.id;
+}
+
+export function availableContentFocuses(context: CoverTitleContext = {}, facts: ExperienceFact[] = []) {
   const enjoy = (context.enjoyMost ?? []).join(" ");
   const note = context.diningNote?.trim() ?? "";
-  if (facts.some((fact) => fact.kind === "food") || /正宗|好吃/.test(`${enjoy}${note}`)) focuses.add("food");
-  if (facts.some((fact) => fact.kind === "atmosphere") || /面积|环境|温馨|翻新/.test(`${enjoy}${note}`)) {
-    focuses.add("atmosphere");
+  const dishes = selectedDishNames(context);
+  const focuses: ContentFocusId[] = [];
+  if (dishes.length > 0 || facts.some((fact) => fact.kind === "food") || /正宗|好吃/.test(`${enjoy}${note}`)) {
+    focuses.push("FOOD");
   }
-  if (facts.some((fact) => fact.kind === "service") || /服务|中文菜单|支付宝/.test(`${enjoy}${note}`)) {
-    focuses.add("service");
+  if (dishes.length > 0) focuses.push("SIGNATURE_DISH");
+  if (
+    facts.some((fact) => fact.id === "chinese-menu" || fact.id === "alipay") ||
+    /中文菜单|支付宝/.test(`${enjoy}${note}`) ||
+    context.customerType === "Tourist"
+  ) {
+    focuses.push("CONVENIENCE");
   }
-  if (enjoy.length > 0) focuses.add("highlight");
-  if (note.length > 0) {
-    focuses.add("custom");
-    focuses.add("experience");
+  if (
+    facts.some((fact) =>
+      ["handsome-owner", "friendly-owner", "good-service", "comfortable", "spacious", "renovated"].includes(fact.id),
+    ) ||
+    /老板|环境|舒服|服务/.test(`${enjoy}${note}`)
+  ) {
+    focuses.push("EXPERIENCE");
   }
-  if ((context.dishes ?? []).some((item) => item && item !== "Others")) focuses.add("dish");
-  if (facts.some((fact) => fact.id === "mall-stop" || fact.id === "mall-chain") || /商场|逛/.test(`${enjoy}${note}`)) {
-    focuses.add("location");
+  if (facts.some((fact) => fact.id === "first-visit") || /1st time/i.test(context.visitFrequency ?? "") || /第一次/.test(note)) {
+    focuses.push("FIRST_VISIT");
   }
-  if (typeof context.mealAmount === "number" && context.mealAmount > 0) focuses.add("spend");
-  if (focuses.size === 0) focuses.add("experience");
-  return [...focuses];
+  if (
+    facts.some((fact) => fact.id === "mall-stop" || fact.id === "mall-chain") ||
+    /商场|逛/.test(`${enjoy}${note}`)
+  ) {
+    focuses.push("SHOPPING");
+  }
+  return focuses.length > 0 ? focuses : (["EXPERIENCE"] as ContentFocusId[]);
 }
 
 function pickRotated<T>(items: T[], seed: number, avoid?: T) {
@@ -177,16 +283,27 @@ function allowedLengthBands(richness: number): CaptionLengthBand[] {
   return ["medium", "long", "extended"];
 }
 
-function detectFocus(text: string, facts: ExperienceFact[]): CaptionFocusId {
-  const hay = text;
-  if (facts.some((fact) => fact.id === "featured-dish" && fact.markers.some((marker) => hay.includes(marker)))) {
-    return "dish";
+export function detectContentFocus(text: string, facts: ExperienceFact[] = []): ContentFocusId {
+  const opening = storyCaptionText(text).replace(/[\p{Extended_Pictographic}]/gu, "").slice(0, 22);
+  if (/^第一次来|^第一次来到|原本只是想试试看/.test(opening)) return "FIRST_VISIT";
+  if (/^在centralwOrld|^逛|逛街|商场里/.test(opening)) return "SHOPPING";
+  if (/支付宝|中文菜单|对游客来说|吃饭方便|方便程度/.test(opening)) return "CONVENIENCE";
+  if (/老板|环境|轻松的用餐|最喜欢的是那种|用餐时的感觉|很容易让人记住的小细节/.test(opening)) return "EXPERIENCE";
+  if (/最想推荐的是|这道真的可以单独|还是/.test(opening) && /虾|咖喱|饭|菜/.test(opening)) return "SIGNATURE_DISH";
+  if (facts.some((fact) => fact.kind === "food" && fact.markers.some((marker) => opening.includes(marker)))) {
+    return "FOOD";
   }
-  if (/服务|中文菜单|支付宝/.test(hay)) return "service";
-  if (/面积|很大|温馨|翻新|舒服|环境/.test(hay)) return "atmosphere";
-  if (/逛|商场|centralwOrld/.test(hay)) return "location";
-  if (/正宗|好吃|味道|菜/.test(hay)) return "food";
-  return "experience";
+  return "FOOD";
+}
+
+export function openingFamily(caption: string) {
+  const opening = storyCaptionText(caption).replace(/[\p{Extended_Pictographic}]/gu, "").slice(0, 22);
+  if (/第一次来|第一次来到|原本只是想/.test(opening)) return "first-visit-first";
+  if (/逛|centralwOrld逛|商场/.test(opening)) return "shopping-first";
+  if (/支付宝|中文菜单|方便程度|对游客|吃饭方便/.test(opening)) return "convenience-first";
+  if (/老板|环境|轻松|用餐感觉|用餐时的感觉|很容易让人记住的小细节/.test(opening)) return "experience-first";
+  if (/最想推荐|蒜炒|咖喱|虾仁|这道|比较想说的还是吃/.test(opening)) return "dish-first";
+  return "other";
 }
 
 function detectOpening(caption: string) {
@@ -206,89 +323,164 @@ function factOrder(caption: string, facts: ExperienceFact[]) {
   return hits.sort().map((item) => item.split(":")[1]);
 }
 
+function factPriorityForFocus(
+  focus: ContentFocusId,
+  facts: ExperienceFact[],
+  dishes: string[],
+  seed: number,
+): string[] {
+  const has = (id: string) => facts.some((fact) => fact.id === id);
+  void seed;
+  switch (focus) {
+    case "FOOD":
+      return [...dishes, ...["featured-dish", "authentic-taste", "variety", "comfortable"].filter(has)];
+    case "SIGNATURE_DISH":
+      return [...dishes.slice(0, 1), "featured-dish", ...["authentic-taste", "good-service"].filter(has)];
+    case "CONVENIENCE":
+      return [...["chinese-menu", "alipay", "mall-chain"].filter(has), ...dishes.slice(0, 1)];
+    case "EXPERIENCE":
+      return [
+        ...["handsome-owner", "friendly-owner", "comfortable", "spacious", "good-service", "renovated"].filter(has),
+        ...dishes.slice(0, 1),
+      ];
+    case "FIRST_VISIT":
+      return ["first-visit", ...["handsome-owner", "good-service", "comfortable"].filter(has), ...dishes.slice(0, 2)];
+    case "SHOPPING":
+      return [...["mall-stop", "mall-chain", "alipay", "chinese-menu"].filter(has), ...dishes.slice(0, 1)];
+    default:
+      return facts.map((fact) => fact.id);
+  }
+}
+
 export function planGenerationVariation(input: {
   context?: CoverTitleContext;
   variantIndex?: number;
   previousCaption?: string;
   previousCoverTitle?: string;
   previousTitles?: string[];
+  previousMemories?: GenerationMemory[];
 }): GenerationVariationPlan {
   const context = input.context ?? {};
-  const facts = extractExperienceFacts(context);
-  const focuses = availableFocuses(context, facts);
+  const facts = workingFacts(context);
+  const focuses = availableContentFocuses(context, facts);
   const seed = input.variantIndex ?? 0;
+  const memories = (input.previousMemories ?? []).slice(-3);
   const previousCaption = input.previousCaption ?? "";
-  const previousFocus = previousCaption ? detectFocus(previousCaption, facts) : undefined;
-  const previousCoverFocus = input.previousCoverTitle
-    ? detectFocus(input.previousCoverTitle, facts)
-    : undefined;
-  const previousBand = previousCaption ? detectLengthBand(previousCaption) : undefined;
-  const previousStructure = previousCaption
-    ? CAPTION_STRUCTURES[storyHanCount(previousCaption) % CAPTION_STRUCTURES.length]
-    : undefined;
+  const usedFocuses = new Set(
+    [
+      ...memories.map((item) => item.contentFocus),
+      previousCaption ? detectContentFocus(previousCaption, facts) : undefined,
+    ].filter((item): item is ContentFocusId => Boolean(item)),
+  );
+  const usedOpenings = new Set(memories.map((item) => item.openingStyle));
+  const usedLengths = new Set(memories.map((item) => item.lengthLevel));
+  const usedPriorities = new Set(memories.map((item) => item.informationPriority.join(">")));
+  const usedDishOrders = new Set(memories.map((item) => item.dishOrder.join(">")));
 
-  const focusId = pickRotated(focuses, seed + 3, previousFocus) ?? "experience";
-  const coverFocusId =
+  const freshFocuses = focuses.filter((item) => !usedFocuses.has(item));
+  const focusPool = freshFocuses.length > 0 ? freshFocuses : focuses.filter((item) => item !== memories.at(-1)?.contentFocus);
+  const contentFocus = pickRotated(focusPool.length ? focusPool : focuses, seed + 3) ?? focuses[0] ?? "EXPERIENCE";
+
+  const dishes = selectedDishNames(context);
+  let dishOrder = dishes.slice();
+  if (dishOrder.length > 1) {
+    const rotated = [...dishOrder.slice(seed % dishOrder.length), ...dishOrder.slice(0, seed % dishOrder.length)];
+    dishOrder = usedDishOrders.has(rotated.join(">")) && dishOrder.length > 1 ? [...dishOrder].reverse() : rotated;
+  }
+
+  let informationPriority = factPriorityForFocus(contentFocus, facts, dishOrder, seed)
+    .filter((item) => Boolean(resolveFactId(item, facts)));
+  if (usedPriorities.has(informationPriority.join(">")) && informationPriority.length > 1) {
+    informationPriority = [...informationPriority.slice(1), informationPriority[0]!];
+  }
+  const selectedFactIds = [...new Set(informationPriority.map((item) => resolveFactId(item, facts)).filter((id): id is string => Boolean(id)))]
+    .slice(0, contentFocus === "SIGNATURE_DISH" ? 3 : 5);
+
+  const openingStyle =
     pickRotated(
-      focuses.filter((item) => item !== focusId),
-      seed + 11,
-      previousCoverFocus,
-    ) ?? focusId;
-  const titlePool = [...focuses];
-  const titleFocuses: [CaptionFocusId, CaptionFocusId, CaptionFocusId] = [
-    pickRotated(titlePool, seed + 1, previousFocus) ?? focusId,
-    pickRotated(titlePool, seed + 5, focusId) ?? "highlight",
-    pickRotated(titlePool, seed + 9, coverFocusId) ?? "experience",
-  ];
-  if (titleFocuses[1] === titleFocuses[0] && titlePool.length > 1) {
-    titleFocuses[1] = titlePool.find((item) => item !== titleFocuses[0]) ?? titleFocuses[1];
-  }
-  if (titleFocuses[2] === titleFocuses[0] || titleFocuses[2] === titleFocuses[1]) {
-    titleFocuses[2] =
-      titlePool.find((item) => item !== titleFocuses[0] && item !== titleFocuses[1]) ?? titleFocuses[2];
-  }
+      OPENING_STYLES.filter((item) => !usedOpenings.has(item) && (
+        (contentFocus === "FOOD" && item === "dish-first") ||
+        (contentFocus === "SIGNATURE_DISH" && item === "dish-first") ||
+        (contentFocus === "SHOPPING" && item === "shopping-first") ||
+        (contentFocus === "EXPERIENCE" && (item === "experience-first" || item === "owner-first")) ||
+        (contentFocus === "CONVENIENCE" && item === "convenience-first") ||
+        (contentFocus === "FIRST_VISIT" && item === "first-visit-first")
+      )),
+      seed,
+    ) ?? FOCUS_TO_OPENING[contentFocus];
 
-  const structureId =
-    pickRotated([...CAPTION_STRUCTURES], seed + 7, previousStructure) ??
-    CAPTION_STRUCTURES[seed % CAPTION_STRUCTURES.length];
   const bands = allowedLengthBands(evidenceRichness(context));
-  const lengthBand = pickRotated(bands, seed + 13, previousBand) ?? bands[0];
+  const previousBand = memories.at(-1)?.lengthLevel ?? (previousCaption ? detectLengthBand(previousCaption) : undefined);
+  const lengthBand =
+    pickRotated(bands.filter((item) => !usedLengths.has(item) && item !== previousBand), seed + 13) ??
+    pickRotated(bands, seed + 13, previousBand) ??
+    bands[0];
   const range = LENGTH_BAND_RANGE[lengthBand];
+  const structureType = STRUCTURE_COPY[contentFocus].split("—")[1]?.trim().split(".")[0] ?? contentFocus;
+  const coverPool = focuses.filter((item) => item !== contentFocus);
+  const coverFocusId = pickRotated(coverPool.length ? coverPool : focuses, seed + 11) ?? contentFocus;
+  const titleFocuses: [ContentFocusId, ContentFocusId, ContentFocusId] = [
+    contentFocus,
+    pickRotated(focuses.filter((item) => item !== contentFocus), seed + 5) ?? contentFocus,
+    pickRotated(focuses.filter((item) => item !== contentFocus && item !== coverFocusId), seed + 9) ?? coverFocusId,
+  ];
+  const memory: GenerationMemory = {
+    contentFocus,
+    openingStyle,
+    informationPriority,
+    dishOrder,
+    structureType,
+    lengthLevel: lengthBand,
+  };
 
   return {
-    structureId,
+    contentFocus,
+    openingStyle,
+    informationPriority,
+    selectedFactIds,
+    dishOrder,
+    structureType,
+    structureId: FOCUS_TO_STRUCTURE[contentFocus],
     lengthBand,
     lengthMin: range.min,
     lengthMax: range.max,
-    focusId,
+    focusId: contentFocus,
     coverFocusId,
     titleFocuses,
+    memory,
   };
 }
 
-export function formatGenerationVariationRules(plan: GenerationVariationPlan) {
-  return `THIS ROUND INDEPENDENT DRAFT — treat Generate / Regenerate as a new post, not an edit of the last one.
+export function formatGenerationVariationRules(plan: GenerationVariationPlan, memories: GenerationMemory[] = []) {
+  const memoryBlock = memories.length
+    ? `RECENT GENERATION MEMORY (do not reuse these contentFocus / openingStyle / informationPriority / dishOrder / structureType / lengthLevel):
+${memories
+  .map(
+    (item, index) =>
+      `Generation ${index + 1}: contentFocus=${item.contentFocus}; openingStyle=${item.openingStyle}; informationPriority=${item.informationPriority.join(" → ") || "none"}; dishOrder=${item.dishOrder.join(" → ") || "none"}; structureType=${item.structureType}; lengthLevel=${item.lengthLevel}`,
+  )
+  .join("\n")}
 
-Do NOT: swap synonyms, move one sentence, only change emoji, or keep the same paragraph skeleton.
-Do: pick a different real focus, a different narrative structure, a different information mix, and a different caption length.
+`
+    : "";
+  return `${memoryBlock}THIS ROUND INDEPENDENT DRAFT — Regenerate ≠ rewrite. Choose a new Content Focus, new information mix (2–5 points), new order, new opening, new length.
 
-THIS ROUND FOCUS: ${plan.focusId} (${FOCUS_COPY[plan.focusId]}). Open from this point. Do not always open from food.
-THIS ROUND TITLE ANGLES: Title 1 = ${plan.titleFocuses[0]}; Title 2 = ${plan.titleFocuses[1]}; Title 3 = ${plan.titleFocuses[2]}. Three different real selling points, not the same sentence with swapped words.
-THIS ROUND COVER: mainTitle from ${plan.coverFocusId}; subTitle from a DIFFERENT real point. Do not clip a caption sentence. Do not reuse the previous cover formula.
+Do NOT cover every customer point every time. Do NOT swap synonyms on the last post.
 
-THIS ROUND STRUCTURE: ${STRUCTURE_COPY[plan.structureId]}
-Do not reuse the previous opening, fact order, or paragraph skeleton.
-
-THIS ROUND CAPTION LENGTH: ${plan.lengthBand} ≈ ${plan.lengthMin}–${plan.lengthMax} Chinese characters (story body only, no 📍/⏰).
-Count must be obviously different from the previous caption. Never 145 → 147 → 146.
+THIS ROUND CONTENT FOCUS: ${plan.contentFocus} — ${FOCUS_COPY[plan.contentFocus]}
+${STRUCTURE_COPY[plan.contentFocus]}
+THIS ROUND OPENING STYLE: ${plan.openingStyle}. The first sentence MUST match this style. Do not reuse the previous opening family (第一次来到 centralwOrld… / 逛完 centralwOrld…).
+THIS ROUND INFORMATION PRIORITY (describe these 2–5 only; skip the rest): ${plan.informationPriority.join(" → ") || "none"}
+THIS ROUND DISH ORDER: ${plan.dishOrder.join(" → ") || "none"}
+THIS ROUND LENGTH: ${plan.lengthBand} ≈ ${plan.lengthMin}–${plan.lengthMax} Chinese characters.
+THIS ROUND TITLE ANGLES: Title 1 = ${plan.titleFocuses[0]}; Title 2 = ${plan.titleFocuses[1]}; Title 3 = ${plan.titleFocuses[2]}.
+THIS ROUND COVER: mainTitle from ${plan.coverFocusId}; subTitle from a DIFFERENT real point.
+Do not reuse the previous opening family, dish order, or informationPriority.
 If the customer gave little evidence, stay in a shorter allowed band — never invent to hit Long / Extended.
-If they selected many points, you MAY write longer and cover more, but natural Chinese > stuffing every tag.
+Describe the chosen 2–5 points; do not average-cover every selected tag.
 
-MULTI-SELECT: If several enjoy-most / dish / reason items exist, the caption must naturally cover MORE THAN ONE. Describe each chosen point (what it felt like), do not only name it.
-BAD: 有中文菜单，餐厅面积很大，店员服务很好，食物很好吃，还可以使用支付宝。
-BAD: 服务很好。 / 餐厅很大。
-GOOD: 店里有中文菜单，点菜不会有太大压力。餐厅空间也比想象中大，店员服务很热情，整体吃下来很舒服。
-Naturalness > covering every option. Drop a minor point if it cannot join the story cleanly.
+BAD: listing every enjoy-most tag. BAD: 服务很好。
+GOOD: 2–5 complete sentences that serve THIS focus only.
 
 CHINESE NATURALNESS: Write complete sentences. Do not glue keywords.
 BAD: 就是食材新鲜度感觉提升空间 / 服务热情周到感觉很好 / 中文菜单游客方便很多体验
@@ -298,7 +490,8 @@ Do not spray 就是 / 感觉 / 其实 / 整体 / 体验 to fake spoken tone.
 Avoid AI stock unless they wrote it: 整体而言 / 值得一提的是 / 不得不说 / 给人一种 / 令人印象深刻 / 可以说是 / 作为一个 / 无论是…还是… / 如果你也… / 强烈推荐大家…
 Prefer lived phrasing only when it fits the evidence: 这次比较喜欢的是 / 我自己最喜欢 / 没想到 / 对游客来说 / 这一点还蛮方便的 / 吃下来觉得 / 比较让我满意的是 / 如果第一次来 / 这次最想推荐的是.
 
-Variation must NOT invent dishes, prices, promos, service, atmosphere, feelings, places, ingredients, or restaurant traits that are not in the customer input or confirmed restaurant data.`;
+Variation must NOT invent dishes, prices, promos, service, atmosphere, feelings, places, ingredients, restaurant traits, party size, or companions that are not in the customer input or confirmed restaurant data.
+If they did not write who they dined with, use 这次来吃 / 这顿吃下来. Never 两个人 / 和朋友 / 一家三口 / 带家人 / 一个人来 from dish count, photos, or spend.`;
 }
 
 function factDescribed(text: string, fact: ExperienceFact) {
@@ -317,8 +510,9 @@ function descriptionFor(
   seed: number,
 ) {
   const variants = [...(FACT_DESCRIPTIONS[fact.id] ?? [])];
-  if (fact.id === "featured-dish" && fact.markers[0]) {
+  if ((fact.id === "featured-dish" || fact.id.startsWith("dish:")) && fact.markers[0]) {
     variants.unshift(
+      fact.captionLine,
       `${fact.markers[0]}很好吃，吃完还想再点。`,
       `这次比较想推荐的是${fact.markers[0]}，味道很合口味。`,
     );
@@ -426,29 +620,11 @@ function uniqueFacts(facts: ExperienceFact[]) {
 }
 
 function structureFactOrder(facts: ExperienceFact[], plan: GenerationVariationPlan) {
-  const byId = (ids: string[]) =>
-    ids.map((id) => facts.find((fact) => fact.id === id)).filter((fact): fact is ExperienceFact => Boolean(fact));
-  const rest = facts.filter((fact) => fact.id !== "first-visit");
-  const food = facts.filter((fact) => fact.kind === "food");
-  const service = facts.filter((fact) => fact.kind === "service" || fact.id === "chinese-menu" || fact.id === "alipay");
-  const room = facts.filter((fact) => fact.kind === "atmosphere");
-  const scene = facts.filter((fact) => fact.kind === "scene");
-  switch (plan.structureId) {
-    case "A":
-      return uniqueFacts([...food, ...room, ...service, ...rest]);
-    case "B":
-      return uniqueFacts([...scene, ...room, ...service, ...food, ...rest]);
-    case "C":
-      return uniqueFacts([...byId(["chinese-menu", "alipay"]), ...service, ...food, ...room, ...rest]);
-    case "D":
-      return uniqueFacts([...byId(["featured-dish"]), ...food, ...room, ...service, ...rest]);
-    case "E":
-      return uniqueFacts([...byId(["first-visit"]), ...room, ...service, ...food, ...rest]);
-    case "F":
-      return uniqueFacts([...food, ...service, ...room, ...rest]).slice(0, 3);
-    default:
-      return uniqueFacts(facts);
-  }
+  const selected = plan.selectedFactIds
+    .map((id) => facts.find((fact) => fact.id === id))
+    .filter((fact): fact is ExperienceFact => Boolean(fact));
+  if (selected.length > 0) return uniqueFacts(selected);
+  return uniqueFacts(facts).slice(0, 3);
 }
 
 function targetFactCount(plan: GenerationVariationPlan, available: number) {
@@ -464,36 +640,36 @@ function openingFor(
   seed: number,
 ) {
   const firstVisit = facts.some((fact) => fact.id === "first-visit");
-  const dish = facts.find((fact) => fact.id === "featured-dish")?.markers[0] ?? "";
+  const dish = plan.dishOrder[0] || facts.find((fact) => fact.id === "featured-dish")?.markers[0] || "";
+  const hasOwner = facts.some((fact) => fact.id === "handsome-owner" || fact.id === "friendly-owner");
   const tourist = context.customerType === "Tourist";
-  const options: string[] = [];
-  if (plan.structureId === "A" && facts.some((fact) => fact.kind === "food")) {
-    options.push("这次比较想说的还是吃的。");
+  switch (plan.openingStyle) {
+    case "dish-first":
+      return dish ? `这次最想推荐的还是${dish}。` : "这次比较想说的还是吃的。";
+    case "shopping-first":
+      return facts.some((fact) => fact.id === "mall-stop")
+        ? "在centralwOrld逛了一圈，想找一家泰餐吃饭，最后选了Baan Ying。"
+        : "在centralwOrld想找一家泰餐吃饭，最后选了Baan Ying。";
+    case "experience-first":
+      return hasOwner
+        ? "这次来Baan Ying，最容易记住的还是用餐时的感觉。"
+        : "这次来Baan Ying，最喜欢的是那种很轻松的用餐感觉。";
+    case "convenience-first":
+      if (facts.some((fact) => fact.id === "mall-stop" || fact.id === "mall-chain")) {
+        return "在曼谷逛商场的时候，找到一家吃饭方便的泰餐其实还蛮重要的。";
+      }
+      return tourist
+        ? "对来曼谷吃饭的人来说，方便程度其实也很重要。"
+        : "这顿比较让我省心的，是吃饭本身很方便。";
+    case "first-visit-first":
+      return firstVisit
+        ? "第一次来Baan Ying，原本只是想简单试试看，结果有几道菜还蛮有记忆点。"
+        : "这次来Baan Ying吃泰餐。";
+    case "owner-first":
+      return hasOwner ? "还有一个很容易让人记住的小细节，就是老板很帅。" : "先说这家店比较让我记得住的地方。";
+    default:
+      return "这顿吃下来，有几个点印象比较深。";
   }
-  if (plan.structureId === "B") {
-    options.push("先说这家店比较让我记得住的地方。");
-  }
-  if (plan.structureId === "C" && tourist) {
-    options.push("对游客来说，这顿吃得比较省心。");
-  }
-  if (plan.structureId === "C" && firstVisit) {
-    options.push("第一次来吃其实还挺方便的。");
-  }
-  if (plan.structureId === "D" && dish) {
-    options.push(`这次最想推荐的是${dish}。`);
-  }
-  if (plan.structureId === "E" && firstVisit) {
-    options.push("第一次来，原本只是想试试看。");
-  }
-  if (plan.structureId === "F") {
-    options.push("这顿有几个点还蛮舒服的。");
-  }
-  if (plan.focusId === "service") options.push("这顿比较让我满意的是服务。");
-  if (plan.focusId === "atmosphere" && facts.some((fact) => fact.id === "spacious" || fact.id === "comfortable")) {
-    options.push("先说店里的空间。");
-  }
-  if (options.length === 0) options.push("这顿吃下来，有几个点印象比较深。");
-  return options[Math.abs(seed) % options.length] ?? options[0];
 }
 
 function rebuildCaption(
@@ -510,11 +686,15 @@ function rebuildCaption(
   const chosen = unique.slice(0, targetFactCount(plan, unique.length));
   const sentences = [openingFor(plan, context, facts, seed)];
   for (const [index, fact] of chosen.entries()) {
+    const alreadyOpened =
+      (fact.id === "first-visit" && /第一次/.test(sentences[0] ?? "")) ||
+      (fact.id === "handsome-owner" && plan.openingStyle === "owner-first" && /老板/.test(sentences[0] ?? ""));
+    if (alreadyOpened) continue;
     const line = descriptionFor(fact, context, seed + index);
     if (!sentences.some((sentence) => sentence.includes(line.slice(0, 6)))) sentences.push(line);
   }
   if (
-    plan.structureId !== "F" &&
+    plan.contentFocus === "EXPERIENCE" &&
     chosen.length >= 2 &&
     facts.some((fact) => fact.id === "comfortable" || fact.id === "good-service" || fact.id === "spacious")
   ) {
@@ -678,7 +858,7 @@ export function evaluateGenerationVariation(input: {
   previousCoverTitle?: string;
 }) {
   const context = input.context ?? {};
-  const facts = extractExperienceFacts(context);
+  const facts = workingFacts(context);
   const caption = stripGeneratedLocationTime(input.caption);
   const reasons: string[] = [];
   if (input.previousCaption && isCaptionTooSimilar(caption, input.previousCaption, facts)) {
@@ -689,8 +869,20 @@ export function evaluateGenerationVariation(input: {
     reasons.push("cover-similar");
   }
   if (hasUnnaturalChinese(caption)) reasons.push("unnatural");
-  const covered = facts.filter((fact) => splitSentences(caption).some((sentence) => factDescribed(sentence, fact)));
-  if (facts.length >= 3 && covered.length < Math.min(2, facts.length)) reasons.push("thin-coverage");
+  const planned = input.plan.selectedFactIds.length
+    ? facts.filter((fact) => input.plan.selectedFactIds.includes(fact.id))
+    : facts.slice(0, 3);
+  const covered = planned.filter((fact) => splitSentences(caption).some((sentence) => factDescribed(sentence, fact)));
+  if (planned.length >= 2 && covered.length < 1) reasons.push("thin-coverage");
+  if (input.previousCaption) {
+    if (openingFamily(caption) === openingFamily(input.previousCaption)) reasons.push("same-opening-family");
+    if (detectContentFocus(caption, facts) === detectContentFocus(input.previousCaption, facts)) {
+      reasons.push("same-focus");
+    }
+    const currentOrder = factOrder(caption, facts).join(">");
+    const previousOrder = factOrder(input.previousCaption, facts).join(">");
+    if (currentOrder && currentOrder === previousOrder) reasons.push("same-info-order");
+  }
   const han = storyHanCount(caption);
   const richness = evidenceRichness(context);
   if (richness >= 3 && han + 18 < input.plan.lengthMin) reasons.push("too-short");
@@ -708,15 +900,26 @@ export function ensureGenerationVariation(input: {
   previousCaption?: string;
   previousCoverTitle?: string;
   previousTitles?: string[];
+  previousMemories?: GenerationMemory[];
   variantIndex?: number;
 }) {
   const context = input.context ?? {};
-  const facts = extractExperienceFacts(context);
+  const facts = workingFacts(context);
   const seed = input.variantIndex ?? 0;
+  let activePlan = input.plan;
   let titles = rotateTitles(input.titles, facts, input.plan);
   let cover = rotateCover(input.coverTitle, input.coverSubtitle, input.previousCoverTitle ?? "", facts);
   let caption = stripGeneratedLocationTime(input.caption);
-  caption = expandMentionOnly(caption, context, facts, input.plan, seed);
+  const shouldRebuild =
+    Boolean(input.previousCaption) ||
+    Boolean(input.previousMemories?.length) ||
+    detectContentFocus(caption, facts) !== input.plan.contentFocus ||
+    openingFamily(caption) !== input.plan.openingStyle;
+  if (shouldRebuild) {
+    caption = rebuildCaption(context, facts, input.plan, seed);
+  } else {
+    caption = expandMentionOnly(caption, context, facts, input.plan, seed);
+  }
   caption = joinSentences(
     splitSentences(caption).map((sentence, index) => polishSentence(sentence, context, facts, seed + index)),
   );
@@ -734,7 +937,11 @@ export function ensureGenerationVariation(input: {
 
   if (
     input.previousCaption &&
-    (verdict.reasons.includes("caption-similar") || verdict.reasons.includes("thin-coverage"))
+    (verdict.reasons.includes("caption-similar") ||
+      verdict.reasons.includes("thin-coverage") ||
+      verdict.reasons.includes("same-opening-family") ||
+      verdict.reasons.includes("same-focus") ||
+      verdict.reasons.includes("same-info-order"))
   ) {
     caption = rebuildCaption(context, facts, input.plan, seed + 21);
     caption = preserveSentiment(caption, context);
@@ -756,7 +963,9 @@ export function ensureGenerationVariation(input: {
       previousCaption: input.previousCaption,
       previousCoverTitle: input.previousCoverTitle,
       previousTitles: input.previousTitles,
+      previousMemories: input.previousMemories,
     });
+    activePlan = retryPlan;
     caption = rebuildCaption(context, facts, retryPlan, seed + 99);
     caption = preserveSentiment(caption, context);
     caption = expandToBand(caption, context, facts, retryPlan, seed + 99);
@@ -774,11 +983,16 @@ export function ensureGenerationVariation(input: {
   }
 
   return {
-    titles,
-    caption,
-    coverTitle: cover.coverTitle,
-    coverSubtitle: cover.coverSubtitle,
+    titles: [
+      neutralizeInventedPartyCopy(titles[0], context),
+      neutralizeInventedPartyCopy(titles[1], context),
+      neutralizeInventedPartyCopy(titles[2], context),
+    ] as [string, string, string],
+    caption: neutralizeInventedPartyCopy(caption, context),
+    coverTitle: neutralizeInventedPartyCopy(cover.coverTitle, context),
+    coverSubtitle: neutralizeInventedPartyCopy(cover.coverSubtitle, context),
     needsRetry: false,
     reasons: verdict.reasons,
+    memory: activePlan.memory,
   };
 }
