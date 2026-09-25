@@ -29,22 +29,31 @@ export function trackAnalyticsEvent(input: {
   });
 
   try {
-    if (typeof navigator !== "undefined" && typeof navigator.sendBeacon === "function") {
-      navigator.sendBeacon("/api/analytics/events", new Blob([payload], { type: "application/json" }));
-    }
-  } catch {
-    /* Beacon is best-effort; fetch below is the fallback. */
-  }
-
-  try {
     return fetch("/api/analytics/events", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: payload,
       credentials: "same-origin",
       keepalive: true,
-    }).then(() => undefined).catch(() => undefined);
+    })
+      .then(() => undefined)
+      .catch(() => {
+        try {
+          if (typeof navigator !== "undefined" && typeof navigator.sendBeacon === "function") {
+            navigator.sendBeacon("/api/analytics/events", new Blob([payload], { type: "application/json" }));
+          }
+        } catch {
+          /* Analytics must never block publishing. */
+        }
+      });
   } catch {
+    try {
+      if (typeof navigator !== "undefined" && typeof navigator.sendBeacon === "function") {
+        navigator.sendBeacon("/api/analytics/events", new Blob([payload], { type: "application/json" }));
+      }
+    } catch {
+      /* Analytics must never block publishing. */
+    }
     return Promise.resolve();
   }
 }

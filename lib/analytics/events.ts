@@ -10,9 +10,6 @@ import {
 } from "@/lib/analytics/types";
 
 const ONCE_PER_SESSION: AnalyticsEventType[] = [
-  "form_submit",
-  "generation_complete",
-  "xhs_publish_click",
   "xhs_copy_content",
   "dianping_copy_content",
 ];
