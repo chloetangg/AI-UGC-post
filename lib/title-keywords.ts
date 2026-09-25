@@ -151,6 +151,7 @@ export function ensureTitleKeywords(
 export function formatTitleKeywordRules() {
   return `TITLE SEARCH KEYWORDS — auxiliary only, never the topic.
 Real customer input and confirmed restaurant facts outrank generic keywords. Keywords must not invent a story.
+Each title must feel like Xiaohongshu, reflect actual customer experience, and naturally contain at least one Bangkok food search keyword. Prefer 3 different keywords. Do not keyword-stuff. Do not sound like an advertisement.
 At least one of the 3 titles must naturally contain one of: 曼谷必吃 / 曼谷美食 / 曼谷泰餐 / 曼谷吃什么 / 曼谷美食推荐 / 曼谷泰菜 / 曼谷餐厅 / 曼谷吃饭 / 曼谷美食攻略 / 曼谷探店.
 Prefer 3 different keywords when they still read as real Xiaohongshu titles. Never glue 曼谷 onto a broken stub (曼谷超爱次来吃 / 曼谷很值得来吃 / 曼谷推荐来吃).
 If a keyword cannot sit naturally, switch phrase. Natural complete Chinese outranks stuffing every title.

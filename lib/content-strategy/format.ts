@@ -5,10 +5,6 @@ import type {
 } from "@/lib/content-strategy/types";
 import { photoSelectionHint, readStrategySignals } from "@/lib/content-strategy/select";
 
-function lineList(values: string[]) {
-  return values.map((value) => `- ${value}`).join("\n");
-}
-
 export function formatStrategyLibrary(library: ContentStrategyLibrary) {
   const ksps = library.ksps
     .map((item) => {
@@ -22,7 +18,7 @@ export function formatStrategyLibrary(library: ContentStrategyLibrary) {
   const storylines = library.storylines
     .map(
       (item) =>
-        `- ${item.id} ${item.name}: ${item.narrativeIntention} Storyline is narrative intention ONLY — never a fixed opening or paragraph template.`,
+        `- ${item.id} ${item.name}: ${item.narrativeIntention}`,
     )
     .join("\n");
 
@@ -81,20 +77,6 @@ export function formatStrategySelection(
   const storyline = library.storylines.find((item) => item.id === suggested.storylineId);
   const angle = library.contentAngles.find((item) => item.id === suggested.contentAngleId);
   const signals = readStrategySignals(evidence);
-  const evidenceLines = [
-    `age range: ${evidence.dinerAgeRange || "Not provided"}`,
-    `origin: ${evidence.dinerOrigin || "Not provided"}`,
-    `gender: ${evidence.dinerGender || "Not provided"}`,
-    `branch: ${evidence.branch || "Not provided"}`,
-    `tourist/local: ${evidence.customerType || "Not provided"}`,
-    `visit frequency: ${evidence.visitFrequency || "Not provided"}`,
-    `recommended dishes: ${(evidence.recommendedDishes ?? []).filter(Boolean).join(", ") || "Not provided"}`,
-    `liked aspects: ${(evidence.enjoyMost ?? []).join(", ") || "Not provided"}`,
-    `taste words: ${(evidence.recommendTo ?? []).join(", ") || "Not provided"}`,
-    `customer description: ${evidence.diningExperienceNote?.trim() || "Not provided"}`,
-    `photo count: ${evidence.photoCount}`,
-    `signals: tourist=${signals.tourist}; firstVisit=${signals.firstVisit}; confirmedRepeat=${signals.confirmedRepeat}; dishes=${signals.dishCount}; friends=${signals.friends}; family=${signals.family}; shopping=${signals.shopping}; travel=${signals.travel}`,
-  ];
 
   return `INTERNAL STRATEGY SELECTION (do not print in titles, caption, hashtags, mainTitle, or subTitle)
 Follow this process inside the SAME JSON response:
@@ -111,11 +93,8 @@ If the suggestion conflicts with customer evidence, choose another supported com
 - previous Content Angle: ${previous.previousContentAngleId || "none"}
 - previous Search Keyword: ${previous.previousSearchKeyword || "none"}
 
-Customer evidence:
-${lineList(evidenceLines)}
+Derived signals (full customer block is above): tourist=${signals.tourist}; firstVisit=${signals.firstVisit}; confirmedRepeat=${signals.confirmedRepeat}; dishes=${signals.dishCount}; friends=${signals.friends}; family=${signals.family}; shopping=${signals.shopping}; travel=${signals.travel}
 
 Photo selection should support the selected Storyline / Angle.
-${photoSelectionHint(suggested.contentAngleId)}
-
-Hashtags: always include #baanying曼谷, pick exactly 4 tags from the approved pool, and shuffle all 5. Do NOT invent tags. Do NOT hard-code hashtags by Storyline.`;
+${photoSelectionHint(suggested.contentAngleId)}`;
 }

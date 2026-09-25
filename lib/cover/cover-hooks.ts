@@ -1,4 +1,4 @@
-import { formatCoverTitleRules, shouldUseCoverLocation, type CoverTitleContext } from "./cover-rules";
+import { formatCoverTitleStaticRules, shouldUseCoverLocation, type CoverTitleContext } from "./cover-rules";
 import type { CoverHookType } from "@/lib/content-evidence";
 
 export const COVER_HOOK_FAMILIES = [
@@ -89,8 +89,8 @@ export function suggestCoverHookFamily(input: {
   return rotation[variant % rotation.length] ?? "HOOK-01";
 }
 
-export function formatCoverHookRules(context: CoverTitleContext = {}) {
-  return `${formatCoverTitleRules(context)}
+export function formatCoverHookRules(_context: CoverTitleContext = {}) {
+  return `${formatCoverTitleStaticRules()}
 
 HOOK FAMILIES — pick from evidence after the coverTitle keyword + one-evidence subtitle rules are satisfied. Do not copy these exact sentences:
 HOOK-01 Search keyword is SEO only: weave 曼谷/泰餐/美食 into an experience hook. Never output 曼谷美食发现 / 曼谷泰餐推荐 / 曼谷美食推荐 as the whole cover.
@@ -100,7 +100,7 @@ HOOK-04 Soft CTA lives in caption
 HOOK-05 Local identity ONLY with evidence. Never invent 泰国人爱吃.
 HOOK-06 Dish-led subtitle from a real selected dish or the dining note, using the approved cover short (冬阴功 not 河虾冬阴功汤; 青柠蒸鲈鱼 not 鲈鱼). Prefer a curiosity/scene hook over 菜名+很好吃. One dish reason only — never glue dish + price + first-visit. Use this when the dining note is actually about food.
 HOOK-07 Warm home-style / comfortable atmosphere in subTitle when the note supports it
-HOOK-08 Location may use exact centralwOrld as the confirmed dining mall. Across Title 1–3 + Cover Title + Cover Subtitle, exact "centralwOrld" must appear once. Do not invent Terminal 21 / Siam Center / One Bangkok. Do not repeat centralwOrld in every field.
+HOOK-08 Location may use exact centralwOrld as the confirmed dining mall. Do not invent Terminal 21 / Siam Center / One Bangkok. Do not repeat centralwOrld in every field. Follow the EVIDENCE PRIORITY centralwOrld RULE.
 
 DIVERSITY: do not repeat the previous coverTitle/subTitle formula. Changing only 推荐/泰菜 is NOT enough. Discovery is one family among many — never the default.`;
 }

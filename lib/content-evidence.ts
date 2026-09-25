@@ -484,16 +484,7 @@ export function previousPrimaryExperienceId(context: CoverTitleContext = {}, pre
   return facts.find((fact) => textHasFact(hay, fact))?.id ?? "";
 }
 
-export function formatEvidencePriorityRules(context: CoverTitleContext = {}, previousTitles: string[] = []) {
-  const facts = extractExperienceFacts(context);
-  const previousHook = context.previousCoverHookType || classifyCoverHookType(context.previousCoverTitle ?? "");
-  const previousPrimary = context.previousPrimaryExperience || previousPrimaryExperienceId(context, previousTitles);
-  const primary = facts.find((fact) => fact.id !== previousPrimary) ?? facts[0];
-  const secondary = facts.find((fact) => fact.id !== primary?.id);
-  const food = facts.find((fact) => fact.kind === "food");
-  const allowedMaterial = facts.length
-    ? facts.map((fact) => `${fact.id}: ${fact.markers.join("/")}`).join("; ")
-    : "confirmed dining location centralwOrld + selected dishes/reasons only";
+export function formatEvidencePriorityStaticRules() {
   return `EVIDENCE PRIORITY — do this internally before writing JSON. Do not print this block.
 
 CUSTOMER INPUT → EXTRACT REAL FACTS → PICK THE MOST ATTRACTIVE TRUE FACTS → WRITE TITLE / COVER TITLE / COVER SUBTITLE.
@@ -507,31 +498,41 @@ Priority 3 — customer-selected dishes and their real recommend reasons.
 Priority 4 — confirmed restaurant facts only, e.g. dining location centralwOrld, confirmed menu/payment/atmosphere already in the system.
 Do not invent an experience, like, selling point, scene, price, promo, or “必吃/隐藏宝藏” conclusion that is not in the input.
 
-ALLOWED TITLE MATERIAL THIS VISIT: ${allowedMaterial}
-
 USER DETAIL PRESERVATION: 老板很帅 ≠ 店员很亲切. 服务很好 ≠ 环境很好. 老板很亲切 ≠ 店里很温馨. You may rewrite the wording, not the fact. Do not invent a boss, service, atmosphere, or emotion the customer did not write.
 
 centralwOrld RULE — Title 1 + Title 2 + Title 3 + Cover Title + Cover Subtitle must contain the exact token "centralwOrld" at least once. Only this spelling counts. Never CentralWorld / Centralworld / centralworld / Central World / central world / 尚泰世界 as a substitute. Weave it naturally in ONE place only. Do not repeat it. Do not stuff it. If a title already has a customer fact, prefer weaving into that line (e.g. centralwOrld逛街顺便吃泰餐) rather than a separate keyword dump.
 
 Forbidden unless the customer or confirmed data actually said it: 曼谷今天也太好吃了 / 隐藏在曼谷的宝藏餐厅 / 泰国本地人才知道的美食 / 第一次来曼谷一定要吃 / 曼谷美食天花板 / 隐藏宝藏 / 美食天花板.
-PARTY SIZE: mention 两个人 / 家人 / 朋友 / 小孩 / 一个人 only when the customer explicitly wrote that. Never infer from spend, dish count, photos, or tourist/local. If unknown, write 这次来吃 / 这顿吃下来.
 
 CONTENT ALLOCATION — same visit, different jobs. Do not paste the same sentence into title + caption + cover.
 TITLE = one hook from real input. CAPTION = the full true story. COVER = the shortest memorable line from the same real facts.
 If the note is 老板很帅，服务很好: Title may use 老板, Caption may use 服务, Cover may use 遇到帅老板. Do not put 老板很帅 in all three.
-
-THIS VISIT INTERNAL BRIEF:
-PRIMARY EXPERIENCE: ${primary ? `${primary.id} (${primary.coverMains[0]})` : "none — use food/scene from selected answers"}
-SECONDARY EXPERIENCE: ${secondary ? `${secondary.id} (${secondary.coverMains[0]})` : "none"}
-FOOD / DISH ANGLE: ${food ? food.coverMains[0] : firstDishShort(context) || "none"}
-SEARCH KEYWORD: SEO only, weave in, do not become the headline topic. Real customer facts > generic keywords > AI flourish.
 
 TITLE ANGLES (must be obviously different, all from real facts):
 1 = location + dining, or personal experience from PRIMARY
 2 = a different customer experience / enjoy-most highlight
 3 = restaurant trait / dish / scene from real input
 Not the same sentence with swapped adjectives. Do not add unrelated details just to look different.
-Forbidden trio: 曼谷美食发现 / 曼谷美食推荐 / 曼谷泰餐推荐
+Forbidden trio: 曼谷美食发现 / 曼谷美食推荐 / 曼谷泰餐推荐`;
+}
+
+export function formatEvidencePriorityInstance(context: CoverTitleContext = {}, previousTitles: string[] = []) {
+  const facts = extractExperienceFacts(context);
+  const previousHook = context.previousCoverHookType || classifyCoverHookType(context.previousCoverTitle ?? "");
+  const previousPrimary = context.previousPrimaryExperience || previousPrimaryExperienceId(context, previousTitles);
+  const primary = facts.find((fact) => fact.id !== previousPrimary) ?? facts[0];
+  const secondary = facts.find((fact) => fact.id !== primary?.id);
+  const food = facts.find((fact) => fact.kind === "food");
+  const allowedMaterial = facts.length
+    ? facts.map((fact) => `${fact.id}: ${fact.markers.join("/")}`).join("; ")
+    : "confirmed dining location centralwOrld + selected dishes/reasons only";
+  return `ALLOWED TITLE MATERIAL THIS VISIT: ${allowedMaterial}
+
+THIS VISIT INTERNAL BRIEF:
+PRIMARY EXPERIENCE: ${primary ? `${primary.id} (${primary.coverMains[0]})` : "none — use food/scene from selected answers"}
+SECONDARY EXPERIENCE: ${secondary ? `${secondary.id} (${secondary.coverMains[0]})` : "none"}
+FOOD / DISH ANGLE: ${food ? food.coverMains[0] : firstDishShort(context) || "none"}
+SEARCH KEYWORD: SEO only, weave in, do not become the headline topic. Real customer facts > generic keywords > AI flourish.
 
 COVER HOOK TYPE this round: prefer ${
     previousHook === "discovery"
@@ -543,9 +544,13 @@ COVER HOOK TYPE this round: prefer ${
 Previous cover hook type: ${previousHook || "none"}
 Previous primary experience: ${previousPrimary || "none"}
 Previous title angle: ${context.previousTitleAngle || "none"}
-Do not default to 曼谷美食发现 / 曼谷泰餐推荐 / 曼谷美食推荐. If validation fails, rebuild from PRIMARY EXPERIENCE + one pool keyword, e.g. 曼谷泰餐遇到帅老板, never 曼谷+美食+发现.
+Do not default to 曼谷美食发现 / 曼谷泰餐推荐 / 曼谷美食推荐. If validation fails, rebuild from PRIMARY EXPERIENCE + one pool keyword, e.g. 曼谷泰餐遇到帅老板, never 曼谷+美食+发现.`;
+}
 
-COVER keyword rule: must naturally contain at least one of 曼谷 / centralwOrld / 泰餐 / 美食 / 必吃, BUT the keyword must not be the main content. USER EXPERIENCE > specific food/scene > search keyword.`;
+export function formatEvidencePriorityRules(context: CoverTitleContext = {}, previousTitles: string[] = []) {
+  return `${formatEvidencePriorityStaticRules()}
+
+${formatEvidencePriorityInstance(context, previousTitles)}`;
 }
 
 export function ensureEvidenceLedCopy(input: {

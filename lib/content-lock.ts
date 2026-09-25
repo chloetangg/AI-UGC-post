@@ -131,29 +131,11 @@ export function buildEvidenceMap(context: CoverTitleContext = {}): EvidenceMap {
   };
 }
 
-export function formatContentLockRules(map: EvidenceMap) {
+export function formatContentLockStaticRules() {
   return `CONTENT EVIDENCE & LOCK — additive. Title, caption, and cover share ONE Evidence Map. Do not interpret the input separately.
 
 Generation order: User Input → Evidence Extraction → Content Priority → Primary Content → Caption → Titles → Cover → Cross-Output Validation.
 Do NOT generate titles, caption, and cover as independent readings of the form.
-
-THIS ROUND EVIDENCE MAP
-strongestExperience: ${map.strongestExperience || "none"}
-favoriteDish: ${map.favoriteDish || "none"}
-recommendedDish: ${map.recommendedDish || "none"}
-recommendationReason: ${map.recommendationReason || "none"}
-enjoyedMost: ${map.enjoyedMost.join(" / ") || "none"}
-specificObservations: ${map.specificObservations.join(" / ") || "none"}
-atmosphere: ${map.atmosphere || "none"}
-service: ${map.service || "none"}
-convenience: ${map.convenience || "none"}
-location: ${map.location || "none"}
-visitStatus: ${map.visitStatus || "none"}
-customerWords (Tier 1, keep the core meaning): ${map.customerWords.join(" / ") || "none"}
-
-CONTENT LOCK
-Primary Content: ${map.primaryContent || "none"}
-Supporting Content: ${map.supportingContent.join(" / ") || "none"}
 
 Priority: diningExperienceNote → explicit like/dislike/most memorable → favoriteDish → recommendedDish → recommendationReason → enjoy-most → tourist/local/visit/scene → brand/KSP/SEO.
 Brand / KSP / SEO must never override a real customer experience.
@@ -179,6 +161,32 @@ No formal translation-speak: 与个人预期有所不同 / 符合个人预期 / 
 No 上次这次来 / 第一次又来 / Title says A while caption's hero is B.
 
 Final check: Title ↔ input, Title ↔ Caption, Cover ↔ Caption, shared Primary Content, customer wording kept, no invented facts, not a questionnaire dump or synonym rewrite.`;
+}
+
+export function formatContentLockInstance(map: EvidenceMap) {
+  return `THIS ROUND EVIDENCE MAP
+strongestExperience: ${map.strongestExperience || "none"}
+favoriteDish: ${map.favoriteDish || "none"}
+recommendedDish: ${map.recommendedDish || "none"}
+recommendationReason: ${map.recommendationReason || "none"}
+enjoyedMost: ${map.enjoyedMost.join(" / ") || "none"}
+specificObservations: ${map.specificObservations.join(" / ") || "none"}
+atmosphere: ${map.atmosphere || "none"}
+service: ${map.service || "none"}
+convenience: ${map.convenience || "none"}
+location: ${map.location || "none"}
+visitStatus: ${map.visitStatus || "none"}
+customerWords (Tier 1, keep the core meaning): ${map.customerWords.join(" / ") || "none"}
+
+CONTENT LOCK
+Primary Content: ${map.primaryContent || "none"}
+Supporting Content: ${map.supportingContent.join(" / ") || "none"}`;
+}
+
+export function formatContentLockRules(map: EvidenceMap) {
+  return `${formatContentLockStaticRules()}
+
+${formatContentLockInstance(map)}`;
 }
 
 export function neutralizeSemanticConflicts(text: string, context: CoverTitleContext = {}) {

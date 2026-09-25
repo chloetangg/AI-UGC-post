@@ -136,7 +136,7 @@ export async function POST(request: Request) {
         json_schema: generatePostJsonSchema,
       },
       messages: [
-        { role: "system", content: buildSystemPrompt(payload.contentStrategy) },
+        { role: "system", content: buildSystemPrompt(payload.contentStrategy, payload.brandContext) },
         {
           role: "user",
           content: [

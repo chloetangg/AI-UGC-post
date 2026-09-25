@@ -646,37 +646,12 @@ export function planGenerationVariation(input: {
   };
 }
 
-export function formatGenerationVariationRules(plan: GenerationVariationPlan, memories: GenerationMemory[] = []) {
-  const memoryBlock = memories.length
-    ? `RECENT GENERATION MEMORY (do not reuse these contentFocus / openingPattern / firstSentencePattern / informationOrder / dishEntryPattern / endingPattern / sentenceRhythm / informationDensity / lengthLevel):
-${memories
-  .map(
-    (item, index) =>
-      `Generation ${index + 1}: contentFocus=${item.contentFocus}; openingPattern=${item.openingPattern || item.openingStyle}; firstSentencePattern=${item.firstSentencePattern || "none"}; informationOrder=${(item.informationOrder ?? item.informationPriority).join(" → ") || "none"}; dishEntryPattern=${item.dishEntryPattern || "none"}; endingPattern=${item.endingPattern || "none"}; sentenceRhythm=${item.sentenceRhythm || "none"}; informationDensity=${item.informationDensity || "none"}; lengthLevel=${item.lengthLevel}`,
-  )
-  .join("\n")}
-
-`
-    : "";
-  return `${memoryBlock}THIS ROUND INDEPENDENT DRAFT — Regenerate ≠ rewrite. Content Focus is WHAT to talk about, not a fixed template.
+export function formatGenerationVariationStaticRules() {
+  return `THIS ROUND INDEPENDENT DRAFT — Regenerate ≠ rewrite. Content Focus is WHAT to talk about, not a fixed template.
 
 Write: real facts → pick this round's angle → organize naturally → then check Focus.
 Do NOT: Focus → fill template → drop in customer facts.
 Do NOT cover every customer point. Do NOT swap synonyms. Do NOT use 这次最想推荐的是 + 菜名 + 评价 as the spine.
-
-THIS ROUND CONTENT FOCUS: ${plan.contentFocus} — ${FOCUS_COPY[plan.contentFocus]}
-${STRUCTURE_COPY[plan.contentFocus]}
-THIS ROUND NARRATIVE PATH: ${plan.openingPattern}. Change the path from the last 3. Do not force odd syntax.
-THIS ROUND OPENING: ${plan.openingStyle}. First sentence must not reuse 这次最想推荐的是 / 这次来Baan Ying / 第一次来到 centralwOrld if those appeared recently.
-THIS ROUND DISH ENTRY: ${plan.dishEntryPattern}. Describe the dish; do not announce 推荐 unless that is the only unused pattern.
-THIS ROUND ENDING: ${plan.endingPattern}. Do not add a summary just to finish.
-THIS ROUND RHYTHM / DENSITY: ${plan.sentenceRhythm} / ${plan.informationDensity}
-THIS ROUND INFORMATION PRIORITY (describe these 2–5 only; skip the rest): ${plan.informationPriority.join(" → ") || "none"}
-THIS ROUND DISH ORDER: ${plan.dishOrder.join(" → ") || "none"}
-THIS ROUND LENGTH: ${plan.lengthBand} ≈ ${plan.lengthMin}–${plan.lengthMax} Chinese characters.
-THIS ROUND TITLE ANGLES: Title 1 = ${plan.titleFocuses[0]}; Title 2 = ${plan.titleFocuses[1]}; Title 3 = ${plan.titleFocuses[2]}. Titles also need different openings and structures, not the same shell with new adjectives.
-THIS ROUND COVER: mainTitle from ${plan.coverFocusId}; subTitle from a DIFFERENT real point.
-If the customer gave little evidence, stay in a shorter allowed band — never invent to hit Long / Extended.
 
 BAD: listing every enjoy-most tag. BAD: 服务很好。 BAD: 整体来说这是一家环境舒适味道正宗的泰餐厅。
 GOOD: 2–5 complete but uneven sentences that serve THIS focus only, ending on a fact.
@@ -691,6 +666,41 @@ Prefer concrete facts: 蒜香比较足，虾仁吃起来Q弹 / 店里刚翻新�
 
 Variation must NOT invent dishes, prices, promos, service, atmosphere, feelings, places, ingredients, restaurant traits, party size, or companions that are not in the customer input or confirmed restaurant data.
 If they did not write who they dined with, use 这次来吃 / 这顿吃下来. Never 两个人 / 和朋友 / 一家三口 / 带家人 / 一个人来 from dish count, photos, or spend.`;
+}
+
+export function formatGenerationVariationInstance(plan: GenerationVariationPlan, memories: GenerationMemory[] = []) {
+  const memoryBlock = memories.length
+    ? `RECENT GENERATION MEMORY (do not reuse these contentFocus / openingPattern / firstSentencePattern / informationOrder / dishEntryPattern / endingPattern / sentenceRhythm / informationDensity / lengthLevel):
+${memories
+  .map(
+    (item, index) =>
+      `Generation ${index + 1}: contentFocus=${item.contentFocus}; openingPattern=${item.openingPattern || item.openingStyle}; firstSentencePattern=${item.firstSentencePattern || "none"}; informationOrder=${(item.informationOrder ?? item.informationPriority).join(" → ") || "none"}; dishEntryPattern=${item.dishEntryPattern || "none"}; endingPattern=${item.endingPattern || "none"}; sentenceRhythm=${item.sentenceRhythm || "none"}; informationDensity=${item.informationDensity || "none"}; lengthLevel=${item.lengthLevel}`,
+  )
+  .join("\n")}
+
+`
+    : "";
+  return `${memoryBlock}Apply THIS ROUND INDEPENDENT DRAFT from the system prompt.
+
+THIS ROUND CONTENT FOCUS: ${plan.contentFocus} — ${FOCUS_COPY[plan.contentFocus]}
+${STRUCTURE_COPY[plan.contentFocus]}
+THIS ROUND NARRATIVE PATH: ${plan.openingPattern}. Change the path from the last 3. Do not force odd syntax.
+THIS ROUND OPENING: ${plan.openingStyle}. First sentence must not reuse 这次最想推荐的是 / 这次来Baan Ying / 第一次来到 centralwOrld if those appeared recently.
+THIS ROUND DISH ENTRY: ${plan.dishEntryPattern}. Describe the dish; do not announce 推荐 unless that is the only unused pattern.
+THIS ROUND ENDING: ${plan.endingPattern}. Do not add a summary just to finish.
+THIS ROUND RHYTHM / DENSITY: ${plan.sentenceRhythm} / ${plan.informationDensity}
+THIS ROUND INFORMATION PRIORITY (describe these 2–5 only; skip the rest): ${plan.informationPriority.join(" → ") || "none"}
+THIS ROUND DISH ORDER: ${plan.dishOrder.join(" → ") || "none"}
+THIS ROUND LENGTH: ${plan.lengthBand} ≈ ${plan.lengthMin}–${plan.lengthMax} Chinese characters.
+THIS ROUND TITLE ANGLES: Title 1 = ${plan.titleFocuses[0]}; Title 2 = ${plan.titleFocuses[1]}; Title 3 = ${plan.titleFocuses[2]}. Titles also need different openings and structures, not the same shell with new adjectives.
+THIS ROUND COVER: mainTitle from ${plan.coverFocusId}; subTitle from a DIFFERENT real point.
+If the customer gave little evidence, stay in a shorter allowed band — never invent to hit Long / Extended.`;
+}
+
+export function formatGenerationVariationRules(plan: GenerationVariationPlan, memories: GenerationMemory[] = []) {
+  return `${formatGenerationVariationStaticRules()}
+
+${formatGenerationVariationInstance(plan, memories)}`;
 }
 
 function factDescribed(text: string, fact: ExperienceFact) {

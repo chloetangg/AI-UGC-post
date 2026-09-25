@@ -144,19 +144,18 @@ export function buildNarrativeGroups(context: CoverTitleContext = {}, map: Evide
 }
 
 export function formatNarrativeFlowRules(context: CoverTitleContext = {}, map: EvidenceMap) {
-  const groups = buildNarrativeGroups(context, map);
-  const groupBlock = groups
-    .map((group, index) => `GROUP ${index + 1} — ${group.label}\n${group.items.map((item) => `- ${item}`).join("\n")}`)
-    .join("\n\n");
+  return `${formatNarrativeFlowStaticRules()}
+
+${formatNarrativeFlowInstance(context, map)}`;
+}
+
+export function formatNarrativeFlowStaticRules() {
   return `NARRATIVE FLOW & ATTRIBUTE CONSISTENCY — additive.
 
 Before writing the caption, decide this order and use each fact ONCE, in the best slot:
 Opening → Context / Experience → Primary Content → Supporting Content → Secondary Detail → Natural Ending.
 
 Do NOT stitch answers in form order. Do NOT finish dish A, go to dish B, summarize, then come back to dish A.
-
-THIS ROUND FACT GROUPS (re-order into a natural story; do not dump every group):
-${groupBlock || "none"}
 
 Same-dish facts stay in ONE semantic stretch.
 GOOD: 咖喱蟹肉份量很足，搭配米饭很下饭，也是这次比较喜欢的一道。
@@ -174,6 +173,15 @@ After Ending = true, do not open a new dish review. Move that sentence into the 
 Natural flow > covering every answer. Keep explicit negatives and clear attitudes.
 
 Read-through test: each sentence should answer the last; same dish not split; no coming back; attributes on the right dish; last two sentences end, they do not start a new thread.`;
+}
+
+export function formatNarrativeFlowInstance(context: CoverTitleContext = {}, map: EvidenceMap) {
+  const groups = buildNarrativeGroups(context, map);
+  const groupBlock = groups
+    .map((group, index) => `GROUP ${index + 1} — ${group.label}\n${group.items.map((item) => `- ${item}`).join("\n")}`)
+    .join("\n\n");
+  return `THIS ROUND FACT GROUPS (re-order into a natural story; do not dump every group):
+${groupBlock || "none"}`;
 }
 
 function renderDishClauses(dish: string, clauses: string[]) {

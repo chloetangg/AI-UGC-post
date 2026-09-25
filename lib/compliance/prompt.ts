@@ -38,8 +38,6 @@ No unverifiable photo claims: 完全无P 100%真实 原图直出 零滤镜 绝�
 
 Titles must pass the same rules. BAD: 曼谷最好吃的泰餐！真的封神了！ GOOD: 曼谷最近吃到的一家泰餐｜这几道菜很喜欢
 
-Hashtags: always include #baanying曼谷, plus exactly 4 tags from the approved pool, shuffled. Never invent hashtags.
-
 Do not copy sample posts, openings, or paragraph skeletons.
 
 ${formatNegativeNeutralizationRules()}

@@ -3,7 +3,8 @@ import { formatCoverAbsoluteRules } from "./cover-absolute";
 import {
   collectFullDishNames,
   coverDishShortName,
-  formatCoverDishNameRules,
+  formatCoverDishNameInstance,
+  formatCoverDishNameStaticRules,
   mentionsCoverDishName,
 } from "./dish-names";
 import { sanitizeCoverLine, toCoverGraphemes } from "./cover-title-text";
@@ -440,20 +441,7 @@ export function coverFallbackPairs(context: CoverTitleContext = {}) {
   return pairs;
 }
 
-export function formatCoverTitleRules(context: CoverTitleContext = {}) {
-  const location = selectedCoverLocation(context.branch);
-  const previousMain = (context.previousCoverTitle ?? "").split("/")[0]?.trim() || "none";
-  const note = context.diningNote?.trim() || "none";
-  const amount =
-    typeof context.mealAmount === "number" && Number.isFinite(context.mealAmount) && context.mealAmount > 0
-      ? `${Math.round(context.mealAmount)} THB`
-      : "not provided";
-  const enjoy = (context.enjoyMost ?? []).filter(Boolean).join(", ") || "none";
-  const dishes = (context.dishes ?? []).filter(Boolean).join(", ") || "none";
-  const locationHint = location
-    ? `Dining location (system-provided): ${location}. Cover may use exact centralwOrld when the mall is the hook. Across Title 1–3 + Cover Title + Cover Subtitle, exact "centralwOrld" must appear once — not necessarily on the cover. Never invent Terminal 21 / Siam Center / One Bangkok.`
-    : "No dining mall keyword is available. Do NOT invent centralwOrld, Terminal 21, Siam Center, or One Bangkok.";
-
+export function formatCoverTitleStaticRules() {
   return `COVER OVERLAY — JSON "mainTitle" (= coverTitle) + "subTitle" (= coverSubtitle). Independent from titles[]. Never shorten titles[] into the cover. Generate both in THIS same JSON. No extra API call.
 
 CORE PRIORITY: natural Chinese > THIS customer's lived evidence > one clear selling point > click/save value > length.
@@ -473,7 +461,6 @@ Never use 曼谷美食发现 as a default when the dining note has a person, ser
 Length: 4–10 units MAX. Not a target. Han=1. centralwOrld=1. Terminal 21 / Siam Center / One Bangkok=2. Baan Ying=2. Other Latin/digits=0.5 rounded up. Prefer a short complete line over padding to 10.
 Do not copy titles[]. Do not shorten a post title. Do not copy the previous cover formula (changing only 推荐/泰菜 is NOT a new title).
 Mall names only when location is the hook (mall KSP / shopping route). Food-led posts must not force a mall name. Never name a place the customer did not visit.
-Previous coverTitle (do not copy): ${previousMain}
 
 SUBTITLE (subTitle)
 Do not only describe the dish. Find the hook: what detail from THIS visit makes someone tap in.
@@ -499,17 +486,9 @@ GOOD: 这口咖喱蟹肉像家的味道 / 没想到超爱的是这道 / 原来�
 BAD: 咖喱蟹肉很有家常味 (too flat if a hook exists) / 咖喱蟹肉很好吃 / 第一次来咖喱蟹肉很好吃 / 第一次来就被狠狠圈粉 / 精选泰式家常料理 / 老板很帅服务很好 (two facts glued)
 Length: 6–10 units, never empty, never a broken sentence. Do not copy the dining note verbatim. Do not repeat mainTitle.
 
-Customer evidence for subtitle (INTERNAL — pick ONE, then rewrite):
-- Dining note: ${note}
-- Meal spend: ${amount}
-- Enjoy-most tags: ${enjoy}
-- Selected dishes: ${dishes}
-- Visit: ${context.visitFrequency || "none"} / ${context.customerType || "none"}
-${locationHint}
-
 If first-visit is the ONLY chosen evidence: 第一次来尝试Baan Ying. Never 第一次美食冒险 / 第一次来就被圈粉 / 第一次来就爱上. If they also said a favorite dish, prefer one hook such as 没想到超爱这道 — do not name the dish AND 第一次来 in the same subtitle.
 
-${formatCoverDishNameRules(context.dishes)}
+${formatCoverDishNameStaticRules()}
 
 NEGATIVES: never put 贵 / 难吃 / 踩雷 / 不推荐 / 失望 / 服务不好 / 态度不好 / 不会回购 on the cover. Neutralize or pick another evidence. Never invert into fake praise.
 
@@ -529,4 +508,36 @@ MainTitle: 4–10 units MAX; ≥1 and ≤2 pool keywords; real headline not stuf
 SubTitle: 6–10 units; one complete natural sentence; one core reason from THIS visit; Xiaohongshu hook without new facts; approved dish shorts only; no concatenated evidence; no verbatim note; no mainTitle repeat; no fake praise, slang, or 让人惊艳 templates; no raw negatives; no 最爱 or other 最-ranking; no hashtag/address/hours/emoji.
 
 FALLBACK if mainTitle or subTitle fails: rebuild from diningExperienceNote first (person → service → scene → atmosphere → food), then selected dish, meal spend, first visit, enjoy-most, location convenience. Weave ONE keyword phrase only if it stays natural. Never concatenate 咖喱蟹肉600泰铢第一次来. Never fall back to 曼谷超爱次来吃 / 曼谷美食发现. A complete short line such as 曼谷泰餐推荐 is allowed only when no stronger customer hook exists.`;
+}
+
+export function formatCoverTitleInstance(context: CoverTitleContext = {}) {
+  const location = selectedCoverLocation(context.branch);
+  const previousMain = (context.previousCoverTitle ?? "").split("/")[0]?.trim() || "none";
+  const note = context.diningNote?.trim() || "none";
+  const amount =
+    typeof context.mealAmount === "number" && Number.isFinite(context.mealAmount) && context.mealAmount > 0
+      ? `${Math.round(context.mealAmount)} THB`
+      : "not provided";
+  const enjoy = (context.enjoyMost ?? []).filter(Boolean).join(", ") || "none";
+  const dishes = (context.dishes ?? []).filter(Boolean).join(", ") || "none";
+  const locationHint = location
+    ? `Dining location (system-provided): ${location}. Cover may use exact centralwOrld when the mall is the hook. Across Title 1–3 + Cover Title + Cover Subtitle, exact "centralwOrld" must appear once — not necessarily on the cover. Never invent Terminal 21 / Siam Center / One Bangkok.`
+    : "No dining mall keyword is available. Do NOT invent centralwOrld, Terminal 21, Siam Center, or One Bangkok.";
+  return `THIS VISIT COVER EVIDENCE — apply COVER OVERLAY rules from the system prompt. Do not invent.
+
+Previous coverTitle (do not copy): ${previousMain}
+Customer evidence for subtitle (INTERNAL — pick ONE, then rewrite):
+- Dining note: ${note}
+- Meal spend: ${amount}
+- Enjoy-most tags: ${enjoy}
+- Selected dishes: ${dishes}
+- Visit: ${context.visitFrequency || "none"} / ${context.customerType || "none"}
+${locationHint}
+${formatCoverDishNameInstance(context.dishes)}`;
+}
+
+export function formatCoverTitleRules(context: CoverTitleContext = {}) {
+  return `${formatCoverTitleStaticRules()}
+
+${formatCoverTitleInstance(context)}`;
 }
