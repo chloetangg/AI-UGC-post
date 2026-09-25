@@ -17,6 +17,7 @@ import { pickSuggestedStrategy, resolveStrategySelection } from "@/lib/content-s
 import { BAAN_YING_CONTENT_STRATEGY } from "@/lib/brand/baan-ying-strategy";
 import { keywordsFromTitles } from "@/lib/title-keywords";
 import { buildGenerateRequest } from "@/lib/generate-prompt";
+import { clientAnalyticsSessionId } from "@/lib/analytics/track-client";
 import type { GenerationMemory } from "@/lib/generation-variation";
 import { emptyCustomerInfo, type CustomerInfo } from "@/types/customer";
 import { isMealExpenseRangeComplete } from "@/lib/meal-expense";
@@ -478,7 +479,8 @@ export function CampaignFlowProvider({
         previousTitleKeywords: previousTitles.length > 0 ? keywordsFromTitles(previousTitles) : [],
       },
     );
-    const payload = buildGenerateRequest(campaign, {
+    const payload = {
+      ...buildGenerateRequest(campaign, {
       ...angleInput,
       recommendedDishOther: current.productFeedback.recommendedDishOther,
       enjoyMostOther: current.productFeedback.enjoyMostOther,
@@ -520,7 +522,9 @@ export function CampaignFlowProvider({
         current.generationMemoryHistory?.length > 0 ? current.generationMemoryHistory : undefined,
       campaignId,
       submissionId: ensureSubmissionId(campaignId),
-    });
+    }),
+      analyticsSessionId: clientAnalyticsSessionId(),
+    };
 
     const form = new FormData();
     form.append("payload", JSON.stringify(payload));

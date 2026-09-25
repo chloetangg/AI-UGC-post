@@ -15,11 +15,11 @@ function dianpingMetadata(generationId = "") {
 
 export async function openTrackedDianpingShop(generationId = "") {
   const metadata = dianpingMetadata(generationId);
-  trackAnalyticsEvent({
+  await trackAnalyticsEvent({
     eventType: "publish_dianping_click",
     metadata,
   });
-  trackAnalyticsEvent({
+  void trackAnalyticsEvent({
     eventType: "dianping_open_attempt",
     metadata,
   });

@@ -18,12 +18,12 @@ export default function GeneratingPage() {
   const [phase, setPhase] = useState<"post" | "cover">("post");
 
   useEffect(() => {
-    if (!hydrated || !canAccess("generating")) return;
+    if (!hydrated) return;
     trackAnalyticsEvent({
       eventType: "form_submit",
       metadata: { source: "generating_page", formType: "baan-ying-ugc" },
     });
-  }, [hydrated, canAccess]);
+  }, [hydrated]);
 
   useEffect(() => {
     if (!hydrated || !canAccess("generating")) return;

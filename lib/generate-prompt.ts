@@ -26,6 +26,7 @@ export type GenerateRequestBody = GeneratePostInput & {
   productDescription: string;
   brandContext?: BrandContext;
   contentStrategy?: ContentStrategyLibrary;
+  analyticsSessionId?: string;
 };
 
 export function resolveContentStrategy(input?: { contentStrategy?: ContentStrategyLibrary }) {

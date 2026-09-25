@@ -89,7 +89,7 @@ export function PublishAssistant({
   }
 
   function trackXhsPublish() {
-    trackAnalyticsEvent({
+    return trackAnalyticsEvent({
       eventType: "xhs_publish_click",
       metadata: {
         platform: "xiaohongshu",
@@ -117,7 +117,7 @@ export function PublishAssistant({
 
   async function publishXiaohongshu() {
     if (busy) return;
-    trackXhsPublish();
+    await trackXhsPublish();
     setXhsOpen(false);
     setBusy(true);
     setOpenFailed(false);

@@ -23,7 +23,6 @@ export default function ResultPage() {
   const { campaignId } = useParams<{ campaignId: string }>();
   const {
     hydrated,
-    canAccess,
     draft,
     generated,
     cover,
@@ -38,7 +37,7 @@ export default function ResultPage() {
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    if (!hydrated || !canAccess("result")) return;
+    if (!hydrated) return;
     if (!draft) {
       router.replace(campaignPath(campaignId, "generating"));
       return;
@@ -47,7 +46,7 @@ export default function ResultPage() {
       eventType: "generation_complete",
       metadata: { source: "result_page" },
     });
-  }, [campaignId, canAccess, draft, hydrated, router]);
+  }, [campaignId, draft, hydrated, router]);
 
   function patch(partial: Partial<ResultDraft>) {
     if (!draft) return;

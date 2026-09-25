@@ -9,7 +9,7 @@ import {
 } from "@/lib/generate-prompt";
 import { insertGeneration } from "@/lib/generations";
 import { upsertSubmission } from "@/lib/submissions";
-import { readAnalyticsSession } from "@/lib/analytics/session";
+import { resolveAnalyticsSession, trackServerEvent } from "@/lib/analytics/server";
 import { normalizeHashtags } from "@/lib/hashtags";
 import { attachOfficialLocationTime, resolveDiningBranch, stripGeneratedLocationTime } from "@/lib/locations";
 import { parseGeneratedContent } from "@/lib/parse-generated";
@@ -99,6 +99,12 @@ export async function POST(request: Request) {
     const payload = JSON.parse(rawPayload) as GenerateRequestBody;
     payload.contentLanguage = "zh-CN";
     payload.branch = resolveDiningBranch(payload.branch);
+    const analyticsSessionId = payload.analyticsSessionId?.trim() || "";
+    await trackServerEvent(
+      "form_submit",
+      { source: "generate_api", formType: "baan-ying-ugc" },
+      analyticsSessionId,
+    );
 
     const photos = form
       .getAll("photos")
@@ -343,7 +349,7 @@ export async function POST(request: Request) {
     const hashtags = normalizeHashtags(compliant.hashtags, payload.previousHashtags ?? []);
 
     const generationId = randomUUID();
-    const session = await readAnalyticsSession();
+    const session = await resolveAnalyticsSession(analyticsSessionId);
     try {
       await insertGeneration({
         generationId,
@@ -385,6 +391,11 @@ export async function POST(request: Request) {
       const detail = error instanceof Error ? error.message : "";
       if (detail) console.error("[generations]", detail);
     }
+    await trackServerEvent(
+      "generation_complete",
+      { source: "generate_api" },
+      analyticsSessionId,
+    );
     if (payload.submissionId && payload.campaignId) {
       try {
         await upsertSubmission({

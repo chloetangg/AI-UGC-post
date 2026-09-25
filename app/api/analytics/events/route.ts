@@ -21,13 +21,18 @@ function asEventType(value: unknown): AnalyticsEventType | "" {
 
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as Record<string, unknown>;
+    const rawBody = await request.text();
+    const body = (rawBody ? JSON.parse(rawBody) : {}) as Record<string, unknown>;
     const eventType = asEventType(body.eventType);
     if (!eventType) {
       return NextResponse.json({ ok: true, skipped: true });
     }
     const session = await readAnalyticsSession();
-    const sessionId = session.sessionId || newAnalyticsSessionId();
+    const fromBody =
+      typeof body.sessionId === "string"
+        ? body.sessionId.trim().replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 80)
+        : "";
+    const sessionId = session.sessionId || fromBody || newAnalyticsSessionId();
     const qrCodeId = sanitizeQrCodeId(
       typeof body.qrCodeId === "string" && body.qrCodeId.trim()
         ? body.qrCodeId
