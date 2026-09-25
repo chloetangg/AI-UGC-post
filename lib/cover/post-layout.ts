@@ -18,12 +18,12 @@ export function isFourPhotoGridCover(photoCount: number, templateId: string) {
 }
 
 export const COVER_TEMPLATE_OPTIONS = [
-  { id: "top-stroke", en: "Style 1", zh: "风格 1", th: "สไตล์ 1" },
-  { id: "dual-line", en: "Style 2", zh: "风格 2", th: "สไตล์ 2" },
-  { id: "top-banner", en: "Style 3", zh: "风格 3", th: "สไตล์ 3" },
-  { id: "polaroid", en: "Style 4", zh: "风格 4", th: "สไตล์ 4" },
-  { id: "center-lower", en: "Style 5", zh: "风格 5", th: "สไตล์ 5" },
-  { id: "photo-only", en: "Style 6", zh: "风格 6", th: "สไตล์ 6" },
+  { id: "top-stroke", en: "Cover 1", zh: "封面 1", th: "ปก 1" },
+  { id: "dual-line", en: "Cover 2", zh: "封面 2", th: "ปก 2" },
+  { id: "top-banner", en: "Cover 3", zh: "封面 3", th: "ปก 3" },
+  { id: "polaroid", en: "Cover 4", zh: "封面 4", th: "ปก 4" },
+  { id: "center-lower", en: "Cover 5", zh: "封面 5", th: "ปก 5" },
+  { id: "photo-only", en: "Cover 6", zh: "封面 6", th: "ปก 6" },
 ] as const;
 
 export type CoverTemplateOptionId = (typeof COVER_TEMPLATE_OPTIONS)[number]["id"];
