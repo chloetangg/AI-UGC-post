@@ -12,6 +12,7 @@ import { TemplatePicker } from "@/components/result/TemplatePicker";
 import { TitleSelector } from "@/components/result/TitleSelector";
 import { Button } from "@/components/ui/button";
 import { campaignPath } from "@/lib/flow";
+import { trackAnalyticsEvent } from "@/lib/analytics/track-client";
 import { buildFinalSlides } from "@/lib/cover/post-layout";
 import { ensureRequiredHashtags, stripAllHashtagsFromCaption } from "@/lib/hashtags";
 import { useT } from "@/components/providers/language-provider";
@@ -40,7 +41,12 @@ export default function ResultPage() {
     if (!hydrated || !canAccess("result")) return;
     if (!draft) {
       router.replace(campaignPath(campaignId, "generating"));
+      return;
     }
+    trackAnalyticsEvent({
+      eventType: "generation_complete",
+      metadata: { source: "result_page" },
+    });
   }, [campaignId, canAccess, draft, hydrated, router]);
 
   function patch(partial: Partial<ResultDraft>) {

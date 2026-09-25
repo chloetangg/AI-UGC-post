@@ -10,15 +10,11 @@ const EVENT_FIELDS: Record<string, string> = {
   qr_scan: "qrScans",
   form_submit: "formSubmissions",
   generation_complete: "generations",
+  xhs_publish_click: "xhsPublishClicks",
+  publish_dianping_click: "dianpingPublishClicks",
 };
 
 function persistCounterField(eventType: string, document: unknown) {
-  if (eventType === "publish_platform_selected") {
-    const platform = (document as { metadata?: { platform?: string } })?.metadata?.platform;
-    if (platform === "rednote" || platform === "xiaohongshu") return "xhsPublishClicks";
-    if (platform === "dianping") return "dianpingPublishClicks";
-    return "";
-  }
   return EVENT_FIELDS[eventType] ?? "";
 }
 

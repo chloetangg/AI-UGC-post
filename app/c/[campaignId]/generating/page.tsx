@@ -6,6 +6,7 @@ import { FlowGuard } from "@/components/flow/FlowGuard";
 import { GeneratingState } from "@/components/generation/GeneratingState";
 import { useCampaignFlow } from "@/components/providers/campaign-flow-provider";
 import { campaignPath } from "@/lib/flow";
+import { trackAnalyticsEvent } from "@/lib/analytics/track-client";
 
 export default function GeneratingPage() {
   const router = useRouter();
@@ -15,6 +16,14 @@ export default function GeneratingPage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [attempt, setAttempt] = useState(0);
   const [phase, setPhase] = useState<"post" | "cover">("post");
+
+  useEffect(() => {
+    if (!hydrated || !canAccess("generating")) return;
+    trackAnalyticsEvent({
+      eventType: "form_submit",
+      metadata: { source: "generating_page", formType: "baan-ying-ugc" },
+    });
+  }, [hydrated, canAccess]);
 
   useEffect(() => {
     if (!hydrated || !canAccess("generating")) return;

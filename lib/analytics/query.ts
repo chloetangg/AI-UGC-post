@@ -64,21 +64,11 @@ export async function queryAnalyticsReport(input: {
             { $count: "count" },
           ],
           rednoteClicks: [
-            {
-              $match: {
-                eventType: "publish_platform_selected",
-                "metadata.platform": { $in: ["xiaohongshu", "rednote"] },
-              },
-            },
+            { $match: { eventType: "xhs_publish_click" } },
             { $count: "count" },
           ],
           dianpingClicks: [
-            {
-              $match: {
-                eventType: "publish_platform_selected",
-                "metadata.platform": "dianping",
-              },
-            },
+            { $match: { eventType: "publish_dianping_click" } },
             { $count: "count" },
           ],
           daily: [
@@ -101,32 +91,10 @@ export async function queryAnalyticsReport(input: {
                   $sum: { $cond: [{ $eq: ["$eventType", "generation_complete"] }, 1, 0] },
                 },
                 xhsPublishClicks: {
-                  $sum: {
-                    $cond: [
-                      {
-                        $and: [
-                          { $eq: ["$eventType", "publish_platform_selected"] },
-                          { $in: ["$metadata.platform", ["xiaohongshu", "rednote"]] },
-                        ],
-                      },
-                      1,
-                      0,
-                    ],
-                  },
+                  $sum: { $cond: [{ $eq: ["$eventType", "xhs_publish_click"] }, 1, 0] },
                 },
                 dianpingPublishClicks: {
-                  $sum: {
-                    $cond: [
-                      {
-                        $and: [
-                          { $eq: ["$eventType", "publish_platform_selected"] },
-                          { $eq: ["$metadata.platform", "dianping"] },
-                        ],
-                      },
-                      1,
-                      0,
-                    ],
-                  },
+                  $sum: { $cond: [{ $eq: ["$eventType", "publish_dianping_click"] }, 1, 0] },
                 },
               },
             },

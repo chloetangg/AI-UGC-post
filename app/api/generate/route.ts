@@ -9,7 +9,6 @@ import {
 } from "@/lib/generate-prompt";
 import { insertGeneration } from "@/lib/generations";
 import { upsertSubmission } from "@/lib/submissions";
-import { trackServerEvent } from "@/lib/analytics/server";
 import { readAnalyticsSession } from "@/lib/analytics/session";
 import { normalizeHashtags } from "@/lib/hashtags";
 import { attachOfficialLocationTime, resolveDiningBranch, stripGeneratedLocationTime } from "@/lib/locations";
@@ -89,7 +88,6 @@ async function fileToImagePart(file: File) {
 }
 
 export async function POST(request: Request) {
-  let formSubmitTrack: Promise<void> | null = null;
   const startedAt = Date.now();
   try {
     const form = await request.formData();
@@ -124,9 +122,6 @@ export async function POST(request: Request) {
     const openai = getClient();
     const model = process.env.OPENAI_MODEL || "gpt-4o";
     const previousTitles = payload.previousTitles ?? [];
-    const formSubmitTrackTask = trackServerEvent("form_submit", { formType: "baan-ying-ugc" });
-    formSubmitTrack = formSubmitTrackTask;
-
     const completion = await openai.chat.completions.create({
       model,
       temperature: 0.95,
@@ -404,14 +399,6 @@ export async function POST(request: Request) {
       }
     }
 
-    await Promise.all([
-      formSubmitTrackTask,
-      trackServerEvent("generation_complete", {
-        generationType: "baan-ying-ugc",
-        generationId,
-      }),
-    ]);
-
     return Response.json({
       titles: outputTitles,
       caption: located.caption,
@@ -435,7 +422,6 @@ export async function POST(request: Request) {
       generationId,
     });
   } catch (error) {
-    if (formSubmitTrack) await formSubmitTrack;
     const raw = error instanceof Error ? error.message : "Generation failed";
     const detail = errorDetail(error);
     console.error("[generate] failed");
