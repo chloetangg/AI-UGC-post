@@ -10,12 +10,9 @@ export function YouPageClient() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("qr")) {
-      params.delete("qr");
-      const next = params.toString();
-      window.history.replaceState(null, "", `${window.location.pathname}${next ? `?${next}` : ""}`);
-    }
-    router.replace(campaignPath(campaignId, "experience"));
+    const qr = params.get("qr")?.trim() || "";
+    const experience = campaignPath(campaignId, "experience");
+    router.replace(qr ? `${experience}?qr=${encodeURIComponent(qr)}` : experience);
   }, [campaignId, router]);
 
   return null;
