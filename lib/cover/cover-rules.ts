@@ -502,7 +502,7 @@ ${formatCoverNaturalRules()}
 No hashtag, address, hours, emoji, Location & Time. Never invent a dish.
 
 QUALITY CHECK before return — if any item fails, rewrite from the same single evidence, do not output:
-1. Natural spoken Chinese? 2. Grammar OK? 3. No typo / missing / repeated character? 4. No keyword glue? 5. Tied to this customer's input? 6. Sounds like a Xiaohongshu cover? 7. ≤10 units and not padded? 8. If 曼谷 is used, is it natural?
+1. Natural spoken Chinese? 2. Grammar OK? 3. No typo / missing / repeated character? 4. No keyword glue? 5. Tied to this customer's input? 6. Sounds like a Xiaohongshu cover? 7. ≤10 units and not padded? 8. If 曼谷 is used, is it natural? 9. After 第一次/尝试/体验/来到/吃/发现/打卡, is there a complete object? Would a Chinese speaker actually say this?
 Ask: would a real Xiaohongshu user write this cover line? Would it spark a little curiosity while staying true?
 MainTitle: 4–10 units MAX; ≥1 and ≤2 pool keywords; real headline not stuffing; not a shortened titles[] item; not previous cover formula; mall name only if true and relevant; no banned claims; no 最/第一/排名/全范围绝对化 (第一次/最近 OK); no hashtag/address/hours/emoji.
 SubTitle: 6–10 units; one complete natural sentence; one core reason from THIS visit; Xiaohongshu hook without new facts; approved dish shorts only; no concatenated evidence; no verbatim note; no mainTitle repeat; no fake praise, slang, or 让人惊艳 templates; no raw negatives; no 最爱 or other 最-ranking; no hashtag/address/hours/emoji.

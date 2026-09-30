@@ -1,5 +1,5 @@
 export const GENERATE_CONTENT_LANGUAGE = "zh-CN" as const;
-export const GENERATE_CONTENT_REQUIRED_HASHTAGS = ["#baanying曼谷"] as const;
+export const GENERATE_CONTENT_REQUIRED_HASHTAGS = ["#BaanYing曼谷"] as const;
 
 export type GenerateContentCampaign = {
   brand: string;
@@ -42,6 +42,8 @@ export type GenerateContentResponse = {
   titles: [string, string, string];
   body: string;
   hashtags: [string, string, string, string, string];
+  locationFormat?: string;
+  locationPlacement?: "standalone" | "inline";
 };
 
 export type GenerateContentErrorCode =

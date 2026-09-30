@@ -73,10 +73,67 @@ export function isMechanicalKeywordGlue(title: string) {
   return Boolean(rest) && BROKEN_REMAINDER.test(rest);
 }
 
+const INCOMPLETE_ACTION_EXACT = new Set([
+  "曼谷泰餐第一次来尝试",
+  "曼谷美食第一次来体验",
+  "centralwOrld泰餐第一次尝试",
+  "曼谷泰餐值得来吃",
+  "到曼谷第一次泰餐",
+  "Baan Ying第一次来",
+  "泰餐第一次来吃",
+  "曼谷泰餐第一次体验",
+  "曼谷美食第一次来吃",
+  "曼谷泰餐值得尝试",
+  "曼谷发现泰餐",
+  "Baan Ying曼谷第一次",
+]);
+
+/** 第一次/尝试/体验/来吃/发现 hanging with no object, or keyword + action glue. */
+export function isIncompleteCoverAction(title: string) {
+  const cleaned = sanitizeCoverLine(title).replace(/\s+/g, "");
+  if (!cleaned) return false;
+  if (INCOMPLETE_ACTION_EXACT.has(cleaned)) return true;
+  if (/(第一次(来)?|来)(尝试|体验)$/.test(cleaned)) return true;
+  if (/第一次来$/.test(cleaned)) return true;
+  if (/第一次来吃$/.test(cleaned)) return true;
+  if (/值得(来吃|尝试)$/.test(cleaned)) return true;
+  if (/第一次(泰餐|美食|曼谷)$/.test(cleaned)) return true;
+  if (/到曼谷第一次(?!餐)/.test(cleaned)) return true;
+  if (/发现(泰餐|美食)$/.test(cleaned) && !/发现(这家|一家)/.test(cleaned)) return true;
+  if (/(曼谷|泰餐|美食|centralwOrld|Baan Ying)第一次$/.test(cleaned)) return true;
+  return false;
+}
+
+export function isSpokenCompleteCoverHeadline(title: string) {
+  const cleaned = sanitizeCoverLine(title).replace(/\s+/g, "");
+  if (!cleaned || isIncompleteCoverAction(cleaned)) return false;
+  return (
+    /^第一次来(尝试|吃|试试|体验).{2,}$/.test(cleaned) ||
+    /^第一次来centralwOrld吃/.test(cleaned) ||
+    /^到曼谷(的)?第一餐/.test(cleaned) ||
+    /^曼谷第一餐/.test(cleaned) ||
+    /^(在)?曼谷(吃到|发现|逛街发现)(一家|这家)/.test(cleaned) ||
+    /^来曼谷(可以)?试试这家/.test(cleaned)
+  );
+}
+
+export function repairIncompleteCoverAction(title: string, context: CoverTitleContext = {}) {
+  const cleaned = sanitizeCoverLine(title);
+  if (!isIncompleteCoverAction(cleaned)) return cleaned;
+  const firstVisit = context.visitFrequency === "1st time" || /第一次/.test(cleaned);
+  if (/centralwOrld|central\s*world/i.test(cleaned) && firstVisit) return "第一次来centralwOrld吃泰餐";
+  if (/发现/.test(cleaned)) return "在曼谷发现这家泰餐";
+  if (/值得/.test(cleaned)) return "来曼谷试试这家泰餐";
+  if (/到曼谷第一次/.test(cleaned)) return "到曼谷第一餐泰餐";
+  if (firstVisit) return "第一次来试试这家泰餐";
+  return "来曼谷试试这家泰餐";
+}
+
 export function isNaturalCoverChinese(title: string) {
   const cleaned = sanitizeCoverLine(title);
   if (!cleaned) return false;
   if (isMechanicalKeywordGlue(cleaned)) return false;
+  if (isIncompleteCoverAction(cleaned)) return false;
   if (/(.)\1{2,}/.test(cleaned.replace(/centralwOrld/gi, ""))) return false;
   if (/[｜|/,，、]$/.test(cleaned)) return false;
   return true;
@@ -98,11 +155,29 @@ Prefer the customer's real note, favorite dish, reason, and restaurant plus. 老
 10 units is a MAX, not a target. Prefer a short complete line over a stuffed 10-character line.
 GOOD: 曼谷泰餐推荐 / 曼谷必吃泰菜 / 曼谷吃什么？ / 曼谷美食探店 / 老板很帅的曼谷泰餐
 BAD: 曼谷超爱次来吃 / 曼谷好吃推荐必吃 / 曼谷美食值得来吃
+
+ACTION OBJECTS — 第一次 / 尝试 / 体验 / 来到 / 吃 / 打卡 / 发现 / 逛 must be followed by a clear object or a complete spoken thought. Do not stack 地点/类别 + 动作 with no object.
+A cover title is a sentence a real Chinese speaker would say, not 地点+关键词+动作+食物 glued together.
+If packing one more keyword would break the grammar, keep the natural sentence.
+Ask: 一个中国人正常聊天会这样说吗? If no, rebuild.
+
+Learn STRUCTURE only, do not copy these lines:
+❌ 曼谷泰餐第一次来尝试 → ✅ 第一次来尝试Baan Ying
+❌ 曼谷泰餐第一次体验 → ✅ 第一次来体验这家泰餐
+❌ 曼谷美食第一次来吃 → ✅ 到曼谷第一餐泰餐
+❌ centralwOrld泰餐第一次尝试 → ✅ 第一次来centralwOrld吃泰餐
+❌ 曼谷泰餐值得尝试 → ✅ 来曼谷试试这家泰餐
+❌ 曼谷发现泰餐 → ✅ 在曼谷发现这家泰餐
+❌ Baan Ying曼谷第一次 → ✅ 第一次来吃Baan Ying
+Also never: 曼谷泰餐值得来吃 / 到曼谷第一次泰餐 / Baan Ying第一次来 / 泰餐第一次来吃.
+Rebuild from THIS visit's restaurant, dishes, and note — do not reuse the example wording as a template.
+
 If any check fails, do not output that title. Rebuild from customer evidence.`;
 }
 
 export function naturalCoverFallback(context: CoverTitleContext = {}, index = 0) {
   const note = `${context.diningNote ?? ""} ${(context.enjoyMost ?? []).join("")} ${(context.recommendTo ?? []).join("")}`;
+  if (context.visitFrequency === "1st time") return "第一次来试试这家泰餐";
   if (/老板/.test(note) && /帅|好看|英俊/.test(note)) return "老板很帅的曼谷泰餐";
   if (/Q弹|蒜香/.test(note)) return "曼谷必吃";
   if (/适合带小朋友|带娃|儿童/.test(note)) return "曼谷吃什么？";

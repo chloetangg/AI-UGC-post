@@ -46,14 +46,15 @@ import {
   type ResultDraft,
 } from "@/types/content";
 import {
-  attachOfficialLocationTime,
-  captionHoursForBranch,
+  detectLocationPlacement,
   detectLocationTimeFormat,
+  finalizeOfficialLocationTime,
+  isLocationPlacement,
   isLocationTimeFormatId,
-  pickNextLocationTimeFormat,
+  planLocationTime,
   resolveDiningBranch,
 } from "@/lib/locations";
-import type { LocationTimeFormatId } from "@/lib/locations";
+import type { LocationPlacement, LocationTimeFormatId } from "@/lib/locations";
 import { formatGenerationCostLog, type GenerationCostReport } from "@/lib/openai-usage";
 import { saveSubmissionToServer } from "@/lib/save-submission-client";
 import { createId } from "@/lib/id";
@@ -75,6 +76,7 @@ type PersistedFlow = {
   selectedCoverTemplateId: string;
   variantIndex: number;
   locationFormatHistory: LocationTimeFormatId[];
+  locationPlacementHistory: LocationPlacement[];
   contentAngleHistory: string[];
   kspHistory: string[];
   storylineHistory: string[];
@@ -141,6 +143,7 @@ function defaultPersisted(): PersistedFlow {
     selectedCoverTemplateId: DEFAULT_COVER_TEMPLATE_ID,
     variantIndex: 0,
     locationFormatHistory: [],
+    locationPlacementHistory: [],
     contentAngleHistory: [],
     kspHistory: [],
     storylineHistory: [],
@@ -432,16 +435,22 @@ export function CampaignFlowProvider({
         : previousTitles[0] || "";
     const previousCaption = current.draft?.caption?.trim() || current.generated?.caption?.trim() || "";
     const history = current.locationFormatHistory ?? [];
+    const placementHistory = current.locationPlacementHistory ?? [];
     const detectedPrevious = previousCaption ? detectLocationTimeFormat(previousCaption) : "";
     const previousLocationFormat =
       history[history.length - 1] || (isLocationTimeFormatId(detectedPrevious) ? detectedPrevious : "");
     const previousLocationFormats = history.length > 0 ? history : previousLocationFormat ? [previousLocationFormat] : [];
     const diningBranch = resolveDiningBranch(current.productFeedback.branch);
-    const requiredLocationFormat = pickNextLocationTimeFormat(
-      previousLocationFormat,
-      previousLocationFormats,
-      Boolean(captionHoursForBranch(diningBranch)),
-    );
+    const previousLocationPlacement =
+      placementHistory[placementHistory.length - 1] ||
+      (previousCaption ? detectLocationPlacement(previousCaption, diningBranch) : "");
+    const locationPlan = planLocationTime({
+      branch: diningBranch,
+      previousPlacement: previousLocationPlacement,
+      previousFormat: previousLocationFormat,
+      recentFormats: previousLocationFormats,
+    });
+    const requiredLocationFormat = locationPlan.format;
     const recommendTo = [
       ...current.productFeedback.recommendTo,
       current.productFeedback.recommendToOther?.trim() ?? "",
@@ -505,6 +514,10 @@ export function CampaignFlowProvider({
       previousLocationFormat,
       previousLocationFormats,
       requiredLocationFormat,
+      previousLocationPlacement,
+      requiredLocationPlacement: locationPlan.placement,
+      requiredInlineLocationStyle: locationPlan.inlineStyle,
+      requiredInlineLocationSlot: locationPlan.inlineSlot,
       previousHashtags: current.draft?.hashtags ?? current.generated?.hashtags,
       previousContentAngle,
       suggestedContentAngle: suggestedStrategy.contentAngleId,
@@ -540,6 +553,7 @@ export function CampaignFlowProvider({
     let data: GeneratedContent & {
       error?: string;
       locationFormat?: string;
+      locationPlacement?: string;
       cost?: GenerationCostReport;
       generationId?: string;
       generationMemory?: GenerationMemory;
@@ -548,6 +562,7 @@ export function CampaignFlowProvider({
       data = (await response.json()) as GeneratedContent & {
         error?: string;
         locationFormat?: string;
+        locationPlacement?: string;
         cost?: GenerationCostReport;
         generationId?: string;
         generationMemory?: GenerationMemory;
@@ -579,13 +594,19 @@ export function CampaignFlowProvider({
       data.hashtags,
       current.draft?.hashtags ?? current.generated?.hashtags,
     );
-    const located = attachOfficialLocationTime(
-      finalized.caption,
-      diningBranch,
-      isLocationTimeFormatId(data.locationFormat) ? data.locationFormat : requiredLocationFormat,
-      previousLocationFormat,
-      previousLocationFormats,
-    );
+    const located = finalizeOfficialLocationTime({
+      caption: finalized.caption,
+      branch: diningBranch,
+      placement: isLocationPlacement(data.locationPlacement)
+        ? data.locationPlacement
+        : locationPlan.placement,
+      format: isLocationTimeFormatId(data.locationFormat) ? data.locationFormat : requiredLocationFormat,
+      previousPlacement: previousLocationPlacement,
+      previousFormat: previousLocationFormat,
+      recentFormats: previousLocationFormats,
+      inlineStyle: locationPlan.inlineStyle,
+      inlineSlot: locationPlan.inlineSlot,
+    });
     const maxPhotoIndex = Math.max(files.length - 1, 0);
     const aiSelectedPhotoIndex = Math.min(
       Math.max(data.selectedPhotoIndex ?? 0, 0),
@@ -671,7 +692,10 @@ export function CampaignFlowProvider({
       error: null,
     };
     const usedFormat = located.format;
-    const locationFormatHistory = [...previousLocationFormats, usedFormat].slice(-6);
+    const locationFormatHistory = usedFormat
+      ? [...previousLocationFormats, usedFormat].slice(-6)
+      : previousLocationFormats;
+    const locationPlacementHistory = [...placementHistory, located.placement].slice(-6);
     const selectedStrategy = resolveStrategySelection(strategyLibrary, suggestedStrategy, {
       kspId: data.selectedKspId,
       storylineId: data.selectedStorylineId,
@@ -701,6 +725,7 @@ export function CampaignFlowProvider({
       cover: nextCover,
       variantIndex: current.variantIndex + 1,
       locationFormatHistory,
+      locationPlacementHistory,
       contentAngleHistory,
       kspHistory,
       storylineHistory,

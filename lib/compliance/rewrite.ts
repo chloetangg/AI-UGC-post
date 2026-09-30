@@ -1,3 +1,4 @@
+import { isRequiredHashtag, REQUIRED_HASHTAGS } from "@/lib/hashtags";
 import { sanitizeOfficialMallNames } from "@/lib/locations";
 import { sanitizeCoverAbsoluteLanguage } from "@/lib/cover/cover-absolute";
 import { allPhraseRules, COMPILED_SEMANTIC_PATTERNS, REQUIRED_SAFE_HASHTAGS } from "./lexicon";
@@ -59,6 +60,7 @@ export function rewriteCompliantText(text: string, field: ComplianceField = "gen
 
 export function rewriteHashtag(tag: string) {
   const formatted = tag.startsWith("#") ? tag : `#${tag}`;
+  if (isRequiredHashtag(formatted)) return REQUIRED_HASHTAGS[0];
   if ((REQUIRED_SAFE_HASHTAGS as readonly string[]).includes(formatted)) return formatted;
   const rewritten = rewriteCompliantText(formatted.replace(/^#/, ""), "hashtag");
   const cleaned = rewritten.replace(/\s+/g, "");

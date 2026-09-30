@@ -1,4 +1,4 @@
-import { STRICT_HASHTAG_RULES } from "@/lib/hashtags";
+import { isRequiredHashtag, STRICT_HASHTAG_RULES } from "@/lib/hashtags";
 import { CONTENT_LANGUAGE } from "@/lib/i18n";
 
 export type HashtagGenerateInput = {
@@ -21,15 +21,15 @@ You do NOT write captions, titles, or Location & Time.
 The caption has already been generated. Your only job is to output hashtags for that caption.
 
 LANGUAGE:
-- Hashtags may mix Simplified Chinese (${CONTENT_LANGUAGE}) and the brand tag #baanying曼谷.
-- Do not translate or rewrite #baanying曼谷.
+- Hashtags may mix Simplified Chinese (${CONTENT_LANGUAGE}) and the brand tag #BaanYing曼谷.
+- Do not translate or rewrite #BaanYing曼谷.
 
 ${STRICT_HASHTAG_RULES}`;
 }
 
 export function buildHashtagUserPrompt(input: HashtagGenerateInput) {
   const previousDynamic = (input.previousHashtags ?? []).filter(
-    (tag) => tag !== "#baanying曼谷",
+    (tag) => !isRequiredHashtag(tag),
   );
 
   return `Generate hashtags for this completed Xiaohongshu caption.
@@ -53,5 +53,5 @@ The 4 random pool hashtags MUST differ from the previous random set when another
 ${STRICT_HASHTAG_RULES}
 
 Return ONLY the 5 hashtags in random order:
-#随机1 #随机2 #baanying曼谷 #随机3 #随机4`;
+#随机1 #随机2 #BaanYing曼谷 #随机3 #随机4`;
 }

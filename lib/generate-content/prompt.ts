@@ -2,14 +2,18 @@ import {
   GENERATE_CONTENT_LANGUAGE,
   type GenerateContentRequest,
 } from "@/lib/generate-content/types";
-import { formatCaptionConsumerVoiceRules } from "@/lib/caption-voice";
+import { formatCaptionEmojiRules } from "@/lib/caption-emoji";
+import { formatCaptionConsumerVoiceRules, formatCustomerOriginalVoiceRules } from "@/lib/caption-voice";
 import { CAPTION_NO_HASHTAG_RULES } from "@/lib/hashtags";
 import { complianceGenerationRules } from "@/lib/compliance/prompt";
 import {
+  formatLocationTimePlanRules,
+  formatLocationTimeStaticRules,
   locationFactsForPrompt,
   officialLocationLine,
   STRICT_MALL_CHINESE_NAME_RULES,
   LOCATION_TIME_FORMAT_POOL,
+  type LocationTimePlan,
   verifiedHoursForBranch,
   resolveDiningBranch,
 } from "@/lib/locations";
@@ -39,7 +43,7 @@ export const generateContentJsonSchema = {
       body: {
         type: "string",
         description:
-          "Exactly 1 Simplified Chinese Xiaohongshu story body written as a real diner. Length follows the evidence — 2 sentences is valid. No fixed sentence/word quota. Do not invent facts. Do not include hashtags. Do not include Location & Time; the system appends one of 6 locked templates after this body.",
+          "Exactly 1 Simplified Chinese Xiaohongshu story body written as a real diner. Length follows the evidence — 2 sentences is valid. No fixed sentence/word quota. Do not invent facts. Do not include hashtags. Follow THIS ROUND LOCATION PLAN.",
       },
     },
   },
@@ -79,26 +83,30 @@ ${locationFacts.chineseNameRules}
 
 ${locationFacts.branchRules}
 If the customer wrote CentralWorld / centralworld / "2F" / wrong floor, still treat the official facts as true.
-Do not write mall floors or opening hours in the body. Generic "Baan Ying" has no mall/floor — do not invent one.
+Generic "Baan Ying" has no mall/floor — do not invent one.
 
-VERIFIED OPENING HOURS (background only; do not write hours into the body):
+VERIFIED OPENING HOURS (locked official facts):
 ${locationFacts.hours}
 
-LOCATION IN CAPTION:
+${formatLocationTimeStaticRules()}
+
+LOCATION TEMPLATES (standalone mode only):
 ${LOCATION_TIME_FORMAT_POOL}
-Do not write Location & Time, 📍 address lines, ⏰ hours, mall floors, or a 7th format. The system appends the locked template after your body.
 
 XIAOHONGSHU STYLE:
 - Titles should be short, catchy, and curiosity-driven.
 - Titles can use emojis naturally.
-- 🍋 is lemon / 柠檬 only. 🥭 is mango / 芒果 only. Never use 🍋 for 芒果糯米饭.
 - Use conversational Chinese.
 - Body length follows this visit's evidence. 2 sentences is valid. Do not force a 3–5 sentence intro/experience/recommend/summary template.
-- Vary sentence length, paragraphing, opening, and emoji count across generations.
+- Vary sentence length, paragraphing, and opening across generations.
 - The content should feel like something a real person would post after dining at a restaurant.
 - Do not make every sentence sound promotional.
 
+${formatCaptionEmojiRules()}
+
 ${formatCaptionConsumerVoiceRules()}
+
+${formatCustomerOriginalVoiceRules()}
 
 TITLE DIVERSITY:
 Generate exactly 3 different title angles, in this order:
@@ -120,7 +128,7 @@ Never include Markdown fences.
 Never include explanations outside the JSON.`;
 }
 
-export function buildGenerateContentUserPrompt(input: GenerateContentRequest) {
+export function buildGenerateContentUserPrompt(input: GenerateContentRequest, locationPlan?: LocationTimePlan) {
   const diningBranch = resolveDiningBranch(input.experience.branch);
   const photos =
     input.photos.length > 0
@@ -147,16 +155,16 @@ USER EXPERIENCE:
 Branch:
 ${diningBranch}
 Treat this as the customer's actual dining location. It is system-provided context, not a customer-selected survey answer.
-Official location and hours are appended by the system after the body. Do not write them in the body.
-Official location line (do not copy into the body):
+Official location line (locked):
 ${officialLocationLine(diningBranch) || "Not provided"}
-Verified opening hours (do not copy into the body):
+Verified opening hours (locked):
 ${verifiedHoursForBranch(diningBranch) || "Not provided"}
+${locationPlan ? formatLocationTimePlanRules(locationPlan, diningBranch) : formatLocationTimeStaticRules()}
 
 ${STRICT_MALL_CHINESE_NAME_RULES}
 
 ${LOCATION_TIME_FORMAT_POOL}
-Do not write Location & Time. The system appends one of the 6 locked templates after your body. Do not add hashtags.
+Do not add hashtags.
 
 ${CAPTION_NO_HASHTAG_RULES}
 
@@ -191,7 +199,7 @@ Generate exactly 3 different Xiaohongshu titles, in this order:
 3. Food / experience highlight hook
 The 3 titles must not be simple rewrites of each other.
 Generate exactly 1 Xiaohongshu body.
-The body MUST contain ZERO hashtags. Do not write Location & Time; the system appends it.
+The body MUST contain ZERO hashtags. Follow THIS ROUND LOCATION PLAN.
 Let the body length follow the information provided. If two sentences are enough, write two. Do not pad.
 Write as a diner who just ate, not a restaurant brochure. Keep mixed like/so-so from the evidence. Do not invent flaws. Do not force a summary CTA.
 Do not add information that is not provided.

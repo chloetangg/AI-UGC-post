@@ -12,7 +12,12 @@ import {
 } from "@/lib/generate-content/prompt";
 import { generateHashtags } from "@/lib/generate-hashtags/generate";
 import { ensureCaptionEmojis, fixFruitEmojisInTitles } from "@/lib/caption-emoji";
-import { attachOfficialLocationTime, resolveDiningBranch, stripGeneratedLocationTime } from "@/lib/locations";
+import {
+  finalizeOfficialLocationTime,
+  planLocationTime,
+  resolveDiningBranch,
+  stripGeneratedLocationTime,
+} from "@/lib/locations";
 import { enforceXiaohongshuCompliance } from "@/lib/compliance";
 import {
   aggregateGenerationCost,
@@ -45,6 +50,8 @@ export async function POST(request: Request) {
     }
 
     const payload = parseGenerateContentRequest(raw);
+    const diningBranch = resolveDiningBranch(payload.experience.branch);
+    const locationPlan = planLocationTime({ branch: diningBranch });
     const openai = getClient();
     const model = process.env.OPENAI_MODEL || "gpt-4o";
 
@@ -59,7 +66,7 @@ export async function POST(request: Request) {
         },
         messages: [
           { role: "system", content: buildGenerateContentSystemPrompt() },
-          { role: "user", content: buildGenerateContentUserPrompt(payload) },
+          { role: "user", content: buildGenerateContentUserPrompt(payload, locationPlan) },
         ],
       });
     } catch (error) {
@@ -101,16 +108,21 @@ export async function POST(request: Request) {
         model,
       });
       usageCalls.push(...compliant.usage);
-      const located = attachOfficialLocationTime(
-        ensureCaptionEmojis(compliant.caption),
-        resolveDiningBranch(payload.experience.branch),
-      );
+      const located = finalizeOfficialLocationTime({
+        caption: ensureCaptionEmojis(compliant.caption),
+        branch: diningBranch,
+        placement: locationPlan.placement,
+        format: locationPlan.format,
+        inlineStyle: locationPlan.inlineStyle,
+        inlineSlot: locationPlan.inlineSlot,
+      });
       logGenerationCost(aggregateGenerationCost(usageCalls));
       return Response.json({
         titles: fixFruitEmojisInTitles(compliant.titles),
         body: located.caption,
         hashtags: compliant.hashtags,
         locationFormat: located.format,
+        locationPlacement: located.placement,
       });
     } catch (error) {
       if (error instanceof GenerateContentError) throw error;

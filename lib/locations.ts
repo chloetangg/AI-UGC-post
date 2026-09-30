@@ -240,9 +240,25 @@ export function sanitizeOfficialMallNames(text: string) {
 
 const ONE_BANGKOK_HOURS = "周一至周六 10:30–21:30｜周日 10:30–21:00";
 
-export const LOCATION_TIME_FORMAT_POOL = `【Location & Time — 6 LOCKED TEMPLATES — SYSTEM APPENDS, YOU DO NOT WRITE】
+export const LOCATION_PLACEMENTS = ["standalone", "inline"] as const;
+export type LocationPlacement = (typeof LOCATION_PLACEMENTS)[number];
 
-The system appends Location & Time after your caption. Do NOT write this block.
+export const INLINE_LOCATION_STYLES = ["location", "location-hours"] as const;
+export type InlineLocationStyle = (typeof INLINE_LOCATION_STYLES)[number];
+
+export const INLINE_LOCATION_SLOTS = ["opening", "later"] as const;
+export type InlineLocationSlot = (typeof INLINE_LOCATION_SLOTS)[number];
+
+export type LocationTimePlan = {
+  placement: LocationPlacement;
+  format: LocationTimeFormatId | "";
+  inlineStyle: InlineLocationStyle | "";
+  inlineSlot: InlineLocationSlot | "";
+};
+
+export const LOCATION_TIME_FORMAT_POOL = `【Location & Time — 6 LOCKED TEMPLATES — STANDALONE ONLY】
+
+These 6 templates are for standalone Location & Time. The system appends one after the caption in standalone mode.
 Do NOT invent a 7th format. Do NOT rewrite the 6 template sentences.
 Official 地点 / 时间 facts never change. Version only changes presentation.
 
@@ -452,6 +468,7 @@ export function attachOfficialLocationTime(
     return {
       caption: `${story}\n\n${section}`,
       format: id,
+      placement: "standalone" as const,
     };
   };
 
@@ -462,6 +479,270 @@ export function attachOfficialLocationTime(
     result = build(resolved);
   }
   return result;
+}
+
+export function isLocationPlacement(value: unknown): value is LocationPlacement {
+  return LOCATION_PLACEMENTS.includes(value as LocationPlacement);
+}
+
+export function isInlineLocationStyle(value: unknown): value is InlineLocationStyle {
+  return INLINE_LOCATION_STYLES.includes(value as InlineLocationStyle);
+}
+
+export function isInlineLocationSlot(value: unknown): value is InlineLocationSlot {
+  return INLINE_LOCATION_SLOTS.includes(value as InlineLocationSlot);
+}
+
+export function officialLocationForBranch(branch: string) {
+  const key = branchKey(resolveDiningBranch(branch));
+  return key ? OFFICIAL_LOCATIONS[key] : null;
+}
+
+export function pickNextLocationPlacement(previous: LocationPlacement | "" = ""): LocationPlacement {
+  if (previous === "standalone") return Math.random() < 0.8 ? "inline" : "standalone";
+  if (previous === "inline") return Math.random() < 0.8 ? "standalone" : "inline";
+  return Math.random() < 0.5 ? "standalone" : "inline";
+}
+
+export function resolveLocationPlacement(
+  requested?: LocationPlacement | "",
+  previous: LocationPlacement | "" = "",
+): LocationPlacement {
+  if (isLocationPlacement(requested) && requested !== previous) return requested;
+  return pickNextLocationPlacement(previous);
+}
+
+export function detectLocationPlacement(caption: string, branch: string): LocationPlacement | "" {
+  if (detectLocationTimeFormat(caption)) return "standalone";
+  if (captionMentionsRestaurantName(caption) || captionMentionsOfficialLocation(caption, branch)) {
+    return "inline";
+  }
+  return "";
+}
+
+export const OFFICIAL_RESTAURANT_NAME = "Baan Ying";
+
+export function captionMentionsRestaurantName(caption: string) {
+  return /Baan\s*Ying/i.test(stripGeneratedLocationTime(caption));
+}
+
+export function normalizeRestaurantNameCasing(text: string) {
+  return text.replace(/baan\s*ying/gi, OFFICIAL_RESTAURANT_NAME);
+}
+
+export function captionMentionsOfficialLocation(caption: string, branch: string) {
+  const story = stripGeneratedLocationTime(caption);
+  const location = officialLocationForBranch(branch);
+  if (!location) return captionMentionsRestaurantName(story);
+  return (
+    story.includes(location.englishName) ||
+    Boolean(location.chineseName && story.includes(location.chineseName)) ||
+    story.includes(location.officialLine)
+  );
+}
+
+const GENERIC_RESTAURANT_RE = [
+  /一家泰式餐厅/,
+  /一家泰餐馆/,
+  /一家泰餐厅/,
+  /这家泰餐餐厅/,
+  /这家泰式餐厅/,
+  /这家泰餐馆/,
+  /这家泰餐厅/,
+  /这家泰餐(?!厅|馆)/,
+  /这家餐厅/,
+];
+
+const MEAL_TO_RESTAURANT_RE: Array<[RegExp, string]> = [
+  [/来吃泰餐/, `来${OFFICIAL_RESTAURANT_NAME}吃泰餐`],
+  [/去吃泰餐/, `去${OFFICIAL_RESTAURANT_NAME}吃泰餐`],
+  [/来吃饭/, `来${OFFICIAL_RESTAURANT_NAME}吃饭`],
+  [/去吃饭/, `去${OFFICIAL_RESTAURANT_NAME}吃饭`],
+  [/来试试这家/, `来试试${OFFICIAL_RESTAURANT_NAME}`],
+  [/发现这家/, `发现${OFFICIAL_RESTAURANT_NAME}`],
+];
+
+function replaceFirst(text: string, pattern: RegExp, value: string) {
+  return text.replace(pattern, value);
+}
+
+/** Keep restaurant identity in the caption body without a fixed address dump. */
+export function ensureCaptionRestaurantName(caption: string, branch: string) {
+  const story = normalizeRestaurantNameCasing(caption).trim();
+  if (!story) return story;
+  if (captionMentionsRestaurantName(story)) return story;
+
+  for (const pattern of GENERIC_RESTAURANT_RE) {
+    if (pattern.test(story)) {
+      return replaceFirst(story, pattern, OFFICIAL_RESTAURANT_NAME);
+    }
+  }
+
+  const location = officialLocationForBranch(branch);
+  const floorZh = location?.floorZh ?? "";
+  if (floorZh && story.includes(floorZh) && !story.includes(`${floorZh}的${OFFICIAL_RESTAURANT_NAME}`)) {
+    return story.replace(floorZh, `${floorZh}的${OFFICIAL_RESTAURANT_NAME}`);
+  }
+
+  for (const [pattern, value] of MEAL_TO_RESTAURANT_RE) {
+    if (pattern.test(story)) return replaceFirst(story, pattern, value);
+  }
+
+  const mentionsMall = Boolean(
+    location &&
+      (story.includes(location.englishName) ||
+        Boolean(location.chineseName && story.includes(location.chineseName))),
+  );
+  if (mentionsMall && /(逛到肚子饿|逛了一圈|逛完|逛街)/.test(story)) {
+    const floorPrefix = floorZh ? `${floorZh}的` : "";
+    return story.replace(/(逛到肚子饿|逛了一圈|逛完|逛街)/, `$1，去了${floorPrefix}${OFFICIAL_RESTAURANT_NAME}`);
+  }
+
+  const weaves = floorZh
+    ? [`去了${floorZh}的${OFFICIAL_RESTAURANT_NAME}`, `来${OFFICIAL_RESTAURANT_NAME}吃泰餐`, `刚好去了${OFFICIAL_RESTAURANT_NAME}`]
+    : [`来${OFFICIAL_RESTAURANT_NAME}吃泰餐`, `刚好去了${OFFICIAL_RESTAURANT_NAME}`, `来${OFFICIAL_RESTAURANT_NAME}吃饭`];
+  const weave = weaves[story.length % weaves.length] ?? `来${OFFICIAL_RESTAURANT_NAME}吃泰餐`;
+  const parts = story.split(/(?<=[。！？\n])/u);
+  const first = parts[0] ?? "";
+  const rest = parts.slice(1).join("");
+  if (first && /[。！？]$/.test(first)) {
+    return `${first.slice(0, -1)}，${weave}${first.slice(-1)}${rest}`;
+  }
+  if (first) return `${first.replace(/[，,]+$/, "")}，${weave}。${rest}`;
+  return `${weave}。${story}`;
+}
+
+export function planLocationTime(input: {
+  branch: string;
+  placement?: LocationPlacement | "";
+  format?: LocationTimeFormatId | "";
+  previousPlacement?: LocationPlacement | "";
+  previousFormat?: LocationTimeFormatId | "";
+  recentFormats?: LocationTimeFormatId[];
+  inlineStyle?: InlineLocationStyle | "";
+  inlineSlot?: InlineLocationSlot | "";
+}): LocationTimePlan {
+  const placement = resolveLocationPlacement(input.placement, input.previousPlacement);
+  const hasHours = Boolean(captionHoursForBranch(input.branch));
+  if (placement === "standalone") {
+    return {
+      placement,
+      format: resolveLocationTimeFormat(
+        input.format,
+        hasHours,
+        input.previousFormat,
+        input.recentFormats ?? [],
+      ),
+      inlineStyle: "",
+      inlineSlot: "",
+    };
+  }
+  return {
+    placement,
+    format: "",
+    inlineStyle: isInlineLocationStyle(input.inlineStyle)
+      ? input.inlineStyle
+      : hasHours && Math.random() < 0.5
+        ? "location-hours"
+        : "location",
+    inlineSlot: isInlineLocationSlot(input.inlineSlot)
+      ? input.inlineSlot
+      : Math.random() < 0.5
+        ? "opening"
+        : "later",
+  };
+}
+
+export function formatLocationTimeStaticRules() {
+  return `LOCATION DISPLAY MODE (locationDisplayMode / THIS ROUND LOCATION PLAN) — official facts only. Follow that one mode only. Never mix inline and standalone logic.
+
+HARD RULES:
+- Restaurant name, mall, floor, and hours come only from official restaurant data. Never invent a branch, floor, address, exit, BTS/MRT, or extra brand fact.
+- centralwOrld must keep this exact casing. Never CentralWorld / Central World / central world / centralworld.
+- The only approved Chinese mall name is 尚泰世界购物中心. Never 中央世界 / 中央世界购物中心 / 尚泰中央世界 / 尚泰世界中心 / 尚泰世界 without 购物中心.
+- If hours appear, they must be the official locked hours. Never change the time to sound natural.
+- Do not invent 刚好路过 / 看到招牌 / 朋友推荐 / 下班后来 / 从BTS走过来 / 离某个出口很近 unless the customer wrote that.
+
+RESTAURANT IDENTITY — BOTH MODES:
+- The caption body itself must identify the restaurant. A reader who never looks at Location & Time must know this is Baan Ying.
+- Prefer official restaurant name Baan Ying. Do not only write the mall (centralwOrld) when Baan Ying is available.
+- Location & Time is NEVER the only restaurant identifier. Standalone ≠ skip the restaurant name.
+- If the customer already named the restaurant, mall, floor, or branch, keep their wording and tone; only tidy grammar. Do not rewrite into ad/探店 copy.
+
+INLINE (locationDisplayMode=inline):
+- Baan Ying and official place facts become part of the story. No 📍/⏰ block. Do not append Location & Time.
+- Recommended natural combos — not all required every time: Baan Ying / Baan Ying+mall / Baan Ying+floor / Baan Ying+mall+floor.
+- Vary where it appears: opening / middle / with the mall / with the meal / with how the restaurant feels. Do not reuse the same address sentence.
+- Good: 这次在centralwOrld逛街，刚好来3楼的Baan Ying吃泰餐。
+- Bad: 今天带大家探店Baan Ying，这家位于centralwOrld 3楼的泰式餐厅非常有特色……
+
+STANDALONE (locationDisplayMode=standalone):
+- Caption still MUST naturally mention Baan Ying. The system appends one locked Version 1–6 Location & Time after the caption.
+- Do not write 📍/⏰ / hours / Location & Time yourself.
+- Caption may mention mall/floor as story. Location & Time only supplements the full place/hours.
+
+FORBIDDEN mechanical fills:
+- Baan Ying位于centralwOrld 3楼
+- Every post 这次来到Baan Ying / 今天带大家探店Baan Ying
+- Official promo tone, fixed openings, SEO-repeat of Baan Ying+mall+floor unless the story needs all three
+
+CHECKS before return:
+1) Caption alone names the restaurant
+2) Mode not mixed
+3) Customer opinion / tone / details kept
+4) Restaurant name is part of the story, not stuffed
+5) Official facts only
+6) Do not stack Baan Ying+mall+floor unless the story needs all three
+Hashtags stay out of the caption.`;
+}
+
+export function formatLocationTimePlanRules(plan: LocationTimePlan, branch: string) {
+  const location = officialLocationForBranch(branch);
+  const locationLine = location?.officialLine || officialLocationLine(branch) || OFFICIAL_RESTAURANT_NAME;
+  const hoursDisplay = captionHoursForBranch(branch) || "none — do not invent hours";
+  const previousHint =
+    plan.placement === "standalone"
+      ? `THIS ROUND LOCATION PLAN: standalone (locationDisplayMode=standalone). Caption MUST naturally mention ${OFFICIAL_RESTAURANT_NAME}. Do NOT write Location & Time, 📍, ⏰, or hours. The system appends locked Version ${plan.format ? LOCATION_TIME_VERSION[plan.format] : "1–6"} after your caption. Location & Time is supplementary only. Mall/floor may appear as story if natural.`
+      : `THIS ROUND LOCATION PLAN: inline (locationDisplayMode=inline). Weave ${OFFICIAL_RESTAURANT_NAME} and the official place into the caption as story. Prefer ${OFFICIAL_RESTAURANT_NAME}; do not only write the mall. No 📍/⏰ block. No Location & Time after the story.
+Style: ${plan.inlineStyle === "location-hours" && hoursDisplay !== "none — do not invent hours" ? "location + official hours" : "location only, no hours"}.
+Slot: ${plan.inlineSlot === "opening" ? "earlier in the caption if the story can carry it" : "mid/later in the caption"}. Place it wherever the story can carry it.
+If hours are requested, use the official hours exactly (${hoursDisplay}). 10点到22点 is allowed only when those are the same official numbers.`;
+
+  return `Official restaurant name (locked): ${OFFICIAL_RESTAURANT_NAME}
+Official dining location (locked): ${locationLine}
+Official hours (locked): ${hoursDisplay}
+${previousHint}
+Do not invent a shopping / passing-by / transit reason unless the dining note supports it.`;
+}
+
+export function finalizeOfficialLocationTime(input: {
+  caption: string;
+  branch: string;
+  placement?: LocationPlacement | "";
+  format?: LocationTimeFormatId | "";
+  previousPlacement?: LocationPlacement | "";
+  previousFormat?: LocationTimeFormatId | "";
+  recentFormats?: LocationTimeFormatId[];
+  inlineStyle?: InlineLocationStyle | "";
+  inlineSlot?: InlineLocationSlot | "";
+}) {
+  const plan = planLocationTime(input);
+  const story = ensureCaptionRestaurantName(
+    sanitizeOfficialMallNames(stripGeneratedLocationTime(input.caption)),
+    input.branch,
+  );
+
+  if (plan.placement === "inline") {
+    return { caption: story, placement: "inline" as const, format: "" as const };
+  }
+
+  return attachOfficialLocationTime(
+    story,
+    input.branch,
+    plan.format,
+    input.previousFormat,
+    input.recentFormats ?? [],
+  );
 }
 
 export function normalizeBaanYingBranch(value: unknown): BaanYingBranch | "" {

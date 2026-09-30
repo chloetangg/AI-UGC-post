@@ -1,7 +1,15 @@
-import { BAAN_YING_BRANCHES, DEFAULT_BAAN_YING_BRANCH, type BaanYingBranch, type LocationTimeFormatId } from "@/lib/locations";
+import {
+  BAAN_YING_BRANCHES,
+  DEFAULT_BAAN_YING_BRANCH,
+  type BaanYingBranch,
+  type InlineLocationSlot,
+  type InlineLocationStyle,
+  type LocationPlacement,
+  type LocationTimeFormatId,
+} from "@/lib/locations";
 
 export { BAAN_YING_BRANCHES, DEFAULT_BAAN_YING_BRANCH };
-export type { BaanYingBranch, LocationTimeFormatId };
+export type { BaanYingBranch, InlineLocationSlot, InlineLocationStyle, LocationPlacement, LocationTimeFormatId };
 
 export const PRODUCT_HIGHLIGHTS = [
   "Thai food",
@@ -278,6 +286,10 @@ export type GeneratePostInput = {
   previousLocationFormat?: LocationTimeFormatId | "";
   previousLocationFormats?: LocationTimeFormatId[];
   requiredLocationFormat?: LocationTimeFormatId | "";
+  previousLocationPlacement?: LocationPlacement | "";
+  requiredLocationPlacement?: LocationPlacement | "";
+  requiredInlineLocationStyle?: InlineLocationStyle | "";
+  requiredInlineLocationSlot?: InlineLocationSlot | "";
   previousHashtags?: string[];
   previousContentAngle?: string;
   suggestedContentAngle?: string;

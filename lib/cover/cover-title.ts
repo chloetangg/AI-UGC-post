@@ -23,7 +23,13 @@ import {
   type CoverTitleContext,
 } from "./cover-rules";
 import { sanitizeCoverAbsoluteLanguage } from "./cover-absolute";
-import { isNaturalCoverChinese, naturalCoverFallback } from "./cover-natural";
+import {
+  isIncompleteCoverAction,
+  isNaturalCoverChinese,
+  isSpokenCompleteCoverHeadline,
+  naturalCoverFallback,
+  repairIncompleteCoverAction,
+} from "./cover-natural";
 import { collectFullDishNames, applyCoverDishShortNames, coverDishShortName, hasIllegalCoverDishShort } from "./dish-names";
 import {
   evidenceLedCoverPairs,
@@ -106,6 +112,7 @@ export function looksIncompleteCover(text: string) {
     }
   }
   if (/这家$/.test(cleaned) && !/[吃冲来试]这家$/.test(cleaned)) return true;
+  if (isIncompleteCoverAction(cleaned)) return true;
   return DANGLING_TAILS.some((tail) => cleaned.endsWith(tail));
 }
 
@@ -152,7 +159,7 @@ export function isAcceptableMainTitle(
   if (FORBIDDEN_COVER_CLAIMS.test(cleaned)) return false;
   if (containsHarshNegative(cleaned)) return false;
   if (/#|📍|⏰|http|www\.|\+\d/.test(cleaned)) return false;
-  if (!hasCoverTitleKeyword(cleaned)) return false;
+  if (!hasCoverTitleKeyword(cleaned) && !isSpokenCompleteCoverHeadline(cleaned)) return false;
   if (isCoverKeywordStuffing(cleaned)) return false;
   if (countHanChars(cleaned) < 2 && !hasMandatoryCoverKeyword(cleaned)) return false;
   if (usesUnselectedCoverLocation(cleaned, context.branch)) return false;
@@ -349,6 +356,16 @@ export function layoutCoverOverlay(
 
   if (preferHook) {
     return { title: first, subtitle: hooked };
+  }
+
+  const repairedTitle = repairIncompleteCoverAction(first, context);
+  if (repairedTitle !== first) {
+    if (isAcceptableCoverOverlay(repairedTitle, second, postTitles, context)) {
+      return { title: repairedTitle, subtitle: second };
+    }
+    if (isAcceptableCoverOverlay(repairedTitle, hooked, postTitles, context)) {
+      return { title: repairedTitle, subtitle: hooked };
+    }
   }
 
   if (isAcceptableCoverOverlay(first, second, postTitles, context)) {

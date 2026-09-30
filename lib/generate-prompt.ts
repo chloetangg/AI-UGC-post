@@ -1,6 +1,12 @@
 import { CONTENT_LANGUAGE } from "@/lib/i18n";
-import { resolveDiningBranch } from "@/lib/locations";
-import { HASHTAGS_JSON_FIELD_RULES, REQUIRED_HASHTAGS } from "@/lib/hashtags";
+import {
+  formatLocationTimePlanRules,
+  formatLocationTimeStaticRules,
+  planLocationTime,
+  resolveDiningBranch,
+} from "@/lib/locations";
+import { HASHTAGS_JSON_FIELD_RULES, isRequiredHashtag } from "@/lib/hashtags";
+import { formatCaptionEmojiRules } from "@/lib/caption-emoji";
 import { formatTitleFormatRules } from "@/lib/title-formats";
 import { formatTitleKeywordRules } from "@/lib/title-keywords";
 import { complianceGenerationRules } from "@/lib/compliance/prompt";
@@ -23,7 +29,11 @@ import {
 } from "@/lib/generation-variation";
 import { formatPartySizeRules } from "@/lib/party-size";
 import { allDishNameHints, chineseFullDishName } from "@/lib/cover/dish-names";
-import { formatCaptionConsumerVoiceRules, formatNaturalHumanWritingRules } from "@/lib/caption-voice";
+import {
+  formatCaptionConsumerVoiceRules,
+  formatCustomerOriginalVoiceRules,
+  formatNaturalHumanWritingRules,
+} from "@/lib/caption-voice";
 import { buildEvidenceMap, formatContentLockInstance, formatContentLockStaticRules } from "@/lib/content-lock";
 import { formatNarrativeFlowInstance, formatNarrativeFlowStaticRules } from "@/lib/narrative-flow";
 import { formatStrategyLibrary, formatStrategySelection } from "@/lib/content-strategy/format";
@@ -69,12 +79,12 @@ export const generatePostJsonSchema = {
       caption: {
         type: "string",
         description:
-          "One Simplified Chinese story body. Follow THIS ROUND length band in the user prompt. Do not invent facts to hit a longer band. No hashtags. No Location & Time block.",
+          "One Simplified Chinese story body. Follow THIS ROUND length band and THIS ROUND LOCATION PLAN in the user prompt. Do not invent facts to hit a longer band. No hashtags.",
       },
       hashtags: {
         type: "array",
         description:
-          "Exactly 5 hashtags: always include #baanying曼谷, plus 4 tags from the approved pool, in random order.",
+          "Exactly 5 hashtags: always include #BaanYing曼谷, plus 4 tags from the approved pool, in random order.",
         minItems: 5,
         maxItems: 5,
         items: { type: "string" },
@@ -245,8 +255,8 @@ Learn: start from a personal moment when that fits, not always the restaurant na
 Learn voice habits only (first person, spoken rhythm, mixed like/so-so when evidenced). Never copy, rewrite, or stitch reference sentences.`;
 }
 
-const MALL_MENTION_RULES = `Do NOT write Location & Time, 📍/⏰ blocks, mall floors as an address block, or opening hours. The system appends a locked Location & Time template after your caption.
-If you casually mention a shopping area in the story, use only these locked names:
+const MALL_MENTION_RULES = `${formatLocationTimeStaticRules()}
+If a shopping area appears, use only these locked names:
 - centralwOrld → 尚泰世界购物中心（centralwOrld）3楼. The ONLY approved Chinese name is 尚泰世界购物中心. Never CentralWorld / Central World / 中央世界 / 中央世界购物中心 / 尚泰中央世界 / 尚泰世界中心 / 尚泰世界 without 购物中心.
 - Siam Center → 暹罗中心（Siam Center）2楼
 - Terminal 21 stays English. Never 终端21 / 终点21 / Terminal 21购物中心
@@ -289,7 +299,7 @@ INTERNAL PROCESS (do not print KSP / Storyline / Content Angle / Search Keyword 
 Follow CONTENT EVIDENCE & LOCK, EVIDENCE PRIORITY, NARRATIVE FLOW, and CONTENT STRATEGY LAYER.
 Select the most natural Content Angle from the lived evidence — not a default dish-recommendation angle.
 Then write Caption → Titles → Cover and cross-check they share Primary Content. Return the chosen strategy ids in JSON.
-Choose 4 random hashtags from the approved pool. Always include #baanying曼谷. Shuffle all 5. Do not invent tags. Do not hard-code hashtags by Storyline.
+Choose 4 random hashtags from the approved pool. Always include #BaanYing曼谷. Shuffle all 5. Do not invent tags. Do not hard-code hashtags by Storyline.
 At most ONE small brand detail if it helps; otherwise omit brand history. KSP-03 is low-frequency.
 
 ${formatContentLockStaticRules()}
@@ -309,12 +319,14 @@ ${formatTitleFormatRules()}
 
 CAPTION: Express the selected Storyline naturally without naming it. Each Generate is an independent draft — new focus, new structure, new length, new sentence rhythm.
 Narrative focus follows THIS ROUND FOCUS, then other real customer points. If they selected several enjoy-most / dish / reason items, describe more than one in natural UGC — do not only write “食物很好吃”.
-Keep the fact, rewrite into complete Xiaohongshu sentences. Do not copy keyword stacks. Do not invent extra service/atmosphere/people.
+Follow CUSTOMER ORIGINAL VOICE: keep the customer's own words when they are already natural. Only tidy grammar or punctuation. Do not copy keyword stacks. Do not invent extra service/atmosphere/people.
 THIS ROUND length band is mandatory when the evidence can support it. Thin input → stay short. Rich input → you may write longer. Never invent to fill Long / Extended.
 Forbidden: the same opening every time; intro+experience+recommend+summary every time; listing every selected tag in one sentence; 145→147 character micro-edits on regenerate.
 Do not always start with the restaurant name or 作为游客 / 来到曼谷 / 这次我选择 / 如果你也 / 最近在找.
 
 ${formatCaptionConsumerVoiceRules()}
+
+${formatCustomerOriginalVoiceRules()}
 
 ${formatNaturalHumanWritingRules()}
 
@@ -334,15 +346,8 @@ If the customer did not write 几个人 / 一家几口 / 和朋友 / 和家人 /
 Never infer party size from tourist/local, dish count, photo count, spend, or other answers. 4 dishes ≠ 几个人. ฿2,000 ≠ 一家人.
 Avoid empty lines like “这里提供丰富的泰式料理，适合朋友聚餐，整体体验非常不错。”
 
-EMOJI — titles and caption story body may use them. Cover overlay never uses emoji. Location 📍/⏰ do not count.
-Use emojis like a real diner, not a quota. Count should change with the caption: a 2-sentence post may have 0–2; a longer one may have more. Never an emoji after every sentence. Never add emojis to pad length.
-Approved list only: 🍛 🦀 🍤 🍚 🍜 🥭 🍋 🌶️ 😍 🥹 🤤 🥰 ❤️ ✨ 🇹🇭 👀 🤯 😳 😋
-Pick the one that fits: 蟹→🦀, 虾→🍤, 芒果→🥭, 柠檬/青柠→🍋, 饭→🍚, 冬阴功→🍜, 咖喱→🍛. Otherwise a mood emoji, or 🇹🇭 only when the sentence is actually about Thailand/Bangkok.
-🍋 = lemon / 柠檬 / 青柠 ONLY. Never use 🍋 for mango / 芒果 / 芒果糯米饭.
-🥭 = mango / 芒果 ONLY. Never use 🥭 for lemon / 柠檬.
-If the dish is 芒果糯米饭, use 🥭 not 🍋.
-Do NOT always use 🇹🇭 + 🍽️ + 🦀 + 😋 + 📍 + 🕐.
-Do NOT start every title 1 with 🇹🇭. Some title 1s have a list emoji, some have none. 🍽️ 📍 🕐 are not in the list.
+${formatCaptionEmojiRules()}
+Do NOT start every title 1 with 🇹🇭. Some title 1s have a list emoji, some have none.
 
 ${MALL_MENTION_RULES}
 
@@ -386,19 +391,19 @@ Then choose ONE of these 6 patterns that the pool can actually support. Do not f
 6: FOOD (fallback)
 remainingPhotoOrder = those original indexes in story order. If the pool is empty, return [].
 
-REGENERATION: If previous title/caption/strategy/hashtags are provided, keep all customer facts identical. This must read like a newly written post, not last time with swapped words. Avoid the previous Content Angle / Storyline / KSP when another valid set exists. Avoid previousCoverHookType / previousPrimaryExperience / previousTitleAngle. Follow THIS ROUND FOCUS, STRUCTURE, and LENGTH BAND. Change opening, fact order, which highlights get described, title angles, cover hook, and the 4 random pool hashtags. Do not copy the previous length band. Variation must come from storytelling approach, not invented experience. Do not copy previous mainTitle or subTitle. Location & Time is chosen by the system.
+REGENERATION: If previous title/caption/strategy/hashtags are provided, keep all customer facts identical. This must read like a newly written post, not last time with swapped words. Avoid the previous Content Angle / Storyline / KSP when another valid set exists. Avoid previousCoverHookType / previousPrimaryExperience / previousTitleAngle. Follow THIS ROUND FOCUS, STRUCTURE, and LENGTH BAND. Change opening, fact order, which highlights get described, title angles, cover hook, and the 4 random pool hashtags. Do not copy the previous length band. Variation must come from storytelling approach, not invented experience. Do not copy previous mainTitle or subTitle. Follow THIS ROUND LOCATION PLAN. Change placement/form from the previous Location & Time.
 
 OUTPUT: Return ONLY JSON matching the schema. No Markdown fences.
-{"titles":["标题1","标题2","标题3"],"caption":"正文 only. No Location & Time. No hashtags.","hashtags":["#曼谷美食","#baanying曼谷","#泰国菜","#曼谷打卡","#泰国"],"mainTitle":"曼谷泰餐遇到帅老板","subTitle":"服务也很舒服","selectedPhotoIndex":0,"selectedPhotoIndexes":[0],"photoSelectionReason":"...","selectedTemplateId":"<one of 10>","suitableTemplateIds":["<id>","<id>","<id>"],"remainingPhotoOrder":[1,2],"remainingOrderPattern":"5","selectedKspId":"KSP-01","selectedStorylineId":"ST-01","selectedContentAngleId":"CA-01","selectedSearchKeyword":"曼谷美食"}
+{"titles":["标题1","标题2","标题3"],"caption":"正文 only. Follow THIS ROUND LOCATION PLAN. No hashtags.","hashtags":["#曼谷美食","#BaanYing曼谷","#泰国菜","#曼谷打卡","#泰国"],"mainTitle":"曼谷泰餐遇到帅老板","subTitle":"服务也很舒服","selectedPhotoIndex":0,"selectedPhotoIndexes":[0],"photoSelectionReason":"...","selectedTemplateId":"<one of 10>","suitableTemplateIds":["<id>","<id>","<id>"],"remainingPhotoOrder":[1,2],"remainingOrderPattern":"5","selectedKspId":"KSP-01","selectedStorylineId":"ST-01","selectedContentAngleId":"CA-01","selectedSearchKeyword":"曼谷美食"}
 
 The sample JSON is FORMAT ONLY. Do not copy its selectedTemplateId, suitableTemplateIds, or strategy ids.
 
 VALIDATE before returning (apply the full rule blocks above; do not invent a second checklist):
 - 3 different spoken titles, mixed formats, no hashtags, no 必吃/最好吃/封神/顶级 hard-sell
 - Title 1 + Title 2 + Title 3 + mainTitle + subTitle contain exact "centralwOrld" at least once
-- Caption follows THIS ROUND structure + length band; no Location & Time; no hashtags
+- Caption follows THIS ROUND structure + length band + LOCATION PLAN; no hashtags
 - Cover passes COVER OVERLAY natural-Chinese / keyword / ranking checks
-- 5 hashtags: always #baanying曼谷 plus 4 pool tags, shuffled
+- 5 hashtags: always #BaanYing曼谷 plus 4 pool tags, shuffled
 - Photo indexes and suitableTemplateIds follow COVER PHOTOS / COVER TEMPLATE / REMAINING PHOTO ORDER
 - Strategy ids stay internal; no invented facts, party size, or companions
 - Neutralize banned negative wording; never false praise`;
@@ -429,7 +434,7 @@ export function buildUserPrompt(input: GenerateRequestBody) {
     (title) => title.trim() && title.trim() !== previousTitle,
   );
   const previousDynamicHashtags = (input.previousHashtags ?? []).filter(
-    (tag) => !REQUIRED_HASHTAGS.some((required) => required === tag),
+    (tag) => !isRequiredHashtag(tag),
   );
   const library = resolveContentStrategy(input);
   const suggestedStrategy = {
@@ -502,6 +507,16 @@ export function buildUserPrompt(input: GenerateRequestBody) {
     customerType: input.customerType,
   };
   const evidenceMap = buildEvidenceMap(lockContext);
+  const locationPlan = planLocationTime({
+    branch: diningBranch,
+    placement: input.requiredLocationPlacement,
+    format: input.requiredLocationFormat,
+    previousPlacement: input.previousLocationPlacement,
+    previousFormat: input.previousLocationFormat,
+    recentFormats: input.previousLocationFormats,
+    inlineStyle: input.requiredInlineLocationStyle,
+    inlineSlot: input.requiredInlineLocationSlot,
+  });
 
   const previousBlock =
     previousTitle || previousCaption
@@ -540,6 +555,7 @@ CUSTOMER (transform into a personal story; use only the points this visit suppor
 Branch:
 ${diningBranch}
 Treat this as the customer's actual dining location. It is system-provided context, not a customer-selected survey answer. Do not copy spelling/floor if it conflicts with locked mall names.
+${formatLocationTimePlanRules(locationPlan, diningBranch)}
 Tourist or local: ${input.customerType || "Not provided"}
 Visit frequency: ${
     input.visitFrequency === "1st time"
@@ -560,7 +576,7 @@ Gender: ${input.dinerGender?.trim() || "Not provided"}
 Enjoyed most: ${[...input.enjoyMost.filter((item) => item !== "其他"), input.enjoyMostOther?.trim() ?? ""].filter(Boolean).join("、") || "Not provided"}
 Recommended dishes (pool — do not automatically include all): ${dishes || "Not provided"}
 Why they recommend: ${reasons || "Not provided"}
-Customer's own words about this dining experience (INTERNAL INPUT ONLY — Priority 1 lived-detail source for titles AND caption AND cover. Weave the meaning in naturally. Do not invent beyond it. Do not copy harsh negatives such as 贵/难吃/踩雷/避雷/不推荐/不值得/失望/不喜欢/很普通/服务不好/抽奖送东西. Rewrite those into neutral factual wording. Never turn them into false praise. Never ignore this note in favor of 曼谷美食发现):
+Customer's own words about this dining experience (INTERNAL INPUT ONLY — Priority 1 lived-detail source for titles AND caption AND cover. Keep the original words when they are already natural. Only tidy lightly. Do not invent beyond it. Do not copy harsh negatives such as 贵/难吃/踩雷/避雷/不推荐/不值得/失望/不喜欢/很普通/服务不好/抽奖送东西. Those follow the existing neutralization rule — keep the judgment direction, never false praise. Never ignore this note in favor of 曼谷美食发现):
 ${diningNote || "Not provided"}
 Photo count (photos are attached in upload order as Photo 1 = index 0, Photo 2 = index 1, …): ${input.photoCount}
 Previous cover templateId (do not reuse if another suitable existing template exists): ${input.previousCoverTemplateId?.trim() || "none"}

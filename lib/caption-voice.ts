@@ -1,13 +1,16 @@
+import { containsHarshNegative } from "@/lib/compliance/negative-feedback";
+
 export function formatNaturalHumanWritingRules() {
-  return `NATURAL HUMAN WRITING — titles AND caption. Additive. Does not replace factuality, sentiment, party-size, or Content Focus.
+  return `NATURAL HUMAN WRITING — titles AND caption. Additive. Does not replace factuality, sentiment, party-size, Content Focus, or CUSTOMER ORIGINAL VOICE.
 
 Goal: same true facts, different lived telling. Change opening, information order, sentence shape, dish wording, sentence length, density, where emotion appears, ending, and rhythm.
+Do not replace the customer's keepable original phrases (一口就满足 / 菜单只有泰语和英语) with fancier synonyms. Vary structure around those phrases.
 FORBIDDEN: same template + different adjectives.
 
 1) Content Focus is WHAT this post is mainly about. It is NOT a fixed article template.
 Write in this order: real customer input → extract facts → pick the angle worth telling this round → organize naturally → THEN check Content Focus.
 FORBIDDEN: Content Focus → fill a template → drop in customer facts.
-The same Focus must still be tellable in completely different wording.
+The same Focus must still be tellable with a different structure. Do not throw away keepable customer phrases to look different.
 
 2) Change the narrative path every generation. Do not repeat the last path.
 Paths: start from the favorite dish / a concrete detail / the dining feel / the scene / result then reason / one dish leading to another / atmosphere or service leading to food / mall or convenience leading to food / the customer's own written moment / no summary, end on the last fact.
@@ -92,7 +95,7 @@ Do not change their real evaluation to make the brand look better.
 Platform-banned attack wording (贵/难吃/踩雷/不推荐/失望 as raw copy) still follows the existing neutralization rule: keep the meaning as personal judgment, never as false praise.
 
 Spoken, slightly irregular Chinese is allowed when it fits: 真的很好吃 / 有点意外 / 我直接吃光 / 这道可以 / 蛮推荐的 / 说实话 / 哈哈 / 下次还会点 / 吃完才发现 / 这个真的很可以 / 对我来说有一点咸.
-Use these only when the context is natural. Do not force slang, 哈哈哈哈, or extra emoji just to sound “real”. No deliberate typos or broken grammar.
+Use these only when the context is natural. Do not force slang or 哈哈哈哈 just to sound “real”. Caption still needs at least 2 list emojis that fit this copy; do not dump more to look lively. No deliberate typos or broken grammar.
 
 Prefer concrete observations over empty adjectives. Avoid dumping 正宗 / 地道 / 美味 / 精致 / 惊艳 / 高级 / 独特 / 令人难忘 / 极致 / 绝绝子 unless the customer's own words support that tone.
 Write what they actually noticed: 酸/甜/辣/咸, 汤底浓不浓, 虾大不大, 蟹肉多不多, 蛋嫩不嫩, 米饭干湿, 有没有锅气, 上菜快慢, 要不要排队, 服务员是否有耐心, 菜单有没有中文, 好不好找, 还会不会再点.
@@ -130,4 +133,94 @@ Before writing the caption, judge internally (do not print this list):
 8) If they selected several points, did I describe more than one in complete sentences — not a tag list?
 9) Is every sentence natural Chinese, not glued keywords (就是食材新鲜度感觉提升空间)?
 Final output must read like a consumer writing this meal in their own way — not an AI restaurant brochure.`;
+}
+
+export function formatCustomerOriginalVoiceRules() {
+  return `CUSTOMER ORIGINAL VOICE — caption layer. Additive. Does not replace compliance neutralization, party-size, or official location facts.
+
+The dining note is not background color. It is primary caption material. The reader should still hear THIS diner.
+
+Priority: like the person speaking > friend sharing > ordinary consumer post > Xiaohongshu copy polish.
+If the original note is already clear and natural, do not “optimize” it.
+
+KEEP the original words / clauses / feelings when they are:
+- grammatically basically OK
+- clear
+- not a platform-banned harsh attack
+- already a real consumer voice
+
+Light tidy only (punctuation, a missing 的, Pad Thai casing). Do not upgrade into 酸甜开胃 / 口感层次 / 令人非常满意.
+
+GOOD source: padthai依旧好吃，一口就满足
+KEEP: Pad Thai依旧好吃，一口就满足。 / Pad Thai依旧好吃，一口下去就很满足。
+BAD: Pad Thai酸甜开胃，丰富的口感层次让人一口接一口，整体味道令人非常满意。
+
+GOOD source: 菜单只有泰语和英语，多花点时间才能看明白 / padthai依旧好吃，一口就满足。冬阴功汤底的这个也不错
+KEEP: 在centralwOrld 3层的一家泰餐馆，菜单只有泰语和英语，第一次看还真的要花一点时间。Pad Thai依旧好吃，一口就满足，冬阴功汤底的这个我也觉得不错。
+BAD: 今天来打卡这家超有特色的泰式餐厅！虽然菜单只有泰语和英语，但完全不影响体验。Pad Thai口感丰富，冬阴功汤底酸辣开胃，每一口都让人回味无穷，喜欢泰餐的朋友真的不要错过！
+
+Spoken texture may stay imperfect: 真的还不错 / 一口就满足 / 没想到还蛮好吃 / 这个我会再吃 / 刚好逛到这里就进来了 / 这个真的可以 / 感觉还不错 / 就是有点辣 / 我自己蛮喜欢的 / 不知道是不是我太久没吃泰餐.
+Do not swap these for 高级 / 精致 / 惊艳 copy.
+
+Do NOT add blogger voice unless the customer wrote it: 今天带大家来 / 作为一个泰餐爱好者 / 不得不说 / 这家店真的让我惊艳了 / 如果你也喜欢……千万不要错过 / 答应我一定要来试试 / 狠狠安利 / 闭眼冲 / 宝子们 / 曼谷必吃 / 私藏宝藏店 / 天花板 / 绝绝子 / 一整个爱住.
+
+No forced 开头吸引→店铺介绍→菜品→推荐→总结→CTA. No 介绍餐厅→环境→菜品→总结 every time.
+2–4 natural sentences are enough when the note is short.
+
+Edit levels:
+1 keep — original already natural
+2 light tidy — word order / punctuation only
+3 re-order — combine scattered customer lines, keep their words
+4 fix — only for broken grammar, typos, unreadable lines, or fact conflicts
+
+Harsh attacks (太难吃了 / 服务很差 / 不会再来了) still follow the existing neutralization rule: keep the judgment direction, never rewrite into 味道很特别 / 服务很有个性 / 下次还会再来. Mild personal notes such as 就是有点辣 stay as the diner said them.
+
+AI may add only what an ordinary diner would naturally add from THIS visit. Never invent wow, layers, must-visit, or a complete restaurant review the customer did not write.`;
+}
+
+function compactText(value: string) {
+  return value.replace(/\s+/g, "").toLowerCase();
+}
+
+export function keepableCustomerPhrases(note: string) {
+  const text = note.replace(/\s+/g, " ").trim();
+  if (!text) return [];
+  const chunks = text
+    .split(/[。！？!?；;\n]+/)
+    .map((part) => part.trim())
+    .filter((part) => part.length >= 6 && part.length <= 60);
+  const phrases: string[] = [];
+  for (const chunk of chunks) {
+    if (containsHarshNegative(chunk)) continue;
+    if (phrases.some((item) => item.includes(chunk) || chunk.includes(item))) continue;
+    phrases.push(chunk);
+  }
+  return phrases.slice(0, 4);
+}
+
+function phraseHeardInCaption(caption: string, phrase: string) {
+  const cap = compactText(caption);
+  const ph = compactText(phrase);
+  if (!ph) return false;
+  if (cap.includes(ph)) return true;
+  if (ph.length < 8) return false;
+  for (let index = 0; index <= ph.length - 6; index += 1) {
+    if (cap.includes(ph.slice(index, index + 6))) return true;
+  }
+  return false;
+}
+
+/** If the caption dropped every keepable dining-note clause, put one back. */
+export function ensureCustomerOriginalPhrases(caption: string, note: string) {
+  const phrases = keepableCustomerPhrases(note);
+  if (phrases.length === 0) return caption;
+  if (phrases.some((phrase) => phraseHeardInCaption(caption, phrase))) return caption;
+  const restored = phrases[0]?.replace(/central\s*world/gi, "centralwOrld").replace(/[。！？!?]+$/, "") ?? "";
+  if (!restored) return caption;
+  const line = /[。！？!?]$/.test(restored) ? restored : `${restored}。`;
+  const body = caption.trim();
+  if (!body) return line;
+  const parts = body.split(/(?<=[。！？!?])/).filter(Boolean);
+  if (parts.length <= 1) return `${body.replace(/[。！？!?]*$/, "")}。${line}`;
+  return `${parts[0]}${line}${parts.slice(1).join("")}`;
 }

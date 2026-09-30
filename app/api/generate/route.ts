@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import OpenAI from "openai";
 import { ensureCaptionEmojis, fixFruitEmojisInTitles } from "@/lib/caption-emoji";
+import { ensureCustomerOriginalPhrases } from "@/lib/caption-voice";
 import {
   buildSystemPrompt,
   buildUserPrompt,
@@ -11,7 +12,12 @@ import { insertGeneration } from "@/lib/generations";
 import { upsertSubmission } from "@/lib/submissions";
 import { resolveAnalyticsSession, trackServerEvent } from "@/lib/analytics/server";
 import { normalizeHashtags } from "@/lib/hashtags";
-import { attachOfficialLocationTime, resolveDiningBranch, stripGeneratedLocationTime } from "@/lib/locations";
+import {
+  finalizeOfficialLocationTime,
+  planLocationTime,
+  resolveDiningBranch,
+  stripGeneratedLocationTime,
+} from "@/lib/locations";
 import { parseGeneratedContent } from "@/lib/parse-generated";
 import {
   classifyCoverHookType,
@@ -99,6 +105,20 @@ export async function POST(request: Request) {
     const payload = JSON.parse(rawPayload) as GenerateRequestBody;
     payload.contentLanguage = "zh-CN";
     payload.branch = resolveDiningBranch(payload.branch);
+    const locationPlan = planLocationTime({
+      branch: payload.branch,
+      placement: payload.requiredLocationPlacement,
+      format: payload.requiredLocationFormat,
+      previousPlacement: payload.previousLocationPlacement,
+      previousFormat: payload.previousLocationFormat,
+      recentFormats: payload.previousLocationFormats,
+      inlineStyle: payload.requiredInlineLocationStyle,
+      inlineSlot: payload.requiredInlineLocationSlot,
+    });
+    payload.requiredLocationPlacement = locationPlan.placement;
+    payload.requiredLocationFormat = locationPlan.format;
+    payload.requiredInlineLocationStyle = locationPlan.inlineStyle;
+    payload.requiredInlineLocationSlot = locationPlan.inlineSlot;
     const analyticsSessionId = payload.analyticsSessionId?.trim() || "";
     await trackServerEvent(
       "form_submit",
@@ -332,13 +352,19 @@ export async function POST(request: Request) {
       title: locked.coverTitle,
       subtitle: locked.coverSubtitle,
     };
-    const located = attachOfficialLocationTime(
-      ensureCaptionEmojis(locked.caption),
-      payload.branch,
-      payload.requiredLocationFormat,
-      payload.previousLocationFormat,
-      payload.previousLocationFormats,
-    );
+    const located = finalizeOfficialLocationTime({
+      caption: ensureCaptionEmojis(
+        ensureCustomerOriginalPhrases(locked.caption, payload.diningExperienceNote ?? ""),
+      ),
+      branch: payload.branch,
+      placement: locationPlan.placement,
+      format: locationPlan.format,
+      previousPlacement: payload.previousLocationPlacement,
+      previousFormat: payload.previousLocationFormat,
+      recentFormats: payload.previousLocationFormats,
+      inlineStyle: locationPlan.inlineStyle,
+      inlineSlot: locationPlan.inlineSlot,
+    });
 
     const cost = aggregateGenerationCost([
       usageFromCompletion(completion, model, "generate"),
@@ -429,6 +455,7 @@ export async function POST(request: Request) {
       selectedContentAngleId: parsed.selectedContentAngleId,
       selectedSearchKeyword: parsed.selectedSearchKeyword,
       locationFormat: located.format,
+      locationPlacement: located.placement,
       cost,
       generationId,
     });

@@ -1,4 +1,4 @@
-export const REQUIRED_HASHTAGS = ["#baanying曼谷"] as const;
+export const REQUIRED_HASHTAGS = ["#BaanYing曼谷"] as const;
 export const RANDOM_HASHTAG_POOL = [
   "#centralworld",
   "#曼谷centralworld",
@@ -41,30 +41,25 @@ Do NOT insert hashtags:
 
 The caption should contain ONLY the actual story body.
 
-Location & Time is appended by the system after the story, using one of 6 locked templates.
-Do not write Location & Time yourself.
+If THIS ROUND LOCATION PLAN is standalone, still name Baan Ying in the caption body. Do not write Location & Time yourself — the system appends one locked template after the story.
+If THIS ROUND LOCATION PLAN is inline, weave Baan Ying and official location into the story naturally and do not add a 📍/⏰ footer.
 
-Correct caption structure after the system appends Location & Time:
-[Main Caption]
-
-[Location & Time Section]
-
-Do NOT add a hashtag block after Location & Time.
+Do NOT add a hashtag block after the caption or after Location & Time.
 Do NOT ask this caption generator to generate hashtags.
 If a previous caption included hashtags, ignore them and do not copy them.`;
 
 export const HASHTAGS_JSON_FIELD_RULES = `HASHTAGS — JSON field "hashtags" only. Never put hashtags in titles or caption.
 
 Exactly 5 hashtags:
-- Always include #baanying曼谷
+- Always include #BaanYing曼谷
 - Pick exactly 4 different tags from the approved pool. Never invent, shorten, combine, translate, or rewrite pool tags.
-- Shuffle all 5 into a random order. #baanying曼谷 is NOT always first.
+- Shuffle all 5 into a random order. #BaanYing曼谷 is NOT always first.
 
 Approved pool ONLY:
 ${POOL_HASHTAG_LINE}
 
 The 4 random tags MUST be different from each other and should differ from previousHashtags when another set exists.
-Never pick #baanying曼谷 as one of the 4 random tags. Never output a tag outside this pool.`;
+Never pick #BaanYing曼谷 as one of the 4 random tags. Never output a tag outside this pool.`;
 
 export const STRICT_HASHTAG_RULES = `【HASHTAG GENERATION — SEPARATE MODULE】
 
@@ -73,13 +68,13 @@ You generate hashtags ONLY. You do NOT write captions.
 Return ONLY the 5 hashtags. No explanations.
 
 1. FIXED HASHTAG (always include, exact spelling, random position):
-#baanying曼谷
+#BaanYing曼谷
 
 2. RANDOM HASHTAGS:
 Select exactly 4 different hashtags from this pool only:
 ${POOL_HASHTAG_LINE}
 Do not invent, shorten, combine, translate, or rewrite them.
-Do not pick #baanying曼谷 as one of the 4 random tags.
+Do not pick #BaanYing曼谷 as one of the 4 random tags.
 Do not repeat the previous random set when another set exists.
 
 3. COUNT: exactly 5. Shuffle the 1 fixed tag + 4 random tags into a random order.
@@ -182,7 +177,7 @@ function orderHashtags(candidates: string[], extras: string[], required: string)
 }
 
 /**
- * Always include #baanying曼谷 plus exactly 4 approved-pool tags.
+ * Always include #BaanYing曼谷 plus exactly 4 approved-pool tags.
  * Generation shuffles all 5. Manual edits keep the current order.
  */
 export function normalizeHashtags(
@@ -283,7 +278,7 @@ export function finalizeGeneratedHashtags(
   };
 }
 
-/** Keep #baanying曼谷 and at most 4 approved-pool extras, preserving order. */
+/** Keep #BaanYing曼谷 and at most 4 approved-pool extras, preserving order. */
 export function ensureRequiredHashtags(tags: string[]): GeneratedHashtags {
   return normalizeHashtags(tags, [], { shuffle: false });
 }
