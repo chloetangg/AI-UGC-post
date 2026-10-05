@@ -151,10 +151,12 @@ export function ensureTitleKeywords(
 export function formatTitleKeywordRules() {
   return `TITLE SEARCH KEYWORDS — auxiliary only, never the topic.
 Real customer input and confirmed restaurant facts outrank generic keywords. Keywords must not invent a story.
-Each title must feel like Xiaohongshu, reflect actual customer experience, and naturally contain at least one Bangkok food search keyword. Prefer 3 different keywords. Do not keyword-stuff. Do not sound like an advertisement.
-At least one of the 3 titles must naturally contain one of: 曼谷必吃 / 曼谷美食 / 曼谷泰餐 / 曼谷吃什么 / 曼谷美食推荐 / 曼谷泰菜 / 曼谷餐厅 / 曼谷吃饭 / 曼谷美食攻略 / 曼谷探店.
-Prefer 3 different keywords when they still read as real Xiaohongshu titles. Never glue 曼谷 onto a broken stub (曼谷超爱次来吃 / 曼谷很值得来吃 / 曼谷推荐来吃).
-If a keyword cannot sit naturally, switch phrase. Natural complete Chinese outranks stuffing every title.
+Each title is one complete spoken sentence about one real point from this visit. A search keyword may sit inside that one point only when the sentence still sounds like a person talking.
+At least one of the 3 titles may naturally contain one of: 曼谷必吃 / 曼谷美食 / 曼谷泰餐 / 曼谷吃什么 / 曼谷美食推荐 / 曼谷泰菜 / 曼谷餐厅 / 曼谷吃饭 / 曼谷美食攻略 / 曼谷探店.
+Do not put a keyword in every title. If the sentence is already complete, do not add another search term.
+Never join two selling points with a comma, ｜, or a colon: 支付宝方便，吃泰餐更省心 / 曼谷美食｜咖喱蟹肉很合口味.
+Never glue 曼谷 onto a broken stub (曼谷超爱次来吃 / 曼谷很值得来吃 / 曼谷推荐来吃).
+If a keyword cannot sit inside the one point, drop it. Natural complete Chinese outranks stuffing.
 Do NOT require the same keyword in every title.
 Do NOT use 必吃 / 最好吃 / 封神 / 顶级 / 曼谷第一 as a title hook.
 Never use the same stuffed pattern in all 3 titles (e.g. 曼谷超好吃泰餐 / 曼谷超地道泰餐 / 曼谷超温馨泰餐).

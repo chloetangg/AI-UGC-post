@@ -499,8 +499,8 @@ export function officialLocationForBranch(branch: string) {
 }
 
 export function pickNextLocationPlacement(previous: LocationPlacement | "" = ""): LocationPlacement {
-  if (previous === "standalone") return Math.random() < 0.8 ? "inline" : "standalone";
-  if (previous === "inline") return Math.random() < 0.8 ? "standalone" : "inline";
+  if (previous === "standalone") return "inline";
+  if (previous === "inline") return "standalone";
   return Math.random() < 0.5 ? "standalone" : "inline";
 }
 
@@ -566,6 +566,17 @@ function replaceFirst(text: string, pattern: RegExp, value: string) {
   return text.replace(pattern, value);
 }
 
+/** Inline captions need the mall and Baan Ying together, once. */
+export function ensureInlineLocationPair(caption: string, branch: string) {
+  const story = ensureCaptionRestaurantName(caption, branch);
+  const location = officialLocationForBranch(branch);
+  if (!location || story.includes(location.englishName)) return story;
+  if (story.includes(OFFICIAL_RESTAURANT_NAME)) {
+    return story.replace(OFFICIAL_RESTAURANT_NAME, `${location.englishName}的${OFFICIAL_RESTAURANT_NAME}`);
+  }
+  return story;
+}
+
 /** Keep restaurant identity in the caption body without a fixed address dump. */
 export function ensureCaptionRestaurantName(caption: string, branch: string) {
   const story = normalizeRestaurantNameCasing(caption).trim();
@@ -598,18 +609,10 @@ export function ensureCaptionRestaurantName(caption: string, branch: string) {
     return story.replace(/(逛到肚子饿|逛了一圈|逛完|逛街)/, `$1，去了${floorPrefix}${OFFICIAL_RESTAURANT_NAME}`);
   }
 
-  const weaves = floorZh
-    ? [`去了${floorZh}的${OFFICIAL_RESTAURANT_NAME}`, `来${OFFICIAL_RESTAURANT_NAME}吃泰餐`, `刚好去了${OFFICIAL_RESTAURANT_NAME}`]
-    : [`来${OFFICIAL_RESTAURANT_NAME}吃泰餐`, `刚好去了${OFFICIAL_RESTAURANT_NAME}`, `来${OFFICIAL_RESTAURANT_NAME}吃饭`];
-  const weave = weaves[story.length % weaves.length] ?? `来${OFFICIAL_RESTAURANT_NAME}吃泰餐`;
-  const parts = story.split(/(?<=[。！？\n])/u);
-  const first = parts[0] ?? "";
-  const rest = parts.slice(1).join("");
-  if (first && /[。！？]$/.test(first)) {
-    return `${first.slice(0, -1)}，${weave}${first.slice(-1)}${rest}`;
-  }
-  if (first) return `${first.replace(/[，,]+$/, "")}，${weave}。${rest}`;
-  return `${weave}。${story}`;
+  const opener = floorZh
+    ? `这次去了${floorZh}的${OFFICIAL_RESTAURANT_NAME}`
+    : `这次去了${OFFICIAL_RESTAURANT_NAME}`;
+  return `${opener}。${story}`;
 }
 
 export function planLocationTime(input: {
@@ -663,36 +666,32 @@ HARD RULES:
 - If hours appear, they must be the official locked hours. Never change the time to sound natural.
 - Do not invent 刚好路过 / 看到招牌 / 朋友推荐 / 下班后来 / 从BTS走过来 / 离某个出口很近 unless the customer wrote that.
 
-RESTAURANT IDENTITY — BOTH MODES:
-- The caption body itself must identify the restaurant. A reader who never looks at Location & Time must know this is Baan Ying.
-- Prefer official restaurant name Baan Ying. Do not only write the mall (centralwOrld) when Baan Ying is available.
-- Location & Time is NEVER the only restaurant identifier. Standalone ≠ skip the restaurant name.
-- If the customer already named the restaurant, mall, floor, or branch, keep their wording and tone; only tidy grammar. Do not rewrite into ad/探店 copy.
+LOCATION MODE IS RANDOM AND MUST CHANGE:
+The system picks one mode per caption and switches on the next generation. Do not use the same mode every time. Dishes in the story do not force the place into the body.
 
-INLINE (locationDisplayMode=inline):
-- Baan Ying and official place facts become part of the story. No 📍/⏰ block. Do not append Location & Time.
-- Recommended natural combos — not all required every time: Baan Ying / Baan Ying+mall / Baan Ying+floor / Baan Ying+mall+floor.
-- Vary where it appears: opening / middle / with the mall / with the meal / with how the restaurant feels. Do not reuse the same address sentence.
-- Good: 这次在centralwOrld逛街，刚好来3楼的Baan Ying吃泰餐。
-- Bad: 今天带大家探店Baan Ying，这家位于centralwOrld 3楼的泰式餐厅非常有特色……
+INLINE (locationDisplayMode=inline) — place inside the story. No 📍/⏰ block.
+- The story must include BOTH the official mall name and Baan Ying. For centralwOrld that means the exact token centralwOrld AND Baan Ying.
+- They may share one sentence or sit in adjacent sentences. Do not write only one of them.
+- Connect them to shopping, choosing the restaurant, or the meal. Say the pair once. Do not repeat the address later in the story.
+- Good: 这次逛centralwOrld的时候顺便去了Baan Ying，咖喱蟹肉真的很合口味。 / centralwOrld 3楼的这家Baan Ying，咖喱蟹肉是我吃了还会想再点的一道。 / 在centralwOrld逛街，最后去了Baan Ying吃泰餐。
+- Bad: 这次在centralwOrld逛街，吃了一家很好吃的餐厅。 / 这次来到Baan Ying，咖喱蟹肉很好吃。 / 咖喱蟹肉很好吃。Baan Ying在centralwOrld 3楼。
 
-STANDALONE (locationDisplayMode=standalone):
-- Caption still MUST naturally mention Baan Ying. The system appends one locked Version 1–6 Location & Time after the caption.
+STANDALONE (locationDisplayMode=standalone) — story only, then the system appends Location & Time.
+- Do NOT add centralwOrld or Baan Ying just to make the post complete. Write the dishes, taste, room, and service.
 - Do not write 📍/⏰ / hours / Location & Time yourself.
-- Caption may mention mall/floor as story. Location & Time only supplements the full place/hours.
+- Good body: 咖喱蟹肉是这次吃下来很喜欢的一道，味道浓郁，搭配米饭刚刚好。芒果糯米饭也很新鲜，甜度不会太腻。
 
 FORBIDDEN mechanical fills:
 - Baan Ying位于centralwOrld 3楼
 - Every post 这次来到Baan Ying / 今天带大家探店Baan Ying
-- Official promo tone, fixed openings, SEO-repeat of Baan Ying+mall+floor unless the story needs all three
+- Repeating the same mall+restaurant sentence in the body and again as if it were the Location & Time line
 
 CHECKS before return:
-1) Caption alone names the restaurant
-2) Mode not mixed
-3) Customer opinion / tone / details kept
-4) Restaurant name is part of the story, not stuffed
+1) Follow this round's mode only
+2) Inline has both the mall name and Baan Ying, once, inside the story
+3) Standalone does not stuff the mall or restaurant name in just to be complete
+4) Customer opinion / tone / details kept
 5) Official facts only
-6) Do not stack Baan Ying+mall+floor unless the story needs all three
 Hashtags stay out of the caption.`;
 }
 
@@ -700,12 +699,15 @@ export function formatLocationTimePlanRules(plan: LocationTimePlan, branch: stri
   const location = officialLocationForBranch(branch);
   const locationLine = location?.officialLine || officialLocationLine(branch) || OFFICIAL_RESTAURANT_NAME;
   const hoursDisplay = captionHoursForBranch(branch) || "none — do not invent hours";
+  const inlinePair = location
+    ? `BOTH ${location.englishName} and ${OFFICIAL_RESTAURANT_NAME}`
+    : `${OFFICIAL_RESTAURANT_NAME} only — this branch has no mall, so do not invent one`;
   const previousHint =
     plan.placement === "standalone"
-      ? `THIS ROUND LOCATION PLAN: standalone (locationDisplayMode=standalone). Caption MUST naturally mention ${OFFICIAL_RESTAURANT_NAME}. Do NOT write Location & Time, 📍, ⏰, or hours. The system appends locked Version ${plan.format ? LOCATION_TIME_VERSION[plan.format] : "1–6"} after your caption. Location & Time is supplementary only. Mall/floor may appear as story if natural.`
-      : `THIS ROUND LOCATION PLAN: inline (locationDisplayMode=inline). Weave ${OFFICIAL_RESTAURANT_NAME} and the official place into the caption as story. Prefer ${OFFICIAL_RESTAURANT_NAME}; do not only write the mall. No 📍/⏰ block. No Location & Time after the story.
+      ? `THIS ROUND LOCATION PLAN: standalone. Do NOT put ${OFFICIAL_RESTAURANT_NAME} or the mall into the story just to identify the restaurant. Write the meal. Do NOT write Location & Time, 📍, ⏰, or hours. The system appends locked Version ${plan.format ? LOCATION_TIME_VERSION[plan.format] : "1–6"} after your caption.`
+      : `THIS ROUND LOCATION PLAN: inline. The story must contain ${inlinePair}, once, tied to shopping, choosing the restaurant, or the meal. Same sentence or adjacent sentences. Do not write only one of them. Do not repeat the pair. No 📍/⏰ block. No Location & Time after the story.
 Style: ${plan.inlineStyle === "location-hours" && hoursDisplay !== "none — do not invent hours" ? "location + official hours" : "location only, no hours"}.
-Slot: ${plan.inlineSlot === "opening" ? "earlier in the caption if the story can carry it" : "mid/later in the caption"}. Place it wherever the story can carry it.
+The mall and Baan Ying open the visit as one scene, before the dishes. Do not append either one after the food, and do not say the same place again later.
 If hours are requested, use the official hours exactly (${hoursDisplay}). 10点到22点 is allowed only when those are the same official numbers.`;
 
   return `Official restaurant name (locked): ${OFFICIAL_RESTAURANT_NAME}
@@ -727,10 +729,9 @@ export function finalizeOfficialLocationTime(input: {
   inlineSlot?: InlineLocationSlot | "";
 }) {
   const plan = planLocationTime(input);
-  const story = ensureCaptionRestaurantName(
-    sanitizeOfficialMallNames(stripGeneratedLocationTime(input.caption)),
-    input.branch,
-  );
+  const cleaned = sanitizeOfficialMallNames(stripGeneratedLocationTime(input.caption));
+  const story =
+    plan.placement === "inline" ? ensureInlineLocationPair(cleaned, input.branch) : cleaned;
 
   if (plan.placement === "inline") {
     return { caption: story, placement: "inline" as const, format: "" as const };

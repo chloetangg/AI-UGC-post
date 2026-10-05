@@ -3,7 +3,7 @@ import {
   type GenerateContentRequest,
 } from "@/lib/generate-content/types";
 import { formatCaptionEmojiRules } from "@/lib/caption-emoji";
-import { formatCaptionConsumerVoiceRules, formatCustomerOriginalVoiceRules } from "@/lib/caption-voice";
+import { formatCaptionConsumerVoiceRules, formatCustomerOriginalVoiceRules, formatSpokenNaturalnessRules } from "@/lib/caption-voice";
 import { CAPTION_NO_HASHTAG_RULES } from "@/lib/hashtags";
 import { complianceGenerationRules } from "@/lib/compliance/prompt";
 import {
@@ -107,6 +107,8 @@ ${formatCaptionEmojiRules()}
 ${formatCaptionConsumerVoiceRules()}
 
 ${formatCustomerOriginalVoiceRules()}
+
+${formatSpokenNaturalnessRules()}
 
 TITLE DIVERSITY:
 Generate exactly 3 different title angles, in this order:

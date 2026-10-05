@@ -5,7 +5,6 @@ import {
 import type { CoverTitleContext } from "@/lib/cover/cover-rules";
 import { chineseFullDishName } from "@/lib/cover/dish-names";
 import { stripGeneratedLocationTime } from "@/lib/locations";
-import { ensureCustomerOriginalPhrases } from "@/lib/caption-voice";
 import { neutralizeInventedPartyCopy } from "@/lib/party-size";
 import { buildEvidenceMap } from "@/lib/content-lock";
 import type { RecommendedDish } from "@/types/content";
@@ -1296,10 +1295,7 @@ export function ensureGenerationVariation(input: {
       neutralizeInventedPartyCopy(titles[1], context),
       neutralizeInventedPartyCopy(titles[2], context),
     ] as [string, string, string],
-    caption: neutralizeInventedPartyCopy(
-      ensureCustomerOriginalPhrases(caption, context.diningNote ?? ""),
-      context,
-    ),
+    caption: neutralizeInventedPartyCopy(caption, context),
     coverTitle: neutralizeInventedPartyCopy(cover.coverTitle, context),
     coverSubtitle: neutralizeInventedPartyCopy(cover.coverSubtitle, context),
     needsRetry: false,

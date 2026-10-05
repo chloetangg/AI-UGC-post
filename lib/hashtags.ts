@@ -41,8 +41,8 @@ Do NOT insert hashtags:
 
 The caption should contain ONLY the actual story body.
 
-If THIS ROUND LOCATION PLAN is standalone, still name Baan Ying in the caption body. Do not write Location & Time yourself — the system appends one locked template after the story.
-If THIS ROUND LOCATION PLAN is inline, weave Baan Ying and official location into the story naturally and do not add a 📍/⏰ footer.
+If THIS ROUND LOCATION PLAN is standalone, do not add Baan Ying or the mall just to identify the restaurant. Do not write Location & Time yourself — the system appends one locked template after the story.
+If THIS ROUND LOCATION PLAN is inline, the story must include both the official mall name and Baan Ying, once. Do not add a 📍/⏰ footer.
 
 Do NOT add a hashtag block after the caption or after Location & Time.
 Do NOT ask this caption generator to generate hashtags.

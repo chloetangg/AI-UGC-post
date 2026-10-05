@@ -33,11 +33,17 @@ export function hasExplicitPartyEvidence(context: CoverTitleContext = {}) {
   return kinds.size > 0;
 }
 
+const PERSON_REACTION = /小孩子|小朋友|孩子|妈妈|爸爸|老公|老婆|男朋友|女朋友|朋友/;
+
 export function formatPartySizeRules(context: CoverTitleContext = {}) {
-  const kinds = [...detectedPartyKinds(customerPartySource(context))];
+  const source = customerPartySource(context);
+  const kinds = [...detectedPartyKinds(source)];
+  const namedReaction = PERSON_REACTION.test(source);
   return `PARTY SIZE — only if the customer explicitly wrote or selected who they dined with.
-Allowed this visit: ${kinds.length ? kinds.join(", ") : "NONE — do not mention any headcount or companion."}
-If NONE, write 这次来吃 / 这顿吃下来 / 来这里吃. Never invent 两个人 / 和朋友 / 一家三口 / 适合一家人 / 一个人来 / 带家人 / 我们几个人.
+Allowed headcount this visit: ${kinds.length ? kinds.join(", ") : "NONE — do not invent a headcount."}
+${namedReaction ? "The note names a person's reaction. Keep that person and what they liked or disliked. Do not drop them." : "If no person is named, write 这次来吃 / 这顿吃下来 / 来这里吃."}
+Never invent 两个人 / 和朋友 / 一家三口 / 适合一家人 / 一个人来 / 带家人 / 我们几个人 / 适合儿童 / 儿童必点 / 适合带孩子 / 亲子用餐.
+A named reaction is not a selling point. 小孩子很喜欢滑蛋饭 stays 小朋友很喜欢这道滑蛋饭. It must not become 适合儿童 or 很适合带孩子来.
 Do not infer party size from tourist/local, dish count, photo count, spend, table photos, or other form answers.
 ฿2,000 ≠ 一家人. 4 dishes ≠ 几个人. 4 photos ≠ 一起吃.`;
 }
@@ -79,12 +85,28 @@ const STRIPPERS: Array<{ kinds: PartyKind[]; pattern: RegExp; replacement: strin
   { kinds: ["partner"], pattern: /两个人约会/g, replacement: "这次来吃" },
 ];
 
+const OBJECTIVE_CHILD_CLAIMS: Array<[RegExp, string]> = [
+  [/亲子用餐首选/g, "小朋友很喜欢"],
+  [/儿童必点/g, "小朋友很喜欢"],
+  [/很适合带孩子来/g, "小朋友很喜欢"],
+  [/适合带孩子/g, "小朋友很喜欢"],
+  [/适合儿童/g, "小朋友很喜欢"],
+];
+
 export function neutralizeInventedPartyCopy(text: string, context: CoverTitleContext = {}) {
-  const allowed = detectedPartyKinds(customerPartySource(context));
+  const source = customerPartySource(context);
+  const allowed = detectedPartyKinds(source);
   let next = text;
   for (const item of STRIPPERS) {
     if (item.kinds.some((kind) => allowed.has(kind))) continue;
     next = next.replace(item.pattern, item.replacement);
+  }
+  const childLiked = /小孩子很喜欢|小朋友很喜欢|孩子很喜欢/.test(source);
+  const childClaimWasTheirs = /适合儿童|适合带孩子|儿童必点|亲子/.test(source);
+  if (childLiked && !childClaimWasTheirs) {
+    for (const [pattern, replacement] of OBJECTIVE_CHILD_CLAIMS) {
+      next = next.replace(pattern, replacement);
+    }
   }
   return next.replace(/\s{2,}/g, " ").replace(/，{2,}/g, "，").trim();
 }

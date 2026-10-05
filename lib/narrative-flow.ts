@@ -153,13 +153,19 @@ export function formatNarrativeFlowStaticRules() {
   return `NARRATIVE FLOW & ATTRIBUTE CONSISTENCY — additive.
 
 Before writing the caption, decide this order and use each fact ONCE, in the best slot:
-Opening → Context / Experience → Primary Content → Supporting Content → Secondary Detail → Natural Ending.
+Opening scene → arriving → what was ordered → how it tasted and who liked it → service or room → overall feeling.
 
-Do NOT stitch answers in form order. Do NOT finish dish A, go to dish B, summarize, then come back to dish A.
+This is one meal, not a checklist of dish, comment, restaurant, service, and place. Do NOT stitch answers in form order. Do NOT finish the food and then add the restaurant name or the mall. Do NOT finish dish A, go to dish B, then come back to describe A. If the place is already in the opening, do not say it again.
 
-Same-dish facts stay in ONE semantic stretch.
-GOOD: 咖喱蟹肉份量很足，搭配米饭很下饭，也是这次比较喜欢的一道。
-BAD: 咖喱蟹肉份量很足…… later ……咖喱蟹肉我很喜欢。
+DISH CONTINUITY — the first time a dish appears, finish 点了什么 → 怎么样 → 具体感受 in that same stretch, then move on.
+Shape: 菜品 → 它的口味/口感/评价 → 下一道菜.
+BAD: 这次一定要体验下Baan Ying的芒果糯米饭。接着点了咖喱蟹肉，味道浓郁。菠萝炒饭的配料也很足。芒果特别新鲜，搭配糯米口感完美。
+GOOD: 这次一定要体验下Baan Ying的芒果糯米饭，芒果特别新鲜，搭配糯米口感刚刚好。接着点了咖喱蟹肉，味道浓郁，吃起来很满足。菠萝炒饭的配料也很足。
+If one dish has several notes (很好吃 / 芒果很新鲜 / 甜而不腻 / 糯米口感很好), merge them beside the dish name. Do not save 芒果很新鲜 for after the other dishes.
+Order the dishes, then walk forward only. After leaving a dish, do not jump back to add its taste, texture, freshness, or liking.
+Do not add a later supplement just to use every input. Drop a repeated point. Do not change the customer's evaluation.
+The only exception is an explicit look-back the customer wrote, such as 吃到后面又觉得还是第一道更好. Otherwise the caption moves in one direction.
+Before writing, group each dish's name, taste, texture, freshness, liking, and other notes. After writing, check that each dish's main description sits next to its first mention. If not, move that description back. Do not print this grouping.
 
 ATTRIBUTE OWNERSHIP is strict. A taste/texture/reason belongs to one dish only.
 Never write 咖喱蟹肉蒜香味很足 if 蒜香 belongs to 蒜炒虾仁.
@@ -170,6 +176,8 @@ After writing, check Dish → Attribute / Reason / Opinion / Experience. Fix cro
 Do not restate a finished dish unless the new sentence adds a real unused customer fact. Delete the restatement.
 
 After Ending = true, do not open a new dish review. Move that sentence into the earlier dish block, or delete it.
+If the evidence says 最后 / 最后点了 / 最后吃了 / 收尾 / 作为结尾 / 甜点收尾 / 吃完刚好 / 完美结束, that dish or moment stays in the second half. Never introduce a new dish after a 收尾 sentence.
+Several dishes are not equal: one hero dish, then a shorter supporting dish, then the closing dish if there is one. Do not give every dish the same 很好吃 sentence.
 Natural flow > covering every answer. Keep explicit negatives and clear attitudes.
 
 Read-through test: each sentence should answer the last; same dish not split; no coming back; attributes on the right dish; last two sentences end, they do not start a new thread.`;
@@ -241,8 +249,36 @@ function fixCrossDishAttributes(sentence: string, context: CoverTitleContext) {
     .map((item) => (/[。！？!?]$/.test(item) ? item : `${item}${ending}`));
 }
 
-function sentenceDish(sentence: string) {
-  return dishesInText(sentence)[0] || "";
+const LOOSE_DISH_CUES: Array<{ dish: string; pattern: RegExp }> = [
+  { dish: "芒果糯米饭", pattern: /芒果|糯米/ },
+  { dish: "菠萝炒饭", pattern: /菠萝/ },
+  { dish: "咖喱蟹肉", pattern: /蟹/ },
+  { dish: "青咖喱牛肉", pattern: /青咖喱|牛肉/ },
+  { dish: "河虾冬阴功汤", pattern: /冬阴功/ },
+  { dish: "炒空心菜", pattern: /空心菜/ },
+  { dish: "滑蛋饭", pattern: /滑蛋/ },
+  { dish: "青柠蒸鲈鱼", pattern: /鲈鱼|青柠/ },
+  { dish: "蒜炒虾仁", pattern: /蒜炒|虾仁/ },
+  { dish: "酸甜酱炒河虾", pattern: /酸甜酱|酸甜河虾/ },
+];
+
+function sentenceDish(sentence: string, introduced: string[] = []) {
+  const named = dishesInText(sentence);
+  if (named.length >= 1) return named[0];
+  const hits = LOOSE_DISH_CUES.filter((item) => introduced.includes(item.dish) && item.pattern.test(sentence));
+  return hits.length === 1 ? hits[0].dish : "";
+}
+
+function continuationClause(sentence: string, dish: string) {
+  let text = sentence.replace(/[。！？!?]+$/, "").trim();
+  for (const term of dishTerms(dish).sort((a, b) => b.length - a.length)) {
+    if (term.length >= 2) text = text.split(term).join("");
+  }
+  return text
+    .replace(/^[，、的\s]*(接着|然后|还有|以及|再来)?/, "")
+    .replace(/^[，、的\s]+/, "")
+    .replace(/[，、\s]+$/, "")
+    .trim();
 }
 
 function hasNewFact(sentence: string, already: string) {
@@ -256,6 +292,99 @@ function isEndingSentence(sentence: string) {
   return ENDING.test(sentence) && (dishesInText(sentence).length === 0 || /下次|整体|刚好在centralwOrld/.test(sentence));
 }
 
+function isBarePlaceClause(clause: string) {
+  const body = clause.replace(/[。！？!?\s]/g, "").replace(/BaanYing/gi, "BaanYing");
+  if (!/BaanYing|centralwOrld|尚泰世界购物中心/i.test(body)) return false;
+  if (/服务|老板|小朋友|小孩子|孩子|妈妈|爸爸|老公|老婆|男朋友|女朋友/.test(body)) return false;
+  const leftover = body
+    .replace(/BaanYing/gi, "")
+    .replace(/centralwOrld/g, "")
+    .replace(/尚泰世界购物中心/g, "")
+    .replace(/[0-9０-９]+楼/g, "")
+    .replace(/这次|刚好|去了|来了|在|的|这家|就|顺便|逛街|逛|时候|吃|泰餐|饭|餐厅|很方便|比较方便|过来|最后/g, "");
+  return leftover.length <= 1;
+}
+
+function isPersonReactionOnly(sentence: string) {
+  if (sentenceDish(sentence)) return false;
+  if (/BaanYing|Baan Ying|centralwOrld|尚泰世界购物中心|服务|老板|环境/i.test(sentence)) return false;
+  return /小朋友|小孩子|孩子|妈妈|爸爸|老公|老婆|男朋友|女朋友|朋友/.test(sentence) && /喜欢|好吃|开心|觉得/.test(sentence);
+}
+
+function detachTrailingPlace(sentence: string) {
+  const ending = sentence.match(/[。！？!?]$/)?.[0] ?? "。";
+  const body = sentence.replace(/[。！？!?]+$/, "");
+  const parts = body.split("，").map((part) => part.trim()).filter(Boolean);
+  if (parts.length < 2) return [sentence];
+  const splitAt = parts.findIndex((part, index) => index > 0 && isBarePlaceClause(part) && !isBarePlaceClause(parts[index - 1]));
+  if (splitAt < 0) return [sentence];
+  const head = parts.slice(0, splitAt).join("，");
+  const tail = parts.slice(splitAt).join("，");
+  if (!head || (!sentenceDish(head) && !/喜欢|好吃|服务|味道|轻松|舒服/.test(head))) return [sentence];
+  return [`${head}${ending}`, `${tail}${ending}`];
+}
+
+function softenPlaceSentence(sentence: string) {
+  if (!isBarePlaceClause(sentence) || /逛|顺便|方便|时候去了|的时候/.test(sentence)) return sentence;
+  const floor = sentence.match(/[0-9０-９]+楼/)?.[0] ?? "";
+  const mall = sentence.includes("尚泰世界购物中心") ? "尚泰世界购物中心" : sentence.includes("centralwOrld") ? "centralwOrld" : "";
+  if (!mall || !/Baan\s*Ying/i.test(sentence)) return sentence;
+  return floor ? `这次去了${mall} ${floor}的Baan Ying。` : `这次在${mall}的时候去了Baan Ying。`;
+}
+
+function collapsePlaceSentences(places: string[]) {
+  if (places.length <= 1) return places;
+  const rich = places.find(
+    (item) => /方便|顺便|逛街/.test(item) && /Baan Ying/.test(item) && /centralwOrld|尚泰世界购物中心/.test(item),
+  );
+  if (rich) return [rich];
+  const text = places.join("");
+  const mall = text.includes("尚泰世界购物中心") ? "尚泰世界购物中心" : text.includes("centralwOrld") ? "centralwOrld" : "";
+  if (mall && /Baan Ying/.test(text)) return [`这次在${mall}的时候去了Baan Ying。`];
+  return [places[0]];
+}
+
+function settleOneVisit(sentences: string[]) {
+  const flat = sentences.flatMap(detachTrailingPlace);
+  const place: string[] = [];
+  const meal: string[] = [];
+  let seenMeal = false;
+  let seenMall = false;
+  let seenRestaurant = false;
+  for (const sentence of flat) {
+    const bare = isBarePlaceClause(sentence);
+    const hasMall = /centralwOrld|尚泰世界购物中心/.test(sentence);
+    const hasRestaurant = /Baan\s*Ying/i.test(sentence);
+    if (bare) {
+      const addsMall = hasMall && !seenMall;
+      const addsRestaurant = hasRestaurant && !seenRestaurant;
+      if (seenMeal && !addsMall && !addsRestaurant) continue;
+      if (!seenMeal || addsMall || addsRestaurant) place.push(softenPlaceSentence(sentence));
+      seenMall = seenMall || hasMall;
+      seenRestaurant = seenRestaurant || hasRestaurant;
+      continue;
+    }
+    if (sentenceDish(sentence) || /好吃|喜欢|服务|味道|老板|小朋友|小孩子|轻松|舒服/.test(sentence)) {
+      seenMeal = true;
+    }
+    seenMall = seenMall || hasMall;
+    seenRestaurant = seenRestaurant || hasRestaurant;
+    meal.push(sentence);
+  }
+  const ordered = [...collapsePlaceSentences(place), ...meal];
+  const attached: string[] = [];
+  for (const sentence of ordered) {
+    const previous = attached[attached.length - 1];
+    if (previous && sentenceDish(previous) && isPersonReactionOnly(sentence)) {
+      const detail = sentence.replace(/[。！？!?]+$/, "");
+      attached[attached.length - 1] = `${previous.replace(/[。！？!?]$/, "，")}${detail}。`;
+      continue;
+    }
+    attached.push(sentence);
+  }
+  return attached;
+}
+
 export function ensureNarrativeFlow(caption: string, context: CoverTitleContext = {}, map: EvidenceMap) {
   let sentences = splitSentences(caption)
     .flatMap((sentence) => fixCrossDishAttributes(sentence, context))
@@ -263,7 +392,7 @@ export function ensureNarrativeFlow(caption: string, context: CoverTitleContext 
   const merged: string[] = [];
   const firstByDish = new Map<string, number>();
   for (const sentence of sentences) {
-    const dish = sentenceDish(sentence);
+    const dish = sentenceDish(sentence, [...firstByDish.keys()]);
     if (!dish) {
       merged.push(sentence);
       continue;
@@ -274,12 +403,17 @@ export function ensureNarrativeFlow(caption: string, context: CoverTitleContext 
       merged.push(sentence);
       continue;
     }
-    const previous = merged[existing] ?? "";
-    if (WEAK_RESTATE.test(sentence) && !hasNewFact(sentence, previous)) continue;
-    if (hasNewFact(sentence, previous)) {
-      merged[existing] = `${previous.replace(/[。！？!?]$/, "，")}${sentence.replace(/^[^，。]*?(份量|下饭|蒜香|Q弹|粘度|不会太甜|椰香|软烂|辣度|酸辣|嫩|锅气)/, "$1")}`;
+    if (/回头|相比|比起|对比/.test(sentence)) {
+      merged.push(sentence);
       continue;
     }
+    const previous = merged[existing] ?? "";
+    const detail = continuationClause(sentence, dish);
+    if (!detail || previous.includes(detail)) continue;
+    if (WEAK_RESTATE.test(detail) && !hasNewFact(sentence, previous) && detail.replace(/我很喜欢|这次比较喜欢|还蛮喜欢|比较有记忆点|很好吃/g, "").replace(/[，、\s]/g, "").length < 4) {
+      continue;
+    }
+    merged[existing] = `${previous.replace(/[。！？!?]$/, "，")}${detail}。`;
   }
   const endingIndex = merged.findIndex((sentence) => isEndingSentence(sentence));
   if (endingIndex >= 0 && endingIndex < merged.length - 1) {
@@ -320,5 +454,5 @@ export function ensureNarrativeFlow(caption: string, context: CoverTitleContext 
   } else {
     sentences = merged;
   }
-  return joinSentences(sentences.filter(Boolean));
+  return joinSentences(settleOneVisit(sentences.filter(Boolean)));
 }

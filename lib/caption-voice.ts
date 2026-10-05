@@ -1,16 +1,14 @@
-import { containsHarshNegative } from "@/lib/compliance/negative-feedback";
-
 export function formatNaturalHumanWritingRules() {
-  return `NATURAL HUMAN WRITING — titles AND caption. Additive. Does not replace factuality, sentiment, party-size, Content Focus, or CUSTOMER ORIGINAL VOICE.
+  return `NATURAL HUMAN WRITING — titles AND caption. Additive. Does not replace factuality, sentiment, party-size, Content Focus, or CUSTOMER DINING NOTE.
 
 Goal: same true facts, different lived telling. Change opening, information order, sentence shape, dish wording, sentence length, density, where emotion appears, ending, and rhythm.
-Do not replace the customer's keepable original phrases (一口就满足 / 菜单只有泰语和英语) with fancier synonyms. Vary structure around those phrases.
+The dining note is source material. Segment it and rewrite it into natural sentences. Do not paste it verbatim, and do not upgrade 一口就满足 / 菜单只有泰语和英语 into 口感层次 / 酸甜开胃 / 不影响体验.
 FORBIDDEN: same template + different adjectives.
 
 1) Content Focus is WHAT this post is mainly about. It is NOT a fixed article template.
 Write in this order: real customer input → extract facts → pick the angle worth telling this round → organize naturally → THEN check Content Focus.
 FORBIDDEN: Content Focus → fill a template → drop in customer facts.
-The same Focus must still be tellable with a different structure. Do not throw away keepable customer phrases to look different.
+The same Focus must still be tellable with a different structure. Do not drop the customer's real points just to look different. Rewrite them; do not paste the raw note.
 
 2) Change the narrative path every generation. Do not repeat the last path.
 Paths: start from the favorite dish / a concrete detail / the dining feel / the scene / result then reason / one dish leading to another / atmosphere or service leading to food / mall or convenience leading to food / the customer's own written moment / no summary, end on the last fact.
@@ -136,91 +134,120 @@ Final output must read like a consumer writing this meal in their own way — no
 }
 
 export function formatCustomerOriginalVoiceRules() {
-  return `CUSTOMER ORIGINAL VOICE — caption layer. Additive. Does not replace compliance neutralization, party-size, or official location facts.
+  return `CUSTOMER DINING NOTE — segment, then rewrite. Additive. Does not replace compliance neutralization, party-size, or official location facts.
 
-The dining note is not background color. It is primary caption material. The reader should still hear THIS diner.
+The "Tell us more about your dining experience" note is RAW EXPERIENCE MATERIAL, not a finished sentence to paste into the caption.
+Pipeline: understand the meaning → split information points → keep the 2–4 that matter for this Storyline / Content Angle → rewrite them into natural complete sentences → weave them into a personal dining story.
+The reader should feel the diner wrote this after eating. Not: the AI rearranged questionnaire answers.
+Priority: real experience > natural wording > completeness.
 
-Priority: like the person speaking > friend sharing > ordinary consumer post > Xiaohongshu copy polish.
-If the original note is already clear and natural, do not “optimize” it.
+1) Do NOT paste the note verbatim, and do NOT only add punctuation.
+BAD source: 很好吃很喜欢想再回来吃店员服务很好老板娘长得很漂亮
+BAD caption: 很好吃很喜欢想再回来吃店员服务很好老板娘长得很漂亮
+BAD caption: 很好吃，很喜欢，想再回来吃，店员服务很好，老板娘长得很漂亮。
+That still reads like a survey dump.
 
-KEEP the original words / clauses / feelings when they are:
-- grammatically basically OK
-- clear
-- not a platform-banned harsh attack
-- already a real consumer voice
+2) Segment stacked, unpunctuated input before writing.
+Example points from that note: 食物口味 很好吃 / 个人感受 很喜欢 / 再访意愿 想再回来吃 / 服务 店员服务很好 / 人物印象 老板娘长得很漂亮
+Missing punctuation does NOT mean the customer wants that format kept. Punctuation, word order, and sentence shape may change. Keep the real information and the real feeling.
+Trigger this split when the note has almost no punctuation, several phrases run together, and mixes food, service, room, people, and emotion.
 
-Light tidy only (punctuation, a missing 的, Pad Thai casing). Do not upgrade into 酸甜开胃 / 口感层次 / 令人非常满意.
+3) You may add a subject, connectors, and spoken tone; split into several sentences; merge repeated meaning; reorder; turn shorthand into natural Xiaohongshu consumer Chinese; put different topics in different sentences; drop duplicates that add no information.
+GOOD: 这次吃下来真的很喜欢，味道很合口味，已经开始想下次再来了。店员服务也很好，老板娘也很漂亮，整个用餐过程都很舒服。
+GOOD short: 味道很好，整体吃下来很喜欢，已经想再来一次了。店员服务很不错，老板娘也很漂亮。
 
+4) Do not cram every topic into one list sentence.
+Food → a food sentence. Service → a service sentence. Room / person / feeling → their own sentence.
+BAD: 食物很好吃、店员服务很好、老板娘很漂亮、环境很好、下次还想来。
+Make them one dining story with a natural order.
+
+5) Do not keep every point. A note with 5–6 scattered points should contribute about 2–4.
+Do not change the customer's meaning. Do not invent an experience they did not express. Do not upgrade 一般 to 很好. Do not add taste, room, or service details they did not give. Do not invent just to make the post feel complete.
+
+6) A mild feeling may be rewritten, not escalated, and not turned into an objective claim.
+很喜欢 may become 这次吃下来真的很喜欢 / 整体很合我的口味 / 这顿饭吃得很开心.
+Do NOT escalate into 这是我吃过最好吃的泰餐 / 全曼谷最喜欢的一家 / 强烈推荐大家都来.
+Keep who liked what. 小孩子很喜欢滑蛋饭 means the child liked that dish.
+GOOD: 滑蛋饭是这次比较喜欢的一道，小朋友也吃得很开心。 / 这次点的滑蛋饭，小朋友吃得很喜欢，我自己也觉得这道很不错。
+BAD: 这道菜适合儿童。 / 儿童必点。 / 很适合带孩子来。 / 亲子用餐首选。 / 小孩子很喜欢，所以非常适合亲子家庭。
+妈妈很喜欢 / 老公觉得很好吃 / 朋友一直说好吃 stay that person's reaction. Do not invent a new judgment.
+服务很好 may become 服务也很好，吃饭的时候不用自己操心太多. It must not become 服务非常专业、贴心、周到.
+老板娘长得很漂亮 stays 老板娘也很漂亮. It must not become 老板娘亲切漂亮，给人留下很深的印象.
+Each point needs a reason to sit where it sits. 滑蛋饭很好吃，小孩子很喜欢 is connected. 服务很好。刚好在centralwOrld。 is not.
+When the location plan puts the place in the story, that scene opens the visit and is not added again after the food. Otherwise leave the place out. Then what they ate, how it tasted, who reacted, and how the meal felt.
+Before writing, judge internally and do not print it: who is named, who liked or disliked what, which dish, feeling versus fact, what to split, what to merge, and whether the wording still means what they said.
+
+7) Concrete notes stay at the same strength. Rewrite the sentence; do not upgrade the claim.
 GOOD source: padthai依旧好吃，一口就满足
-KEEP: Pad Thai依旧好吃，一口就满足。 / Pad Thai依旧好吃，一口下去就很满足。
+GOOD: Pad Thai依旧好吃，一口下去就很满足。
 BAD: Pad Thai酸甜开胃，丰富的口感层次让人一口接一口，整体味道令人非常满意。
+GOOD source: 菜单只有泰语和英语，多花点时间才能看明白
+GOOD: 菜单只有泰语和英语，第一次看还真的要花一点时间。
+BAD: 今天来打卡这家超有特色的泰式餐厅！虽然菜单只有泰语和英语，但完全不影响体验。
 
-GOOD source: 菜单只有泰语和英语，多花点时间才能看明白 / padthai依旧好吃，一口就满足。冬阴功汤底的这个也不错
-KEEP: 在centralwOrld 3层的一家泰餐馆，菜单只有泰语和英语，第一次看还真的要花一点时间。Pad Thai依旧好吃，一口就满足，冬阴功汤底的这个我也觉得不错。
-BAD: 今天来打卡这家超有特色的泰式餐厅！虽然菜单只有泰语和英语，但完全不影响体验。Pad Thai口感丰富，冬阴功汤底酸辣开胃，每一口都让人回味无穷，喜欢泰餐的朋友真的不要错过！
-
-Spoken texture may stay imperfect: 真的还不错 / 一口就满足 / 没想到还蛮好吃 / 这个我会再吃 / 刚好逛到这里就进来了 / 这个真的可以 / 感觉还不错 / 就是有点辣 / 我自己蛮喜欢的 / 不知道是不是我太久没吃泰餐.
-Do not swap these for 高级 / 精致 / 惊艳 copy.
+Spoken texture may stay: 真的还不错 / 没想到还蛮好吃 / 这个我会再吃 / 刚好逛到这里就进来了 / 就是有点辣.
+Do not swap these for 高级 / 精致 / 惊艳.
 
 Do NOT add blogger voice unless the customer wrote it: 今天带大家来 / 作为一个泰餐爱好者 / 不得不说 / 这家店真的让我惊艳了 / 如果你也喜欢……千万不要错过 / 答应我一定要来试试 / 狠狠安利 / 闭眼冲 / 宝子们 / 曼谷必吃 / 私藏宝藏店 / 天花板 / 绝绝子 / 一整个爱住.
 
-No forced 开头吸引→店铺介绍→菜品→推荐→总结→CTA. No 介绍餐厅→环境→菜品→总结 every time.
+No forced 开头吸引→店铺介绍→菜品→推荐→总结→CTA.
 2–4 natural sentences are enough when the note is short.
 
-Edit levels:
-1 keep — original already natural
-2 light tidy — word order / punctuation only
-3 re-order — combine scattered customer lines, keep their words
-4 fix — only for broken grammar, typos, unreadable lines, or fact conflicts
+Harsh attacks still follow neutralization: keep the judgment direction, never rewrite 太难吃了 into 味道很特别 or 不会再来了 into 下次还会再来. Mild notes such as 就是有点辣 stay at that strength.
 
-Harsh attacks (太难吃了 / 服务很差 / 不会再来了) still follow the existing neutralization rule: keep the judgment direction, never rewrite into 味道很特别 / 服务很有个性 / 下次还会再来. Mild personal notes such as 就是有点辣 stay as the diner said them.
-
-AI may add only what an ordinary diner would naturally add from THIS visit. Never invent wow, layers, must-visit, or a complete restaurant review the customer did not write.`;
+Never invent wow, layers, must-visit, or a full restaurant review the customer did not write.`;
 }
 
-function compactText(value: string) {
-  return value.replace(/\s+/g, "").toLowerCase();
-}
+export function formatSpokenNaturalnessRules() {
+  return `SPOKEN CHINESE FIRST — titles AND caption. Additive. Natural word order beats covering every field.
 
-export function keepableCustomerPhrases(note: string) {
-  const text = note.replace(/\s+/g, " ").trim();
-  if (!text) return [];
-  const chunks = text
-    .split(/[。！？!?；;\n]+/)
-    .map((part) => part.trim())
-    .filter((part) => part.length >= 6 && part.length <= 60);
-  const phrases: string[] = [];
-  for (const chunk of chunks) {
-    if (containsHarshNegative(chunk)) continue;
-    if (phrases.some((item) => item.includes(chunk) || chunk.includes(item))) continue;
-    phrases.push(chunk);
-  }
-  return phrases.slice(0, 4);
-}
+Do not pack place + dish + keyword + extra fact into one sentence just to satisfy a checklist.
+Priority: real experience > natural Chinese > story order > completeness > length.
 
-function phraseHeardInCaption(caption: string, phrase: string) {
-  const cap = compactText(caption);
-  const ph = compactText(phrase);
-  if (!ph) return false;
-  if (cap.includes(ph)) return true;
-  if (ph.length < 8) return false;
-  for (let index = 0; index <= ph.length - 6; index += 1) {
-    if (cap.includes(ph.slice(index, index + 6))) return true;
-  }
-  return false;
-}
+TITLES — exactly 3. Each title is one complete, attractive sentence about ONE thing worth sharing: a dish that fit, a convenient place, a roomy room, a memorable dish, eating Thai food after shopping, or one real memory.
+A title is not two selling points glued together.
+FORBIDDEN comma splice of two claims: 青咖喱牛肉后劲足，但不腻 / 支付宝方便，吃泰餐更省心 / 咖喱蟹肉好吃，餐厅环境也不错 / 餐厅宽敞，咖喱蟹肉很满足.
+Also forbidden: ｜ or a colon used only to bolt a second selling point or a search keyword onto the sentence.
+GOOD: 青咖喱牛肉越吃越喜欢 / 在曼谷吃泰餐支付宝也能直接用 / centralwOrld这家泰餐厅空间真的很宽敞 / 咖喱蟹肉是我吃了还想再点的一道.
+If a place appears, it must serve that one point: centralwOrld 3楼这家泰餐的咖喱蟹肉很合口味. Not 曼谷美食｜咖喱蟹肉很合口味.
+If the sentence is already complete, do not add more search keywords. One title, one core. 支付宝方便 + 吃泰餐 becomes 在曼谷吃泰餐支付宝也能直接用, not two clauses.
+No 最 / 第一 / 最好吃 / 封神 / 顶级.
 
-/** If the caption dropped every keepable dining-note clause, put one back. */
-export function ensureCustomerOriginalPhrases(caption: string, note: string) {
-  const phrases = keepableCustomerPhrases(note);
-  if (phrases.length === 0) return caption;
-  if (phrases.some((phrase) => phraseHeardInCaption(caption, phrase))) return caption;
-  const restored = phrases[0]?.replace(/central\s*world/gi, "centralwOrld").replace(/[。！？!?]+$/, "") ?? "";
-  if (!restored) return caption;
-  const line = /[。！？!?]$/.test(restored) ? restored : `${restored}。`;
-  const body = caption.trim();
-  if (!body) return line;
-  const parts = body.split(/(?<=[。！？!?])/).filter(Boolean);
-  if (parts.length <= 1) return `${body.replace(/[。！？!?]*$/, "")}。${line}`;
-  return `${parts[0]}${line}${parts.slice(1).join("")}`;
+ONE VISIT — the caption is one meal the person is remembering. Plan that story first, then place the facts inside it.
+The line is: where this meal happened, what they ordered, how it tasted, who reacted, how the meal felt.
+Do not complete separate tasks: 菜品介绍 → 客户评论 → 餐厅介绍 → 服务评价 → 地点介绍.
+When this round's location plan puts the place in the story, open with that scene, once: 这次逛centralwOrld的时候刚好去了Baan Ying，点了几道泰餐，其中滑蛋饭是我比较喜欢的一道，没想到小朋友也特别喜欢。服务也很好，整个吃饭过程比较轻松。
+BAD: 滑蛋饭很好吃。小孩子很喜欢。刚好去了Baan Ying。服务很好。刚好在centralwOrld。
+If the restaurant or the mall is already in that opening, do not introduce it again. 刚好去了Baan Ying and 刚好在centralwOrld are the same fact said twice.
+A person's reaction sits with that dish: 这次点的几道里面，我比较喜欢滑蛋饭，没想到小朋友也特别喜欢。 Not 滑蛋饭很好吃。小孩子很喜欢。刚好去了Baan Ying。
+Service sits with how the meal went: 服务也很到位，整个吃饭的过程比较轻松。 Not in the middle of the dishes.
+Standalone location plan: do not add the mall or Baan Ying just to complete a checklist. Tell the meal. The system adds Location & Time.
+Each sentence needs a reason to follow the one before it. If deleting a sentence changes nothing, it was stuffed in. Do not finish the food, then suddenly add the restaurant name, then the service, then the mall.
+After drafting, ignore the brand names and read it again. It still has to sound like one person telling the meal. If it sounds like finished tasks, rewrite the whole caption.
+
+CLOSING FACTS STAY LATE. If the evidence says 最后 / 最后点了 / 最后吃了 / 收尾 / 作为结尾 / 最后再来 / 甜点收尾 / 吃完刚好 / 完美结束, that item belongs in the second half, usually the last dish stretch.
+BAD: 咖喱蟹肉很好吃，再来一份芒果糯米饭，甜而不腻，完美收尾。滑蛋饭也是这次的选择之一。
+GOOD: 这次在Baan Ying点了咖喱蟹肉，味道很合我的口味。滑蛋饭也很简单耐吃，整体味道比较浓郁。最后用芒果糯米饭收尾，甜而不腻，粘度也刚刚好。
+Never: A → 最后吃B → then a new dish C.
+
+PLACE — follow THIS ROUND LOCATION PLAN. Inline: both the mall and Baan Ying, once, inside the meal. Standalone: do not stuff them in; the system adds Location & Time. Say that place once. The system Location & Time block at the end is not a repeat.
+GOOD: centralwOrld 3楼的这家Baan Ying，咖喱蟹肉是我吃了还会想再点的一道。 / 这次逛centralwOrld顺便去了3楼的Baan Ying，咖喱蟹肉是我吃了还会想再点的一道。
+BAD: 咖喱蟹肉是我这次还会想再点的一道。去了3楼的Baan Ying。
+BAD: 咖喱蟹肉很好吃。Baan Ying在centralwOrld 3楼。 / 滑蛋饭味道不错。centralwOrld 3楼。 / 餐厅环境很好。Baan Ying 3楼。
+If the story does not need the address, leave mall, floor, and hours to the system Location & Time block. Do not invent a shopping trip to justify the address.
+After centralwOrld 3楼的这家Baan Ying, do not add Baan Ying就在centralwOrld 3楼.
+
+DISH CONTINUITY — when a dish is first named, finish its taste, texture, and judgment there. Do not return to it after the next dish has started.
+BAD: 芒果糯米饭。接着咖喱蟹肉。菠萝炒饭。芒果特别新鲜，搭配糯米口感完美。
+GOOD: 芒果糯米饭，芒果特别新鲜，搭配糯米口感刚刚好。接着咖喱蟹肉。然后菠萝炒饭。
+Several notes about one dish stay in that same stretch. After the next dish starts, do not jump back.
+
+DISH WEIGHT — several dishes are not equal paragraphs. Main dish → a shorter supporting dish → a closing dish if the evidence has one.
+BAD: 咖喱蟹肉很好吃。芒果糯米饭很好吃。滑蛋饭也很好吃。
+GOOD: 这次在Baan Ying最喜欢的还是咖喱蟹肉，味道很合我的口味。滑蛋饭简单但很耐吃。最后用芒果糯米饭收尾，甜而不腻。
+Skipping a dish, a reason, the room, or the service is allowed. 2–3 sentences are allowed.
+
+Before writing, judge internally and do NOT print this list:
+1) the main experience 2) the hero dish 3) supporting dishes 4) any 最后/收尾/逛街后 relation 5) what comes first 6) what comes last 7) whether place belongs in the story 8) which sentence can carry the place 9) which note points to rewrite 10) whether this sounds like a person after the meal.
+If a sentence has the right facts but a Chinese speaker would not say it that way, rewrite the order. Do not keep an awkward line just because it satisfies a rule.`;
 }

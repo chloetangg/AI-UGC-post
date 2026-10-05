@@ -33,6 +33,7 @@ import {
   formatCaptionConsumerVoiceRules,
   formatCustomerOriginalVoiceRules,
   formatNaturalHumanWritingRules,
+  formatSpokenNaturalnessRules,
 } from "@/lib/caption-voice";
 import { buildEvidenceMap, formatContentLockInstance, formatContentLockStaticRules } from "@/lib/content-lock";
 import { formatNarrativeFlowInstance, formatNarrativeFlowStaticRules } from "@/lib/narrative-flow";
@@ -313,13 +314,13 @@ Follow EVIDENCE PRIORITY title angles, the centralwOrld rule, TITLE SEARCH KEYWO
 Unacceptable: 曼谷Baan Ying好好吃 / 真的好好吃 / 超好吃. Do not make the 3 titles the same sentence with different adjectives.
 ZERO hashtags in titles.
 If a title mentions 芒果 / 芒果糯米饭 / mango, use 🥭 not 🍋. 🍋 is lemon / 柠檬 / 青柠 only.
-Title emojis, if any, must be chosen from the same list as the caption. Title 1 must not always start with 🇹🇭.
+Title emojis, if any, must be chosen from the same list as the caption, except 🇹🇭. A leading 🇹🇭 is a separate rare prefix: about 1 in 10 titles, first character only, never required on every batch of 3.
 ${formatTitleKeywordRules()}
 ${formatTitleFormatRules()}
 
 CAPTION: Express the selected Storyline naturally without naming it. Each Generate is an independent draft — new focus, new structure, new length, new sentence rhythm.
 Narrative focus follows THIS ROUND FOCUS, then other real customer points. If they selected several enjoy-most / dish / reason items, describe more than one in natural UGC — do not only write “食物很好吃”.
-Follow CUSTOMER ORIGINAL VOICE: keep the customer's own words when they are already natural. Only tidy grammar or punctuation. Do not copy keyword stacks. Do not invent extra service/atmosphere/people.
+Follow CUSTOMER DINING NOTE: the dining note is source material. Segment stacked phrases, rewrite about 2–4 useful points into natural sentences, and weave them into the story. Do not paste the raw note or only add punctuation. Do not invent extra service/atmosphere/people. Do not upgrade the customer's judgment.
 THIS ROUND length band is mandatory when the evidence can support it. Thin input → stay short. Rich input → you may write longer. Never invent to fill Long / Extended.
 Forbidden: the same opening every time; intro+experience+recommend+summary every time; listing every selected tag in one sentence; 145→147 character micro-edits on regenerate.
 Do not always start with the restaurant name or 作为游客 / 来到曼谷 / 这次我选择 / 如果你也 / 最近在找.
@@ -329,6 +330,8 @@ ${formatCaptionConsumerVoiceRules()}
 ${formatCustomerOriginalVoiceRules()}
 
 ${formatNaturalHumanWritingRules()}
+
+${formatSpokenNaturalnessRules()}
 
 ${formatGenerationVariationStaticRules()}
 
@@ -342,12 +345,12 @@ Do not force 第一次来尝试Baan Ying into every first-visit post, and do not
 Not first visit (No): they have been before. Do not write as a first-time discovery. Do not invent 每次来 / 又来了 unless the dining note says they return often.
 Local: do not explain basic Bangkok tourist info.
 Favorite = food → food is central. Atmosphere → environment may appear. Variety → ordering several dishes. Never invent companions or headcount.
-If the customer did not write 几个人 / 一家几口 / 和朋友 / 和家人 / 和孩子 / 和伴侣 / 一个人 / 两个人 / 聚餐, do not mention any of those. Use 这次来吃 / 这顿吃下来.
+If the customer did not write 几个人 / 一家几口 / 和朋友 / 和家人 / 和孩子 / 和伴侣 / 一个人 / 两个人 / 聚餐, do not invent a headcount. If they named who liked a dish, such as 小孩子很喜欢滑蛋饭 / 妈妈很喜欢 / 老公觉得很好吃, keep that person and that reaction. Do not turn it into 适合儿童 / 适合带孩子 / 亲子用餐. When nobody is named, use 这次来吃 / 这顿吃下来.
 Never infer party size from tourist/local, dish count, photo count, spend, or other answers. 4 dishes ≠ 几个人. ฿2,000 ≠ 一家人.
 Avoid empty lines like “这里提供丰富的泰式料理，适合朋友聚餐，整体体验非常不错。”
 
 ${formatCaptionEmojiRules()}
-Do NOT start every title 1 with 🇹🇭. Some title 1s have a list emoji, some have none.
+Do NOT put 🇹🇭 in the middle or end of a title, and do NOT start most titles with it. Decorative title emoji is separate from that rare leading flag.
 
 ${MALL_MENTION_RULES}
 
@@ -399,9 +402,16 @@ OUTPUT: Return ONLY JSON matching the schema. No Markdown fences.
 The sample JSON is FORMAT ONLY. Do not copy its selectedTemplateId, suitableTemplateIds, or strategy ids.
 
 VALIDATE before returning (apply the full rule blocks above; do not invent a second checklist):
-- 3 different spoken titles, mixed formats, no hashtags, no 必吃/最好吃/封神/顶级 hard-sell
-- Title 1 + Title 2 + Title 3 + mainTitle + subTitle contain exact "centralwOrld" at least once
+- 3 different spoken titles, each ONE complete point, no comma/｜ splice of two selling points, no hashtags, no 最/第一/必吃/最好吃/封神/顶级
+- A search keyword only if it already belongs inside that one sentence
+- Title 1 + Title 2 + Title 3 + mainTitle + subTitle contain exact "centralwOrld" at least once, woven into a real sentence
 - Caption follows THIS ROUND structure + length band + LOCATION PLAN; no hashtags
+- Story emojis: at least 2 in the whole caption, not on every sentence; 📍/⏰ do not count
+- 最后/收尾 content is in the second half; no new dish after a closing line
+- Each dish's taste, texture, and judgment sits with its first mention. No A → B → C → back to A
+- The caption is one meal. Place, if this round includes it, opens the visit once. No dish, then a later 刚好去了Baan Ying, then a later 刚好在centralwOrld
+- Dining note was segmented and rewritten, not pasted or only punctuated
+- A named reaction stays that person's reaction. 小孩子很喜欢 is not 适合儿童. 老板娘很漂亮 is not 亲切专业. No new judgment was added
 - Cover passes COVER OVERLAY natural-Chinese / keyword / ranking checks
 - 5 hashtags: always #BaanYing曼谷 plus 4 pool tags, shuffled
 - Photo indexes and suitableTemplateIds follow COVER PHOTOS / COVER TEMPLATE / REMAINING PHOTO ORDER
@@ -576,7 +586,7 @@ Gender: ${input.dinerGender?.trim() || "Not provided"}
 Enjoyed most: ${[...input.enjoyMost.filter((item) => item !== "其他"), input.enjoyMostOther?.trim() ?? ""].filter(Boolean).join("、") || "Not provided"}
 Recommended dishes (pool — do not automatically include all): ${dishes || "Not provided"}
 Why they recommend: ${reasons || "Not provided"}
-Customer's own words about this dining experience (INTERNAL INPUT ONLY — Priority 1 lived-detail source for titles AND caption AND cover. Keep the original words when they are already natural. Only tidy lightly. Do not invent beyond it. Do not copy harsh negatives such as 贵/难吃/踩雷/避雷/不推荐/不值得/失望/不喜欢/很普通/服务不好/抽奖送东西. Those follow the existing neutralization rule — keep the judgment direction, never false praise. Never ignore this note in favor of 曼谷美食发现):
+Customer's own words about this dining experience (INTERNAL INPUT ONLY — Priority 1 source material, not a finished sentence. Understand it, split the information points, then rewrite about 2–4 of them into natural complete sentences inside the personal story. Do NOT paste the raw note. Do NOT only add punctuation. Do not invent beyond it. Do not upgrade 一般 / 很喜欢 into 最好吃 / 全曼谷最喜欢 / 强烈推荐. Do not copy harsh negatives such as 贵/难吃/踩雷/避雷/不推荐/不值得/失望/不喜欢/很普通/服务不好/抽奖送东西. Those follow the existing neutralization rule — keep the judgment direction, never false praise. Never ignore this note in favor of 曼谷美食发现):
 ${diningNote || "Not provided"}
 Photo count (photos are attached in upload order as Photo 1 = index 0, Photo 2 = index 1, …): ${input.photoCount}
 Previous cover templateId (do not reuse if another suitable existing template exists): ${input.previousCoverTemplateId?.trim() || "none"}

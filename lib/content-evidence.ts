@@ -247,7 +247,7 @@ export function extractExperienceFacts(context: CoverTitleContext = {}): Experie
       markers: ["面积", "环境大", "够大", "很大", "空间"],
       coverMains: ["环境够大", "店里很大"],
       coverSubs: ["坐着不觉得挤", "环境大吃饭也舒服"],
-      titleHooks: ["环境够大，吃泰餐很舒服", "这家泰餐环境大，吃饭也舒服"],
+      titleHooks: ["这家泰餐厅空间真的很宽敞", "这家泰餐环境大吃饭也舒服"],
       captionLine: "店里的空间比想象中大很多，坐下来吃饭不会觉得挤。",
     });
   }
@@ -273,7 +273,7 @@ export function extractExperienceFacts(context: CoverTitleContext = {}): Experie
       markers: ["翻新"],
       coverMains: ["刚刚翻新", "环境刚翻新"],
       coverSubs: ["翻新后环境更好了", "店里刚刚翻新"],
-      titleHooks: ["刚刚翻新，环境看着很舒服", "这家泰餐刚刚翻新"],
+      titleHooks: ["这家泰餐厅刚刚翻新看着很舒服", "这家泰餐刚刚翻新"],
       captionLine: "店里刚刚翻新，环境看着很舒服。",
     });
   }
@@ -286,7 +286,7 @@ export function extractExperienceFacts(context: CoverTitleContext = {}): Experie
       markers: ["菜品", "选择"],
       coverMains: ["菜品选择多", "菜品很丰富"],
       coverSubs: ["想吃的基本都有", "菜品选择很多"],
-      titleHooks: ["菜品选择多，点泰餐不纠结", "这家泰餐菜品选择很丰富"],
+      titleHooks: ["这家泰餐菜品选择很多", "这家泰餐点起来不纠结"],
       captionLine: "店里菜品选择很多，点餐不纠结。",
     });
   }
@@ -299,7 +299,7 @@ export function extractExperienceFacts(context: CoverTitleContext = {}): Experie
       markers: ["支付宝"],
       coverMains: ["能用支付宝", "支付宝能付"],
       coverSubs: ["结账可以用支付宝", "付款很方便"],
-      titleHooks: ["结账能用支付宝，吃泰餐更方便", "这家泰餐可以用支付宝"],
+      titleHooks: ["在曼谷吃泰餐支付宝也能直接用", "这家泰餐可以用支付宝"],
       captionLine: "结账可以用支付宝，付款方便很多。",
     });
   }
@@ -337,7 +337,7 @@ export function extractExperienceFacts(context: CoverTitleContext = {}): Experie
       markers: ["正宗"],
       coverMains: ["味道很正宗", "泰餐很正宗"],
       coverSubs: ["味道吃着很正宗", "这顿味道很正"],
-      titleHooks: ["这家泰餐味道很正宗", "食物味道正宗，吃着很满足"],
+      titleHooks: ["这家泰餐味道很正宗", "这顿泰餐味道很合口味"],
       captionLine: "食物整体味道很正宗，吃起来就是很熟悉的泰式风味。",
     });
   }
@@ -751,13 +751,10 @@ function weaveCentralworld(title: string, context: CoverTitleContext) {
   if (mall && /逛街/.test(body)) return `${flag}${body.replace("逛街", `${CANONICAL_CENTRALWORLD}逛街`)}`;
   if (mall && /逛完/.test(body)) return `${flag}${body.replace("逛完", `${CANONICAL_CENTRALWORLD}逛完`)}`;
   if (mall && /商场/.test(body)) return `${flag}${body.replace("商场", `${CANONICAL_CENTRALWORLD}商场`)}`;
-  if (body.includes("，")) {
-    const at = body.indexOf("，");
-    return `${flag}${body.slice(0, at + 1)}${CANONICAL_CENTRALWORLD}${body.slice(at + 1)}`;
-  }
-  if (body.includes("｜")) {
-    const at = body.indexOf("｜");
-    return `${flag}${body.slice(0, at + 1)}${CANONICAL_CENTRALWORLD}${body.slice(at + 1)}`;
+  if (/[，,]/.test(body) || body.includes("｜")) {
+    const head = body.split(/[，,｜]/)[0]?.trim() || body;
+    if (/逛/.test(head)) return `${flag}${head.replace("逛", `${CANONICAL_CENTRALWORLD}逛`)}`;
+    return `${flag}在${CANONICAL_CENTRALWORLD}${head.replace(/^在/, "")}`;
   }
   return `${flag}${CANONICAL_CENTRALWORLD}${body}`;
 }
@@ -777,7 +774,7 @@ function naturalCentralworldTitle(
   const enjoy = (context.enjoyMost ?? []).join(" ");
   const note = context.diningNote ?? "";
   if (mall && /中文菜单/.test(`${enjoy} ${note}`)) {
-    return `${flag}centralwOrld逛街吃泰餐，中文菜单太方便`;
+    return `${flag}在centralwOrld吃泰餐点菜有中文菜单`;
   }
   if (mall) return `${flag}centralwOrld逛街顺便吃泰餐`;
   const hook = facts[0]?.titleHooks[0] ?? "";

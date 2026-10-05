@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 import OpenAI from "openai";
 import { ensureCaptionEmojis, fixFruitEmojisInTitles } from "@/lib/caption-emoji";
-import { ensureCustomerOriginalPhrases } from "@/lib/caption-voice";
 import {
   buildSystemPrompt,
   buildUserPrompt,
@@ -353,9 +352,7 @@ export async function POST(request: Request) {
       subtitle: locked.coverSubtitle,
     };
     const located = finalizeOfficialLocationTime({
-      caption: ensureCaptionEmojis(
-        ensureCustomerOriginalPhrases(locked.caption, payload.diningExperienceNote ?? ""),
-      ),
+      caption: ensureCaptionEmojis(locked.caption),
       branch: payload.branch,
       placement: locationPlan.placement,
       format: locationPlan.format,

@@ -23,6 +23,7 @@ export const STORY_EMOJI_POOL = [
   "🤯",
   "😳",
   "😋",
+  "🛍️",
 ] as const;
 
 export const MIN_STORY_POOL_EMOJIS = 2;
@@ -39,6 +40,7 @@ const FOOD_EMOJI_CUES: Array<[RegExp, (typeof STORY_EMOJI_POOL)[number]]> = [
 ];
 
 const PLACE_EMOJI_CUES: Array<[RegExp, (typeof STORY_EMOJI_POOL)[number]]> = [
+  [/逛街|购物|商场/, "🛍️"],
   [/泰国|曼谷|Thai|Bangkok/i, "🇹🇭"],
 ];
 
@@ -103,7 +105,8 @@ export function formatCaptionEmojiRules() {
   return `EMOJI — caption story body MUST include at least ${MIN_STORY_POOL_EMOJIS} emojis from the approved list that fit THIS caption. Titles may use the same list. Cover overlay never uses emoji. Location 📍/⏰ do not count.
 
 Approved list only: ${STORY_EMOJI_POOL.join(" ")}
-Pick ones that fit the sentence: 蟹→🦀, 虾→🍤, 芒果→🥭, 柠檬/青柠→🍋, 饭→🍚, 冬阴功→🍜, 咖喱→🍛, 辣→🌶️. Mood emoji when there is no food cue. 🇹🇭 only when the sentence is actually about Thailand/Bangkok.
+The minimum is for the WHOLE story, not for each sentence. One sentence may carry two fitting emojis; most sentences should have none.
+Pick ones that fit the sentence: 蟹→🦀, 虾→🍤, 芒果→🥭, 柠檬/青柠→🍋, 饭→🍚, 冬阴功→🍜, 咖喱→🍛, 辣→🌶️, 逛街/购物→🛍️. Mood emoji when there is no food cue. 🇹🇭 only when the sentence is actually about Thailand/Bangkok.
 🍋 = lemon / 柠檬 / 青柠 ONLY. Never 🍋 for 芒果 / 芒果糯米饭.
 🥭 = mango / 芒果 ONLY. Never 🥭 for lemon / 柠檬.
 Do not put an emoji after every sentence. Do not use 🍽️ 📍 🕐 or any emoji outside this list.

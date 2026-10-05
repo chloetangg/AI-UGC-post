@@ -149,7 +149,7 @@ Do not pick a different hero dish for the title or cover because it is shorter, 
 If Primary Content is a dish, at least one title and the caption must support that dish. Cover may name it only if the caption also does.
 An isolated dish (mentioned but not the focus) cannot become the title/cover hero.
 
-CUSTOMER WORDING: keep Tier 1 meaning. Caption also keeps the customer's original tokens when they are already natural — see CUSTOMER ORIGINAL VOICE. 
+CUSTOMER WORDING: keep Tier 1 meaning (taste, texture, like / so-so / dislike). The dining note is source material — segment it and rewrite; do not paste the raw note or only add commas. See CUSTOMER DINING NOTE. 
 GOOD: 芒果糯米饭粘度刚好，也不会太甜，刚好是我喜欢的口味。
 BAD: 芒果糯米饭很好吃，味道不错。
 GOOD: 蒜炒虾仁蒜香味很足，虾仁Q弹。
