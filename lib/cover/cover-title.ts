@@ -54,7 +54,7 @@ export const MIN_MAIN_TITLE_CHARS = 4;
 export const PREFERRED_MAIN_TITLE_CHARS = 6;
 export const MAX_MAIN_TITLE_CHARS = 10;
 export const MIN_SUB_TITLE_CHARS = 6;
-export const MAX_SUB_TITLE_CHARS = 10;
+export const MAX_SUB_TITLE_CHARS = 15;
 
 /** @deprecated Use MIN_MAIN_TITLE_CHARS */
 export const MIN_COVER_TITLE_CHARS = MIN_MAIN_TITLE_CHARS;
@@ -117,7 +117,7 @@ export function looksIncompleteCover(text: string) {
 }
 
 const FORBIDDEN_COVER_CLAIMS =
-  /最好吃|最爱|最强|最绝|最正宗|最值得|最推荐|最便宜|最划算|最火|之最|封神|顶级|唯一|全网第一|曼谷第一|泰国第一|全曼谷|全泰国|必吃第一名|必须吃|明星爱吃|名人推荐|泰国人也爱|泰国人爱吃|本地人爱吃|本地人都|天花板|无敌/;
+  /最好吃|最爱|最强|最绝|最正宗|最值得|最推荐|最便宜|最划算|最火|之最|顶级|唯一|全网第一|曼谷第一|泰国第一|全曼谷|全泰国|必吃第一名|必须吃|明星爱吃|名人推荐|泰国人也爱|泰国人爱吃|本地人爱吃|本地人都|无敌/;
 
 function comparableHan(text: string) {
   return sanitizeCoverLine(text).replace(/[^\p{Script=Han}]+/gu, "");
@@ -167,13 +167,7 @@ export function isAcceptableMainTitle(
   return true;
 }
 
-function maxSubtitleUnits(text: string, context: CoverTitleContext) {
-  const names = collectFullDishNames({
-    dishes: context.dishes,
-    sourceTexts: [...(context.sourceTexts ?? []), context.diningNote ?? ""],
-  });
-  const used = names.filter((name) => text.includes(name) || text.includes(coverDishShortName(name)));
-  if (used.length > 0) return 12;
+function maxSubtitleUnits(_text: string, _context: CoverTitleContext) {
   return MAX_SUB_TITLE_CHARS;
 }
 

@@ -28,7 +28,6 @@ const COVER_ABSOLUTE_REPLACEMENTS: Array<{ phrase: string; replacement: string }
   { phrase: "最绝", replacement: "真的很香" },
   { phrase: "之最", replacement: "超爱" },
   { phrase: "天花板级别", replacement: "超爱" },
-  { phrase: "天花板", replacement: "超爱" },
   { phrase: "无敌", replacement: "超爱" },
   { phrase: "全网第一", replacement: "超爱这家" },
   { phrase: "曼谷第一泰餐", replacement: "曼谷泰餐" },
@@ -72,27 +71,13 @@ export function formatCoverAbsoluteRules() {
   return `COVER ABSOLUTE / RANKING LANGUAGE — MANDATORY for mainTitle AND subTitle.
 
 Never use ranking, No.1, or universal-superiority wording, even if a review or reference used it:
-最 / 第一 / 第一名 / Top 1 / TOP1 / No.1 / 冠军 / 之最 / 最爱 / 最好吃 / 最值得 / 最推荐 / 最正宗 / 最便宜 / 最划算 / 最火 / 最强 / 最绝 / 天花板 / 无敌 / 全网第一 / 曼谷第一 / 泰国第一 / 全曼谷 / 全泰国 / 100% / 百分百 / 必须吃 / 必吃第一名
+最 / 第一 / 第一名 / Top 1 / TOP1 / No.1 / 冠军 / 之最 / 最爱 / 最好吃 / 最值得 / 最推荐 / 最正宗 / 最便宜 / 最划算 / 最火 / 最强 / 最绝 / 无敌 / 全网第一 / 曼谷第一 / 泰国第一 / 全曼谷 / 全泰国 / 100% / 百分百 / 必须吃 / 必吃第一名
+绝绝子 / 封神 / 天花板 are casual reactions, not rankings. They are optional and only fit strong praise the customer already gave. Do not rewrite them away when they fit, and do not add them to a mild line.
 任何“第一 / 排名 / 全部范围 / 绝对优势”的意思都不要上封面。
 
 例外（不是排名）：第一次 / 第一道 / 最近 / 最后 / 最终. Cover keyword 必吃 may still appear as a pool keyword (曼谷必吃 / 必吃泰式料理), but never 必须吃 / 必吃第一名 / 必吃的泰餐 as a ranking claim.
 
 最爱 is NOT allowed. Always rewrite 最爱 → 超爱. Any leftover 最 must be rewritten.
 
-Prefer a diner's personal feeling over an objective ranking, only when THIS visit supports it:
-超爱 / 很喜欢 / 好喜欢 / 真的喜欢 / 太好吃了 / 真的很香 / 很惊喜 / 意外好吃 / 很想再吃 / 下次还要点 / 这道可以 / 真的很推荐 / 让我记住了 / 吃完还在想
-Do not invent 一口就爱上 / 很惊喜 unless the evidence has that feeling.
-
-REWRITE:
-❌ 曼谷最好吃的泰餐 → ✅ 超爱这家泰餐
-❌ 曼谷第一泰餐 → ✅ 曼谷泰餐
-❌ 最好吃的蟹肉滑蛋 → ✅ 超爱蟹肉滑蛋
-❌ 必吃的泰餐 → ✅ 很想再吃的泰餐
-❌ 最正宗的泰餐 → ✅ 很有泰式风味
-❌ 最值得点的菜 → ✅ 这道真的很喜欢
-❌ 曼谷最强冬阴功 → ✅ 超爱这碗冬阴功
-❌ 我最爱这道 → ✅ 我超爱这道
-❌ 没想到最喜欢这道 → ✅ 没想到超爱这道
-
-BEFORE RETURN: if mainTitle or subTitle contains 最 (except 最近/最后/最终), 第一 (except 第一次/第一道), No.1, 冠军, 天花板, 全曼谷/全泰国, rewrite into a short subjective line. The cover should say “这是消费者很喜欢的东西”, never “这是客观上排名第一的东西”.`;
+Rewrite 最爱 → 超爱, 曼谷最好吃的泰餐 → 超爱这家泰餐, 我最爱这道 → 我超爱这道. Do not invent 一口就爱上 / 很惊喜 unless the evidence has that feeling. Leave 绝绝子 / 封神 / 天花板 only when they match strong customer praise.`;
 }

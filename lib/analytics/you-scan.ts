@@ -15,7 +15,7 @@ function isPrefetchRequest(store: Headers) {
   return purpose.includes("prefetch");
 }
 
-export async function recordExperienceScan(qrFromQuery?: string) {
+export async function recordExperienceScan(qrFromQuery?: string, source = "experience-page") {
   try {
     const store = await headers();
     if (isPrefetchRequest(store)) return;
@@ -27,7 +27,7 @@ export async function recordExperienceScan(qrFromQuery?: string) {
       sessionId,
       qrCodeId: sanitizeQrCodeId(qrFromQuery || session.qrCodeId),
       campaign: ANALYTICS_CAMPAIGN,
-      metadata: { source: "experience-page" },
+      metadata: { source },
     });
     if (!result.recorded && !result.duplicate) {
       console.error("[analytics] experience page qr_scan was not written to MongoDB");

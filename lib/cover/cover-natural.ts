@@ -110,8 +110,6 @@ export function isSpokenCompleteCoverHeadline(title: string) {
   return (
     /^第一次来(尝试|吃|试试|体验).{2,}$/.test(cleaned) ||
     /^第一次来centralwOrld吃/.test(cleaned) ||
-    /^到曼谷(的)?第一餐/.test(cleaned) ||
-    /^曼谷第一餐/.test(cleaned) ||
     /^(在)?曼谷(吃到|发现|逛街发现)(一家|这家)/.test(cleaned) ||
     /^来曼谷(可以)?试试这家/.test(cleaned)
   );
@@ -124,8 +122,10 @@ export function repairIncompleteCoverAction(title: string, context: CoverTitleCo
   if (/centralwOrld|central\s*world/i.test(cleaned) && firstVisit) return "第一次来centralwOrld吃泰餐";
   if (/发现/.test(cleaned)) return "在曼谷发现这家泰餐";
   if (/值得/.test(cleaned)) return "来曼谷试试这家泰餐";
-  if (/到曼谷第一次/.test(cleaned)) return "到曼谷第一餐泰餐";
-  if (firstVisit) return "第一次来试试这家泰餐";
+  if (/到曼谷第一次/.test(cleaned)) return "来曼谷试试这家泰餐";
+  if (firstVisit && !context.diningNote?.trim() && (context.dishes ?? []).length === 0) {
+    return "第一次来试试这家泰餐";
+  }
   return "来曼谷试试这家泰餐";
 }
 
@@ -161,26 +161,22 @@ A cover title is a sentence a real Chinese speaker would say, not 地点+关键�
 If packing one more keyword would break the grammar, keep the natural sentence.
 Ask: 一个中国人正常聊天会这样说吗? If no, rebuild.
 
-Learn STRUCTURE only, do not copy these lines:
-❌ 曼谷泰餐第一次来尝试 → ✅ 第一次来尝试Baan Ying
-❌ 曼谷泰餐第一次体验 → ✅ 第一次来体验这家泰餐
-❌ 曼谷美食第一次来吃 → ✅ 到曼谷第一餐泰餐
-❌ centralwOrld泰餐第一次尝试 → ✅ 第一次来centralwOrld吃泰餐
-❌ 曼谷泰餐值得尝试 → ✅ 来曼谷试试这家泰餐
-❌ 曼谷发现泰餐 → ✅ 在曼谷发现这家泰餐
-❌ Baan Ying曼谷第一次 → ✅ 第一次来吃Baan Ying
-Also never: 曼谷泰餐值得来吃 / 到曼谷第一次泰餐 / Baan Ying第一次来 / 泰餐第一次来吃.
-Rebuild from THIS visit's restaurant, dishes, and note — do not reuse the example wording as a template.
-
-If any check fails, do not output that title. Rebuild from customer evidence.`;
+第一次来 is one possible angle, only for a first visit to Baan Ying. Never rewrite a broken line into 第一次吃泰餐, 到曼谷第一餐泰餐, or 曼谷泰餐第一次来尝试. Rebuild from this visit. Do not copy the example lines.`;
 }
 
 export function naturalCoverFallback(context: CoverTitleContext = {}, index = 0) {
   const note = `${context.diningNote ?? ""} ${(context.enjoyMost ?? []).join("")} ${(context.recommendTo ?? []).join("")}`;
-  if (context.visitFrequency === "1st time") return "第一次来试试这家泰餐";
   if (/老板/.test(note) && /帅|好看|英俊/.test(note)) return "老板很帅的曼谷泰餐";
   if (/Q弹|蒜香/.test(note)) return "曼谷必吃";
   if (/适合带小朋友|带娃|儿童/.test(note)) return "曼谷吃什么？";
   if (/逛街|逛完/.test(note)) return "曼谷美食探店";
+  if (
+    context.visitFrequency === "1st time" &&
+    !context.diningNote?.trim() &&
+    (context.dishes ?? []).length === 0 &&
+    (context.enjoyMost ?? []).length === 0
+  ) {
+    return "第一次来试试这家泰餐";
+  }
   return NATURAL_SHORT_COVERS[index % NATURAL_SHORT_COVERS.length] ?? "曼谷泰餐推荐";
 }

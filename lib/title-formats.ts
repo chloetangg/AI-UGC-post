@@ -269,55 +269,8 @@ export function ensureTitleFormats(
 
 export function formatTitleFormatRules() {
   const pool = STORY_EMOJI_POOL.join(" ");
-  return `TITLE FORMAT DIVERSITY — MANDATORY:
-Every generation must actively change sentence structure, punctuation, AND emoji. Do NOT give all 3 titles the same shell.
-
-Title 1 is NOT reserved for a decorative emoji.
-If the previous title 1 had a decorative emoji, this round title 1 must have NO decorative emoji.
-Some generations title 1 has an emoji; some generations title 1 is plain text. Alternate.
-
-When a title uses a decorative emoji, pick exactly 1 from this list that fits the sentence, except 🇹🇭:
-${pool}
-Match the food when the title names it: 蟹→🦀, 虾→🍤, 芒果→🥭, 柠檬/青柠→🍋, 饭→🍚, 冬阴功/汤→🍜, 咖喱→🍛.
-Mood emojis (😋 😍 🥰 ✨ ❤️ 🤤 🥹 👀 😳 🤯) are fine when there is no food cue.
-Do not use 🍽️ 📍 🕐 or any emoji outside this list.
-🇹🇭 is NOT a decorative emoji. Do not place it in the middle or at the end, and do not add it to most titles.
-
-LEADING 🇹🇭 — about 1 in 10 titles, system-controlled:
-- Across titles, about 10% start with 🇹🇭. A batch of 3 usually has none. Do not put 🇹🇭 on every batch.
-- The system decides whether this batch gets one leading flag. If it does, exactly one of the 3 titles starts with it.
-- 🇹🇭 must be the first character: 🇹🇭咖喱蟹肉是我吃了还想再点的一道
-- Never 来曼谷吃到的泰国菜🇹🇭. Never a second 🇹🇭 in the same title.
-- The flag adds no information and does not count toward title length. The words after it must still be one complete natural sentence and must follow every other title rule.
-- Do not use the flag to glue on a second selling point. 🇹🇭曼谷美食｜咖喱蟹肉很合口味 is still forbidden.
-
-Mix these formats. They are optional tools, not a fixed order:
-
-1) PLAIN SENTENCE — no emoji, no 🇹🇭. At least one of the 3 titles must be plain.
-   Examples: 曼谷这家泰式料理真的值得专程来吃 / 来曼谷旅游可以先看看这家餐厅
-
-2) ONE POOL EMOJI — 1 emoji at the start or end, chosen from the list above.
-   Examples: 这道咖喱蟹真的很可以🦀 / 😋曼谷这家泰餐吃得好满足
-
-3) LEADING 🇹🇭 — rare. Only when this batch is one of the roughly 10% titles. First character only, on exactly one title. The sentence after it is still one point.
-   Example: 🇹🇭这家泰餐厅空间真的很宽敞
-
-4) COLON — rare. Only if both sides are still ONE point. Never use a colon, comma, or ｜ to bolt on a second selling point.
-   BAD: 曼谷美食：隐藏在商场里的泰式餐厅 / 支付宝方便，吃泰餐更省心
-
-For exactly 3 titles:
-- Formats must look obviously different.
-- NOT all 3 with a colon.
-- NOT all 3 starting with 🇹🇭. Most batches start with no 🇹🇭 at all.
-- NOT all 3 using a decorative emoji.
-- NOT all 3 without any decorative emoji. A leading 🇹🇭 does not replace that emoji.
-- At least 1 title has a decorative emoji; at least 1 title has none.
-- Colon and decorative emoji are optional. Recombine them every generation.
-- Do not force 🇹🇭 onto a title to make it look like a Xiaohongshu title.
-
-FORBIDDEN FIXED TEMPLATE:
-Do NOT treat “🇹🇭 + keyword + colon + content” or “🇹🇭 + keyword + ｜ + content” as a title formula.
-Do not make 2 or 3 titles follow that same skeleton with swapped words.
-
-If previous titles exist, do not repeat that same 3-structure combination, and do not copy title 1's emoji/flag pattern.`;
+  return `TITLE FORMAT — the 3 titles must look different. At least one is plain text. At least one has exactly one emoji from: ${pool}
+Match the food: 蟹→🦀, 虾→🍤, 芒果→🥭, 柠檬/青柠→🍋, 饭→🍚, 冬阴功→🍜, 咖喱→🍛. No emoji outside this list. No comma, ｜, or colon that adds a second selling point.
+🇹🇭 is rare, about 1 in 10 titles, first character only, on at most one title in a batch. Most batches have none. Never 🇹🇭 in the middle or at the end, and never 🇹🇭 + keyword + ｜.
+If the previous title 1 had a decorative emoji, this title 1 is plain. Do not copy the previous 3-structure.`;
 }

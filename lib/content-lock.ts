@@ -3,6 +3,7 @@ import type { CoverTitleContext } from "@/lib/cover/cover-rules";
 import type { RecommendedDish } from "@/types/content";
 import { ensureNarrativeFlow, ownerOfPhrase } from "@/lib/narrative-flow";
 import { isUnnaturalHeadline, naturalCoverFallback } from "@/lib/cover/cover-natural";
+import { stripUnsupportedFirstThaiMeal } from "@/lib/first-visit-wording";
 
 export type EvidenceMap = {
   strongestExperience: string;
@@ -104,7 +105,11 @@ export function buildEvidenceMap(context: CoverTitleContext = {}): EvidenceMap {
   const service = enjoy.find((item) => /服务|中文菜单/.test(item)) || (/服务|老板/.test(note) ? "服务或老板" : "");
   const convenience = enjoy.find((item) => /支付宝|商场/.test(item)) || (/支付宝|商场/.test(note) ? "用餐方便" : "");
   const location = /centralwOrld|商场/.test(`${note}${enjoy.join("")}`) ? "centralwOrld" : "";
-  const visitStatus = /1st time/i.test(context.visitFrequency ?? "") || /第一次/.test(note) ? "first-visit" : context.visitFrequency || "";
+  const visitStatus = /第一次来|第一次到这家|第一次来这家/.test(note)
+    ? "customer wrote a first visit to this restaurant"
+    : /1st time/i.test(context.visitFrequency ?? "")
+      ? "first time at Baan Ying only — not a default hook, and not a first Thai meal"
+      : context.visitFrequency || "";
   const strongestExperience = customerWords[0] || favoriteDish || atmosphere || service || convenience || "";
   const dishPrimary = ranked[0] && scoreDish(ranked[0], context) > 0 ? ranked[0] : "";
   const experiencePrimary = /老板/.test(note) ? "老板很帅" : atmosphere || service;
@@ -190,7 +195,7 @@ ${formatContentLockInstance(map)}`;
 }
 
 export function neutralizeSemanticConflicts(text: string, context: CoverTitleContext = {}) {
-  let next = text;
+  let next = stripUnsupportedFirstThaiMeal(text, context.diningNote ?? "");
   for (const [pattern, replacement] of SEMANTIC_FIXES) next = next.replace(pattern, replacement);
   if (context.visitFrequency === "Not first time") {
     next = next.replace(/第一次来尝试Baan Ying/g, "这次来Baan Ying").replace(/第一次来/g, "这次来");

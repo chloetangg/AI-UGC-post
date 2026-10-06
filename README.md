@@ -1,8 +1,8 @@
 # AI 小红书 / Rednote UGC 生成器
 
-**版本：** Consumer Demo v0.14  
-**日期：** 2026-09-18  
-**状态：** 消费者端前端 + OpenAI 真实生成（标题 / 正文 / 话题标签 / 封面 mainTitle + subTitle / 封面选图）+ 内部 Content Strategy Layer + Cover Composer + MongoDB 保存 YOU / RATE 选项与生成文案 + GitHub / Vercel 部署
+**版本：** Consumer Demo v0.15  
+**日期：** 2026-10-06  
+**状态：** 消费者端前端 + 星级入口 + OpenAI 真实生成（标题 / 正文 / 话题标签 / 封面 mainTitle + subTitle / 封面选图）+ 内部 Content Strategy Layer + Cover Composer + MongoDB 保存 YOU / RATE 选项与生成文案 + GitHub / Vercel 部署
 
 本文是仓库里**唯一**的说明文档，记录现在已经上线到 Demo 里的行为。不是完整产品 spec。
 
@@ -20,17 +20,18 @@
 
 消费者进入后：
 
-1. YOU：标题为「感谢您参与分享！」；年龄、性别、来自哪个国家；游客/本地；是否第一次来 Baan Ying
-2. RATE：本餐开销、喜欢的点、推荐菜、推荐理由、用餐补充说明、上传 1–5 张照片
-3. Generating：一次 OpenAI 请求写出标题 + 正文 + 5 个标签 + 封面 mainTitle / subTitle + 封面照片选择；系统追加 Location & Time，再调用 Cover Composer 自动生成封面
-4. POST：看封面、换封面风格（Style 1–6）、选正文标题、改正文、改标签
-5. SHARE：点「去发布」后选择小红书（系统分享发图）或大众点评（复制文案后手动发布）
+1. 星级：标题为「这次用餐体验怎么样？」。1–2 星停在感谢页和抽奖按钮，不进入后面的填写，也不调用 OpenAI。3–5 星点 Continue 后才继续
+2. YOU：标题为「感谢您参与分享！」；年龄、性别、来自哪个国家；游客/本地；是否第一次来 Baan Ying
+3. RATE：本餐开销、喜欢的点、推荐菜、推荐理由、用餐补充说明、上传 1–5 张照片
+4. Generating：一次 OpenAI 请求写出标题 + 正文 + 5 个标签 + 封面 mainTitle / subTitle + 封面照片选择；地点按本轮模式写入或由系统追加，再调用 Cover Composer 自动生成封面
+5. POST：看封面、换封面风格（Style 1–6）、选正文标题、改正文、改标签
+6. SHARE：点「去发布」后选择小红书（系统分享发图）或大众点评（复制文案后手动发布）
 
 生成目标口吻：
 
 > 一个真实的人刚吃完 Baan Ying，然后顺手把自己的体验写下来。
 
-不是品牌广告、不是正式餐厅评测、也不是把问卷关键词拼成文章。正文长度由这次用餐本身决定，2 句也可以。
+不是品牌广告、不是正式餐厅评测、也不是把问卷关键词拼成文章。正文至少 3 句；普通输入大约 3–6 句；信息多时可以更长，但不要把问卷逐条写完。
 
 **没有：** 注册、登录、品牌 Dashboard、Cloudinary、小红书自动发布、AI 生图。  
 **已有：** MongoDB Atlas 在生成成功后写入 `generations`（YOU / RATE + 标题 / 正文 / hashtag / 封面标题 / 封面副标题 / token 费用），以及 `analytics_events` 转化漏斗。
@@ -44,7 +45,7 @@ npm install
 npm run dev
 ```
 
-打开：**http://localhost:3000**（若被占用则看终端实际端口，常见 3001）。`/` 会跳到 `/c/baan-ying/customer`。
+打开：**http://localhost:3000**（若被占用则看终端实际端口，常见 3001）。`/` 会跳到 `/c/baan-ying/rating`。
 
 复制 `.env.example` 为 `.env.local`（不提交 Git）：
 
@@ -86,24 +87,29 @@ Vercel 需配置同样的环境变量（Production / Preview / Development），
 ## 4. 消费者流程
 
 ```text
-打开网站（空表单）
+打开网站
+        ↓
+星级（1–5）
+        ↓
+1–2 星 → 感谢 + 抽奖按钮（不调用 OpenAI）
+3–5 星 → Continue
         ↓
 YOU（感谢您参与分享！/ 年龄 / 性别 / 国家 / 游客或本地 / 是否第一次）
         ↓
 RATE（本餐开销 / 喜欢的点 / 菜 / 理由 / 补充说明 / 上传 1–5 张）
         ↓
-Generating（1 次 OpenAI → 系统追加 Location & Time → 1 次 Cover Composer）
+Generating（1 次 OpenAI → 地点按本轮模式处理 → 1 次 Cover Composer）
         ↓
 POST（看封面 / 换 Style 1–6 / 选正文标题 / 改正文 / 改标签）
         ↓
 SHARE（点「去发布」打开系统分享；可复制文案、保存图片）
 ```
 
-进度条中英文都是：**YOU → RATE → SHARE**
+星级页不进进度条。进入填写之后，进度条中英文都是：**YOU → RATE → SHARE**。
 
-流程守卫：没填完 YOU、RATE（含餐费、补充说明至少 10 个计数单位、至少 1 张照片），不能进后面的步骤。
+1–2 星不会进入 YOU / RATE，也不会打 `/api/generate`。3–5 星点 Continue 后才放开后面的步骤。没填完 YOU、RATE（含餐费、补充说明至少 10 个计数单位、至少 1 张照片），不能进生成。
 
-刷新或重新打开页面，表单清空，从 YOU 重新开始。同一次访问里按返回，已填内容还在。
+刷新星级感谢页会回到星星。刷新填写页会清空表单，并回到星级。同一次访问里按返回，已填内容还在。抽奖按钮在；`LUCKY_DRAW_URL` 为空时点击不跳转。
 
 ---
 
@@ -111,8 +117,9 @@ SHARE（点「去发布」打开系统分享；可复制文案、保存图片）
 
 | 路由 | 页面 |
 | --- | --- |
-| `/` | 跳转到 `/c/baan-ying/customer` |
-| `/c/[campaignId]` | 跳转到 `customer` |
+| `/` | 跳转到 `/c/baan-ying/rating` |
+| `/c/[campaignId]` | 跳转到 `rating` |
+| `/c/[campaignId]/rating` | 星级入口。1–2 星感谢 + 抽奖；3–5 星 Continue 后进入 YOU |
 | `/c/[campaignId]/customer` | YOU：感谢您参与分享！年龄、性别、国家、游客/本地、是否第一次 |
 | `/c/[campaignId]/experience` | RATE：餐费、喜欢的点、菜、理由、补充说明、上传 1–5 张照片 |
 | `/c/[campaignId]/preferences` | 重定向到 experience |
@@ -217,7 +224,7 @@ YOU 页标题：
 
 联系邮箱：**admin@trendplay.com.sg**（可点 `mailto`）。
 
-政策正文写明：回答会在活动结束后保存最多 12 个月。**当前实现：** 只有生成成功才写入 Mongo `generations`（YOU / RATE 快照 + 3 个标题、正文、5 个 hashtag、封面标题、封面副标题、token 费用）。不再写入 `submissions`。照片、封面 JPEG、策略、用餐补充说明不入库。刷新后浏览器表单仍清空。
+政策正文写明：回答会在活动结束后保存最多 12 个月。**当前实现：** 只有生成成功才写入 Mongo `generations`（YOU / RATE 快照 + 用餐补充说明 + 3 个标题、正文、5 个 hashtag、封面标题、封面副标题、token 费用）。不再写入 `submissions`。照片、封面 JPEG、策略不入库。刷新后浏览器表单仍清空。1–2 星不生成，因此不写 `generations`。
 
 ---
 
@@ -247,13 +254,13 @@ YOU 页标题：
 - 中英混写把字和词加在一起
 - 计数函数：`countDiningExperienceUnits()`（`types/content.ts`）
 
-字段名：`diningExperienceNote`。会传给生成，当作用餐体验素材，不要当成推荐理由的 Others，也不要原样贴进正文。
+字段名：`diningExperienceNote`。会传给生成，当作用餐体验素材，不要当成推荐理由的 Others。生成成功后会写入 `generations`，但正文和标题都不能原样贴这句。
 
 选项内部值保持英文（给 AI 用）。中文 / 泰文 UI 只翻译显示文案。
 
-`1st time`（Yes / 是 / ใช่）按第一次到访写，不要写成回头客。`Not first time`（No / 不是 / ไม่ใช่）表示来过，不要写成第一次发现；除非用餐说明里写明常来，否则不要发明「每次来 / 又来了」。
+`1st time`（Yes / 是 / ใช่）只表示第一次来 Baan Ying，不是第一次吃泰餐，也不是默认卖点。顾客已经写了菜、味道、老板或服务时，优先用那个点。只有用餐说明自己写了「第一次吃泰餐」一类的话，才可以出现「第一次吃泰餐」。`Not first time`（No / 不是 / ไม่ใช่）表示来过，不要写成第一次发现；除非用餐说明里写明常来，否则不要发明「每次来 / 又来了」。
 
-这些答案要转化成**个人经历**，不要逐条复述。只写这次用餐真正支持的内容点。补充说明是主要素材，不是成品句子；先拆信息点再改写，规则见 12.5。
+这些答案要转化成**个人经历**，不要逐条复述。只写这次用餐真正支持的内容点。补充说明是信息来源，不是成品标题；先抽出吸引点再改写，规则见 12.4 和 12.5。顾客自己写的食物即使不在菜单里也要保留，例如「粉红奶很好喝」。
 
 ### 照片
 
@@ -314,9 +321,9 @@ POST /api/generate
 正好 1 次 openai.chat.completions.create
 （structured JSON：titles[3] + caption + hashtags[5] + mainTitle + subTitle + selectedPhotoIndex + photoSelectionReason）
         ↓
-本地补全标题关键词 / 格式、水果 emoji 纠错、封面叠字、从正文剥 hashtag
+本地整理：标题不照搬原句、emoji 标点、段落、封面叠字、从正文剥 hashtag
         ↓
-系统按锁定模板追加 Location & Time
+地点：standalone 追加锁定模板；inline 把商场和店名写进故事一次
         ↓
 返回 { titles, caption, hashtags, coverTitle, coverSubtitle, selectedPhotoIndex, photoSelectionReason, locationFormat, cost }
         ↓
@@ -327,7 +334,9 @@ POST /api/compose-cover（不是 OpenAI）
 进入 Result，封面已经生成好
 ```
 
-一次用户生成 = **正好 1 次** OpenAI 文本请求 + **1 次** Cover Composer。不要再分开调用策略选择、标题、正文、标签、封面标题或选图。
+一次用户生成 = **正好 1 次** OpenAI 文本请求 + **1 次** Cover Composer。策略、hook、标题、正文、标签、封面标题、封面副标题、选图都在这一次 JSON 里完成。标题提炼、分段和 emoji 清理用本地逻辑，不再打一次模型。本地合规替换后仍命中禁用词时，才会多一次改写；这不是常规路径。1–2 星不进入这条链路。
+
+文本生成的成本目标大约 **USD $0.05 / 篇**，最好更低。prompt 里不重复同一条禁令，不发送 README，参考帖只发送写法特征。2026-10-06 用 gpt-4o、无照片测过短 / 中 / 长三条：都是 `Calls: 1`，费用大约 $0.026–$0.041，平均约 $0.032。第一次没有缓存会高一些；同一段系统 prompt 被缓存后输入更便宜。单价在 `lib/openai-pricing.ts`。
 
 封面合成失败时点 Retry Cover：**不再调用 OpenAI**，只再打 `/api/compose-cover`。
 
@@ -339,8 +348,8 @@ POST /api/compose-cover（不是 OpenAI）
 
 ```text
 Caption
-  [正文]
-  [Location & Time]
+  [正文段落，段与段之间空一行]
+  [仅 standalone：Location & Time]
 
 Hashtags
   #baanying曼谷 + 4 个池子标签（5 个打乱顺序，#baanying曼谷不一定排第一）
@@ -368,9 +377,9 @@ Input Tokens: ...
 | 1. 品牌知识 | Baan Ying 故事、个性、可用事实；只当背景 |
 | 2. 顾客体验 | 系统分店（centralwOrld）、游客/本地、是否第一次、餐费、喜欢的点、推荐菜、补充说明、照片 |
 | 3. 写法风格 | 参考帖压缩成特征 + 真实消费者 UGC 口吻 |
-| 4. 生成规则 | 内部策略层（KSP / Storyline / Content Angle / Search Keyword）+ 标题、正文、emoji、hashtag JSON 字段、封面 mainTitle / subTitle、封面选图、负面中性化、安全、多样性；Location & Time 由系统追加 |
+| 4. 生成规则 | 内部策略层（KSP / Storyline / Content Angle / Search Keyword）+ 标题提炼、正文段落、emoji、hashtag JSON 字段、封面 mainTitle / subTitle、封面选图、负面中性化、安全、多样性；地点模式由系统指定 |
 | 5. 输出格式 | JSON：3 个正文标题 + 1 篇正文 + 5 个 hashtags + mainTitle + subTitle + selectedPhotoIndex + 内部策略 id |
-| 6. 校验规则 | 中文、正文无 hashtag、不编造、正文不含 Location & Time 区块；篇幅随证据变化，2 句合格 |
+| 6. 校验规则 | 中文、正文无 hashtag、不编造、标题不照搬原句；正文至少 3 句、一段最多 3 句；standalone 才在文末追加 Location & Time |
 
 JSON 形状：
 
@@ -418,40 +427,39 @@ KSP-03 Family Recipes & Heritage 是低频策略，不默认写 1999 / Auntie Yi
 
 ### 12.4 标题
 
-每次正好 3 个简体中文标题。切入角度必须明显不同，不能只换形容词。
+每次正好 3 个简体中文标题。切入角度、句式、先写哪一个事实都必须不同，不能只换形容词。
 
-**每个标题必须自然包含至少 1 个曼谷美食搜索关键词**，例如：曼谷美食、曼谷泰餐、曼谷吃什么、曼谷美食推荐、曼谷泰菜、曼谷餐厅、曼谷吃饭、曼谷美食攻略、曼谷探店。次关键词（如 曼谷旅行美食、泰国菜推荐）也可以。不要用「必吃」当标题卖点。
+**顾客原句不是标题。** 用餐说明只是信息来源。先理解，再抽出一个吸引点，改写成自然标题。不要整句照搬，不要只改几个字，也不要只加一个 emoji。
 
-同一次的 3 个标题优先用 3 个不同关键词。关键词要贴合内容，成为标题的一部分，不要堆砌，标题里不能有 hashtag。
+例如顾客写「这次我最喜欢芒果糯米饭，甜度刚刚好，吃完还想再点。」标题可以是「芒果糯米饭甜度刚刚好」或「芒果糯米饭真的很难不爱」，不能是原句或「最喜欢芒果糯米饭，甜度刚刚好」。封面 mainTitle / subTitle 同样先提炼。本地 `lib/title-insight.ts` 会在同一次生成之后改掉仍在照搬的标题，不再打一次模型。
 
-重新生成时会传入 `previousTitleKeywords`。本次至少应有 2 个标题换用不同关键词；条件允许则 3 个都换。
+有两个以上真实信息时，一个标题或封面带顾客写出的点，另一个带不同的菜、环境或服务。不要三句和封面都写「第一次」。
 
-**标题格式必须有变化**，不要 3 句同一套壳。🇹🇭、冒号、emoji 都是可选项：
+每个标题只讲一个点。不要用逗号、`｜` 或冒号把两个卖点拼在一起。
 
-1. 🇹🇭 开头（可有可无冒号）
-2. 冒号结构（不要每句都有）
-3. 无冒号、无国旗的完整句子
-4. 偶尔 1 个自然 emoji
+曼谷搜索词是辅助，不是题目本身。可以自然放进已经完整的那一句，例如：曼谷美食、曼谷泰餐、曼谷吃什么、曼谷美食推荐、曼谷泰菜、曼谷餐厅。不要每句都塞同一个词，也不要用「必吃」当正文标题卖点。Title 1–3 加封面主标题和副标题里，`centralwOrld` 这个拼写要出现一次，写进一句真正的话里。
 
-同一次 3 个标题：**不要全部冒号、全部 🇹🇭、全部带 emoji、全部不带 emoji**。禁止把「🇹🇭 + 关键词 + 冒号 + 内容」当成固定模板。
+**格式必须有变化。** 三个标题里至少一句纯文字，至少一句带一个贴题 emoji。🇹🇭 大约每 10 个标题出现一次，只能放在句首，一批三个标题里通常一个都没有。禁止「🇹🇭 + 关键词 + 冒号或 ｜」。
 
-系统会校验关键词和格式；不合格时**不再第二次调用 OpenAI**，只做最小本地补全。
+不合格时**不再第二次调用 OpenAI**，只做本地整理。
 
 ### 12.5 正文
 
 写成连贯的个人经历，不要问卷清单。
 
-**篇幅随这次用餐本身决定，没有固定字数、句数、段落配额。** 证据简单时 2 句完全合格；证据更丰富时可以更长。优先级：真实性 > 信息量 > 自然口吻 > 篇幅。不要为了凑长度或换花样而注水。允许区间（不是目标）：极短 2 句 / 短 3–4 / 中 5–7 / 更长 8+。同一组事实可短可长。
+**篇幅：** 至少 3 句，不要每次都刚好 3 句。普通输入大约 3–6 句；信息多时最多大约 8 句。只写最有用的 2–4 个点，不要为了写全问卷而加长，也不要编造句子来凑数。本地长度带的上限是 240 个汉字左右。
 
-**口吻（叠加在现有规则上，不替换篇幅、合规、Storyline、标签、封面）：** 真实消费者刚吃完顺手发帖。第一人称、有依据的个人判断；这次有喜欢/一般/不喜欢就保留差别，不要一律升成好评。不要固定「餐厅介绍 → 菜品 → 环境 → 服务 → 性价比 → 总结」。写完就停，不要硬加「总体来说非常值得推荐」。规则在 `lib/caption-voice.ts`。
+**段落：** 一段最多 3 句，通常 2 或 3 句。一段只有 1 句只用于真正需要强调的时候。段和段之间是空行（caption 字符串里的 `\n\n`），不要一句一段。同一类信息放在一起：地点、环境和逛商场写一段；一道菜的味道和想再点的理由写一段；老板和服务写一段。顺序跟着顾客最强调的点，不必每次都是地点 → 环境 → 食物 → 服务 → 总结。
 
-**用餐补充说明：** `diningExperienceNote` 是真实体验素材，不是必须原样复制进正文的句子。先理解意思，拆成食物、感受、再访意愿、服务、人物、环境等信息点，再按本次 Storyline / Content Angle 选大约 2–4 个，改写成自然完整句，融进个人用餐故事。优先级：真实体验 > 自然表达 > 信息完整度。
+**口吻：** 真实消费者刚吃完顺手发帖。第一人称、有依据的个人判断；喜欢、一般、不喜欢保持原来的程度。「老板很帅」可以写成「老板真的很帅」，不要写成「令人印象深刻」。「很喜欢」可以写成「很喜欢这家餐厅」，不能写成「最好吃 / 全曼谷最喜欢 / 强烈推荐」。小孩子很喜欢某道菜，写的是这个人的反应，不要改成「适合儿童」。规则在 `lib/caption-voice.ts`。
+
+**用餐补充说明：** `diningExperienceNote` 是信息来源，不是成品句子。先理解，抽出有用的点，改写成口语。优先级：真实体验 > 自然表达 > 信息完整度。
 
 - 不要整段原样粘贴，也不要只加标点。无标点、多个意思连写时，先做语义拆分；没有标点不代表要保留原句格式。
 - 食物、服务、环境或人物拆到不同句子，不要写成「食物很好吃、店员服务很好、老板娘很漂亮、下次还想来」这种问卷罗列。
 - 可以补主语和连接词、调整语序、合并重复意思。不得改变原意，不得把「一般」写成「很好」，不得编造顾客没写的味道、环境或服务细节。
-- 「很喜欢」可以写成「这次吃下来真的很喜欢」或「整体很合我的口味」，不能升成「这是我吃过最好吃的泰餐」「全曼谷最喜欢的一家」或「强烈推荐大家都来」。
-- 例：`很好吃很喜欢想再回来吃店员服务很好老板娘长得很漂亮` → `这次吃下来真的很喜欢，味道很合口味，已经开始想下次再来了。店员服务也很好，老板娘本人很亲切，整个用餐过程都很舒服。`
+- 「很喜欢」可以写成「很喜欢这家餐厅」，不能写成「最好吃 / 全曼谷最喜欢 / 强烈推荐」。
+- 例：`很好吃很喜欢想再回来吃店员服务很好老板娘长得很漂亮` → `很喜欢这家餐厅，味道很合口味，已经开始想下次再来了。店员服务也很好，老板娘也很漂亮，整个用餐过程都很舒服。`
 - 刺耳差评仍走下面的负面中性化，不能借改写变成夸奖。生成后不再把顾客原句硬塞回正文。
 
 菜是内容池，不是必须全写：
@@ -467,7 +475,7 @@ KSP-03 Family Recipes & Heritage 是低频策略，不默认写 1999 / Auntie Yi
 
 不编造：配料、口味、价格、奖项、米其林、明星、营业时间、促销、排名、「曼谷第一」。
 
-生成链路会先按小红书合规规则写标题 / 正文 / 标签 / 封面 / 内容角度；返回前再扫描绝对化、医疗功效、迷信、引流、跨平台、硬广「必吃/封神/顶级」等表述。命中则改写成中性个人体验后再检查一次。
+生成链路会先按小红书合规规则写标题 / 正文 / 标签 / 封面 / 内容角度；返回前再扫描绝对化、医疗功效、迷信、引流、跨平台、硬广等表述。命中则先本地改写。仍命中时才再打一次模型改写。「绝绝子 / 封神 / 天花板」可以作为顾客已经很夸时的口语反应，不是配额，也不用在「环境很舒服」这种温和句子上。仍然禁止「这家店直接封神 / 天花板级别 / 全曼谷天花板 / 最好吃」。
 
 **负面反馈中性化（Negative → Neutral）：** 顾客原话里的负面意思要保留，但不得原样出现在标题、正文、标签或封面。不要删掉、也不要改成假好评。映射写在 `lib/compliance/negative-feedback.ts`，例如：
 
@@ -487,17 +495,21 @@ KSP-03 Family Recipes & Heritage 是低频策略，不默认写 1999 / Auntie Yi
 
 品牌固定标签只有 `#baanying曼谷`；正文和标题里不再把「必吃」当卖点。封面主标题允许用池子里的「必吃」作为自然关键词之一。`#曼谷必吃` 只作为话题池选项，不是固定标签。用户只看到终稿，看不到内部合规分析。
 
-写法应口语、自然、略带情绪；避免「作为一家…」「值得一提的是…」「整体来说…」「如果你正在寻找…」这类评测 / 广告句式。
+写法应口语、自然、略带情绪。除非顾客自己就是这么写的，否则避免「作为一家…」「值得一提的是…」「总体来说…」「总的来说…」「如果你正在寻找…」「这次来到…」「不得不说…」「非常值得推荐…」「给我的感觉是…」「是一家非常…」「对于喜欢……的人来说…」。
 
-结构不要固定成同一模板。重新生成时应换开头和叙事顺序。
+结构不要固定成同一模板。重新生成时应换开头和叙事顺序。上一篇已经用了「第一次来」，而这顿还有别的合法卖点时，换掉「第一次」。
 
 ### 12.6 Emoji
 
-正文故事区**可以有 emoji，没有 2–6 个配额**，也不再因为数量为 0 而自动补 emoji。
+故事 emoji 按这句话的意思用，没有固定个数，也不为了凑数去补无关 emoji。
+
+可用：😋 🥰 😍 😌 😆 ☺️ 😊 🤤，以及贴食物的 🦀 🍤 🥭 🍋 🍚 🍜 🍛。可以在句首、句中或句尾。不要每句都加，也不要两个叠在一起。
+
+emoji 后面不能直接跟中文句号、逗号或感叹号。`好好吃😋` 可以；`好好吃😋。` 不行。`芒果糯米饭🥭甜度刚刚好。` 可以，因为句号不贴着 emoji。本地 `ensureCaptionEmojis` 会清掉这种标点，并按内容把句子收成段落。
 
 - Location & Time 里的 📍 / ⏰ **不算**故事 emoji
-- 不要每句都加，也不要每次同一组
-- 🍋 只表示柠檬，🥭 只表示芒果；本地只做水果纠错（`ensureCaptionEmojis` = `fixFruitEmojis`）
+- 🍋 只表示柠檬 / 青柠，🥭 只表示芒果
+- 封面叠字不加 emoji
 
 ### 12.7 重新生成
 
@@ -507,7 +519,7 @@ KSP-03 Family Recipes & Heritage 是低频策略，不默认写 1999 / Auntie Yi
 - 标题角度 / 标题关键词 / 开头
 - 叙事结构
 - 主推菜强调方式
-- 句子节奏 / 情绪 / 篇幅（可从中篇换成 2 句，或反过来，只要证据撑得住）
+- 句子节奏 / 情绪 / 篇幅（仍至少 3 句；信息少就停在短的一边，不要编一句来变长）
 - emoji 用法
 - Location & Time 版式
 - 4 个池子 hashtags（`#baanying曼谷` 仍必须出现，位置可变）
@@ -526,8 +538,8 @@ Generating 页文案：先 `Generating your post...`，再 `Creating your cover.
 
 | 字段 | 字数（汉字等价单位） |
 | --- | --- |
-| mainTitle / coverTitle | **4–7**。禁止 3 |
-| subTitle | **6–10**。禁止空、禁止套模板 |
+| mainTitle / coverTitle | **4–10**，10 是上限，不是目标 |
+| subTitle | **6–15**。禁止空、禁止为了写满 15 而硬凑、禁止套模板 |
 
 计数：汉字 = 1；`centralwOrld` = 1；`Terminal 21` / `Siam Center` / `One Bangkok` = 2；`Baan Ying` = 2；其余拉丁/数字 = 0.5 再向上取整。主标题池子关键词最多自然带 2 个，不要堆砌。
 
@@ -538,10 +550,10 @@ Generating 页文案：先 `Generating your post...`，再 `Creating your cover.
 合格例如：曼谷隐藏泰餐、centralwOrld泰餐推荐、曼谷泰餐推荐、必吃泰式料理、曼谷美食发现、曼谷泰餐新体验。  
 不合格：曼谷centralwOrld泰餐美食必吃推荐、centralwOrld必吃（只有 3 单位）。
 
-**副标题不是固定句。** 从小红书感出发：用 RATE 标签、顾客自己写的句子、餐费、菜、场景、KSP 里抽出**一条**证据，改写成短句。不要复述主标题，不要整句抄用餐说明，不要堆多条卖点。菜名若出现，必须是批准短称，且顾客选过或写过。  
-例如：DIY打抛饭很好玩 / 逛街后舒服聚餐 / 两人600泰铢很满足。禁止永远用「招牌泰式料理」。
+**副标题不是固定句，也不是顾客原句。** 从顾客写出的点、选过的菜、喜欢的标签里抽**一条**，改写成短 hook。不要复述主标题，不要整句抄用餐说明，不要堆多条卖点。菜单里的菜用批准短称。顾客自己写的、表里没有的食物保留全名，例如粉红奶。  
+例如：粉红奶真的很好喝 / 逛完街来吃刚刚好 / 老板很帅的曼谷泰餐。禁止永远用「招牌泰式料理」。只有「第一次来」这一条证据、别的什么都没写时，副标题才可以用「第一次来尝试Baan Ying」。
 
-`必吃` **只允许作为封面池子关键词**（如 曼谷必吃 / 必吃泰式料理）。话题池里的 `#曼谷必吃` 有时会被抽到。封面禁止排名/绝对化：最 / 第一 / Top 1 / No.1 / 冠军 / 天花板 / 无敌 / 全曼谷 等。`最爱` 一律改成 `超爱`。不是排名的例外：第一次 / 第一道 / 最近 / 最后 / 最终。不要编造「泰国人爱吃 / 明星爱吃」。清洗在 `lib/cover/cover-absolute.ts`，只作用于封面叠字；正文仍可写「最喜欢」。
+`必吃` **只允许作为封面池子关键词**（如 曼谷必吃 / 必吃泰式料理）。话题池里的 `#曼谷必吃` 有时会被抽到。封面禁止排名/绝对化：最 / 第一 / Top 1 / No.1 / 冠军 / 无敌 / 全曼谷 等。`最爱` 一律改成 `超爱`。不是排名的例外：第一次 / 第一道 / 最近 / 最后 / 最终。「绝绝子 / 封神 / 天花板」不是排名，只在顾客已经很夸时偶尔出现。不要编造「泰国人爱吃 / 明星爱吃」。清洗在 `lib/cover/cover-absolute.ts`，只作用于封面叠字；正文仍可写「最喜欢」。
 
 主标题缺关键词时，在**同一次** JSON 里改写主标题，不再多打 OpenAI。校验失败才用证据向的短标题兜底，不截原句。`layoutCoverOverlay` 的叠字架构不变。
 
@@ -624,7 +636,7 @@ Cover Composer 失败时：「Cover generation failed」+ Retry Cover（只重�
 | `coverTitle` / `coverSubtitle` | 封面主标题、副标题 |
 | `aiUsage` | model / inputTokens / outputTokens / totalTokens / cost |
 
-另存 `campaignId`、`submissionId`，方便和 YOU / RATE 记录对上。不存照片、封面 JPEG、KSP、用餐补充说明。
+另存 `campaignId`、`submissionId`、`diningExperienceNote`。不存照片、封面 JPEG、KSP。1–2 星没有生成记录。
 
 ### 12.10 转化分析（`analytics_events`）
 
@@ -632,26 +644,30 @@ Cover Composer 失败时：「Cover generation failed」+ Retry Cover（只重�
 
 | 事件 | 何时写入 | 去重 |
 | --- | --- | --- |
-| `qr_scan` | 服务端渲染 YOU 页时 | 每次进入一条；跳过 Link prefetch。`/qr/:qrCodeId` 只跳转，不单独记 |
+| `qr_scan` | 服务端渲染星级页时 | 每次进入一条；`?draw=1` 不再记第二次。跳过 Link prefetch。`/qr/:qrCodeId` 只跳到星级页，不单独记 |
+| `rating_submitted` | 点选星级时 | 同一次评分记一条。`rating` 为 1–5，`band` 为 `rating_low`（1–2）或 `rating_positive`（3–5） |
 | `form_submit` | 现有 `POST /api/generate` 真正发出时 | 每 session 一次 |
 | `generation_complete` | 现有 `/api/generate` 成功返回前 | 每 session 一次 |
 | `publish_click` | 小红书系统分享成功，或确认打开 `xhsdiscover://post` | 每 session + platform 一次。系统分享：`platform=unknown`，`method=web_share`。Deep Link：`platform=xiaohongshu`，`method=deep_link`。取消不记 |
 | `publish_platform_selected` | SHARE 选择小红书或大众点评 | 每 session + platform 一次。大众点评只记选择，不记「已发布」 |
 | `xhs_publish_click` | 旧版 SHARE 点 Publish to Rednote | 历史数据保留读取。新的系统分享成功**不**再记此事件。看板 XHS 数 = 旧事件 + `publish_click` 且 platform 为 rednote/xiaohongshu |
 
-进入 YOU 页记一次 `qr_scan`。`/qr/:qrCodeId` 只跳到 YOU，避免扫码被记两次。首页 `/` 和 `/c/baan-ying/customer` 也会记。访客 cookie：`ugc_sid`（httpOnly session）、`ugc_qr`（来源码）。不存 IP、姓名、电话、邮箱。
+进入星级页记一次 `qr_scan`，来源是 `rating-page`。`/qr/:qrCodeId` 只跳到星级页，避免扫码被记两次。首页 `/` 和 `/c/baan-ying` 会先到星级页再记。`?draw=1` 是 1–2 星的感谢页，刷新时不重复记扫码。访客 cookie：`ugc_sid`（httpOnly session）、`ugc_qr`（来源码）。不存 IP、姓名、电话、邮箱。1–2 星只记 `rating_submitted`，不记 `form_submit` / `generation_complete`。
 
 看板：`GET /api/analytics?range=today|yesterday|last_7_days|last_30_days|this_month|all`，可加 `startDate` / `endDate` / `qrCodeId`。页面 `/analytics`。日期按 Asia/Bangkok。
 
 ---
 
-## 13. 地点与营业时间（固定事实 + 6 种锁定模板）
+## 13. 地点与营业时间（固定事实 + 两种位置 + 6 种锁定模板）
 
-Location & Time 必须出现在正文**最后**，后面不能再有 CTA、推荐语、emoji、hashtag 或其他文字。
+地点有两种位置，由系统每轮选定，下一轮换另一种：
 
-**官方事实固定。6 种呈现方式固定。模型不得自己写这一块，也不得创造第 7 种格式。**
+- **standalone：** 正文只写这顿饭。系统把 Version 1–6 其中一种追加在正文最后。这块后面不能再有 CTA、推荐语或 hashtag。模型不要自己写 📍 / ⏰。
+- **inline：** 不追加文末地点块。故事里要同时出现官方商场名和 Baan Ying，只写一次，接在逛街、选店或这顿饭上。
 
-系统从 `lib/locations.ts` 取官方地点和营业时间，再套上 Version 1–6 其中一种。只能换模板，不能改商场名、楼层、大小写或营业时间。
+**官方事实固定。** 不能改商场名、楼层、`centralwOrld` 大小写或营业时间，也不能发明第 7 种模板。没有顾客自己写的路过、看招牌、朋友推荐，就不要编这些进店理由。
+
+系统从 `lib/locations.ts` 取官方地点和营业时间。standalone 再套上 Version 1–6 其中一种。
 
 ### 13.1 官方数据
 
@@ -736,7 +752,7 @@ Version 1 和 Version 6 使用单换行，行与行之间没有空行。
 
 ### 13.4 选择规则
 
-- 每次必须从 Version 1–6 选一种
+- standalone 每次必须从 Version 1–6 选一种。inline 不输出文末地点块，只在故事里写一次官方地点
 - 连续两次不能用同一个 Version
 - 若有 `previousLocationFormat`，本次必须排除上一版
 - 没有上一版时，从 Version 1–6 中选择（无官方营业时间时排除 Version 2 / 5）
@@ -749,7 +765,7 @@ Version 1 和 Version 6 使用单换行，行与行之间没有空行。
 
 ### 13.5 返回前自检
 
-1. Location & Time 是否在正文最后？
+1. standalone 时 Location & Time 是否在正文最后？inline 时故事是否只写了一次商场名和 Baan Ying，且没有文末地点块？
 2. 是否只使用 Version 1–6？
 3. 是否与上一版使用了不同 Version？
 4. 地点是否与所选分店完全匹配？
@@ -846,7 +862,7 @@ Version 1 和 Version 6 使用单换行，行与行之间没有空行。
 | `lib/mongodb.ts` | MongoDB Atlas 连接 |
 | `lib/analytics/` | 转化事件写入、日期窗口、看板查询 |
 | `middleware.ts` | 匿名 `ugc_sid` session cookie |
-| `app/qr/[qrCodeId]/route.ts` | 扫码记 `qr_scan` 后跳进 campaign |
+| `app/qr/[qrCodeId]/route.ts` | 扫码后跳到星级页；`qr_scan` 在星级页服务端记 |
 | `app/api/analytics/route.ts` | 看板汇总 / 转化率 / 按日 / 按 QR |
 | `app/api/analytics/events/route.ts` | 客户端点击事件（XHS） |
 | `app/analytics/page.tsx` | 内部转化看板 |
@@ -882,8 +898,13 @@ Version 1 和 Version 6 使用单换行，行与行之间没有空行。
 | `lib/brand/baan-ying-context.ts` | 品牌故事、个性、可用事实、参考帖特征 |
 | `lib/title-keywords.ts` | 标题曼谷搜索关键词、去重、校验与兜底 |
 | `lib/title-formats.ts` | 标题句式多样性（国旗 / 冒号 / 纯句 / emoji）校验与兜底 |
-| `lib/caption-emoji.ts` | 水果 emoji 纠错（不按配额补 emoji） |
-| `lib/caption-voice.ts` | 正文口吻；用餐补充说明先拆信息点再改写，不原样贴回 |
+| `lib/caption-emoji.ts` | 故事 emoji、去掉 emoji 后的标点、按类别收成段落 |
+| `lib/caption-voice.ts` | 正文口吻、篇幅和段落；用餐说明先提炼再改写 |
+| `lib/title-insight.ts` | 标题照搬顾客原句时，本地提炼成 hook |
+| `lib/first-visit-wording.ts` | 第一次来 Baan Ying；没有写明就去掉「第一次吃泰餐」 |
+| `lib/entry-rating.ts` | 3–5 星通过后才允许进入 YOU |
+| `lib/lucky-draw.ts` | 抽奖链接；当前为空，按钮不跳转 |
+| `app/c/[campaignId]/rating/` | 星级入口 |
 | `types/content.ts` | 体验问卷类型；10 道菜 + 其他；默认分店、到访 Yes/No、补充说明计数 |
 | `lib/generate-prompt.ts` | 合并后的标题 / 正文 / 标签 / 封面 / 选图 prompt + JSON schema |
 | `lib/generate-hashtags/prompt.ts` | 备用接口的标签 prompt |
@@ -896,6 +917,7 @@ Version 1 和 Version 6 使用单换行，行与行之间没有空行。
 | `lib/parse-generated.ts` | 解析标题 + 正文 + hashtags + mainTitle / subTitle + 封面选图 |
 | `app/api/generate/route.ts` | 消费者主生成：1 次 OpenAI → 本地补全 → 追加地点；最多 5 张图 |
 | `app/api/generate-content/route.ts` | 备用 JSON 生成接口 |
+| `app/c/[campaignId]/rating/page.tsx` | 星级入口；非 `draw=1` 时记 `qr_scan` |
 | `app/c/[campaignId]/customer/page.tsx` | YOU：感谢标题、年龄/性别/国家、游客/本地、是否第一次 |
 | `app/c/[campaignId]/experience/page.tsx` | RATE：餐费、菜、理由、补充说明、上传照片 |
 | `app/c/[campaignId]/*` | 消费者页面 |
@@ -908,7 +930,8 @@ Version 1 和 Version 6 使用单换行，行与行之间没有空行。
 
 - 登录 / 注册 / 品牌后台配置
 - Cloudinary / 图片存储（照片和封面 JPEG 都不进 Mongo）
-- 用餐补充说明、KSP 写入 Mongo
+- KSP 写入 Mongo（用餐补充说明会在生成成功时写入 `generations`）
+- 1–2 星调用 OpenAI 或进入 YOU / RATE
 - 小红书 / 大众点评自动填文案或自动发布（SHARE 只把 files/text/title 交给系统分享；网站不知道用户选了哪个 App）
 - AI 生图 / 修图 / 用模型绘制中文封面（封面是 Cover Composer 叠字，不是生图）
 - QR 图片生成服务（只追踪已有 `/qr/:qrCodeId` 扫码）

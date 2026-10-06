@@ -158,9 +158,11 @@ Never join two selling points with a comma, ｜, or a colon: 支付宝方便，�
 Never glue 曼谷 onto a broken stub (曼谷超爱次来吃 / 曼谷很值得来吃 / 曼谷推荐来吃).
 If a keyword cannot sit inside the one point, drop it. Natural complete Chinese outranks stuffing.
 Do NOT require the same keyword in every title.
-Do NOT use 必吃 / 最好吃 / 封神 / 顶级 / 曼谷第一 as a title hook.
+Do NOT use 必吃 / 最好吃 / 顶级 / 曼谷第一 as a title hook.
+The 3 titles must differ in angle, sentence shape, and which fact comes first. Do not write the same claim three times with different adjectives.
+绝绝子 / 封神 / 天花板 may appear in a title only when that title's fact is already strong praise. They are never required.
 Never use the same stuffed pattern in all 3 titles (e.g. 曼谷超好吃泰餐 / 曼谷超地道泰餐 / 曼谷超温馨泰餐).
 Do not claim 明星 / 网红 / 排队 unless the customer wrote that.
 No hashtags in titles.
-Across the 3 titles + cover title + cover subtitle, exact "centralwOrld" must appear once if the dining location is Baan Ying centralwOrld. Weave it; do not stuff.`;
+Across the 3 titles + cover title + cover subtitle, the locked mall spelling must appear once if the dining location is that mall. Weave it; do not stuff.`;
 }

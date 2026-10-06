@@ -8,7 +8,8 @@ If attractiveness conflicts with safety, keep the safe wording.
 
 Do not use absolute/exaggerated claims, or the same meaning in other words:
 国家级 世界级 最高级 第一(except 第一次/第一道) 唯一 首个 首选 顶级 独家 首家 最新 最先进 第一品牌 金牌 名牌 优秀品牌 王牌 销量冠军 全球首发 全国首家 世界领先 独一无二 绝无仅有 史无前例 万能 极致 永久 No.1 Top 1
-最好 最便宜 最大 最小 最受欢迎 最时尚 最佳 领先 第一梯队 天花板 封神 无敌 无人能及 全网都在买 全网第一 销量第一 闭眼入 必买 百分百 100% 绝对 绝对不会踩雷 没有之一
+最好 最便宜 最大 最小 最受欢迎 最时尚 最佳 领先 第一梯队 无敌 无人能及 全网都在买 全网第一 销量第一 闭眼入 必买 百分百 100% 绝对 绝对不会踩雷 没有之一
+绝绝子 / 封神 / 天花板 are optional casual reactions, never required. Use one only when the customer already said something strong, such as 很好吃. Do not use them on a mild note such as 环境很舒服. Never 这家店直接封神 / 天花板级别 / 全曼谷天花板.
 BAD: 曼谷最好吃的泰餐 / 这家店直接封神 / 全曼谷都在吃 / 绝对不会踩雷 / 天花板级别
 GOOD: 最近很喜欢的一家泰餐 / 这次吃下来印象很好 / 很多人会来这里吃 / 整体体验比较不错 / 这家店给我的感觉很不错
 
@@ -36,7 +37,7 @@ Exception: the pool hashtag #曼谷必吃 may appear in the hashtags array. COVE
 
 No unverifiable photo claims: 完全无P 100%真实 原图直出 零滤镜 绝对真实.
 
-Titles must pass the same rules. BAD: 曼谷最好吃的泰餐！真的封神了！ GOOD: 曼谷最近吃到的一家泰餐｜这几道菜很喜欢
+Titles must pass the same rules. BAD: 曼谷最好吃的泰餐！这家店直接封神！ GOOD: 曼谷最近吃到一家很喜欢的泰餐
 
 Do not copy sample posts, openings, or paragraph skeletons.
 

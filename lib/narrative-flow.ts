@@ -3,6 +3,7 @@ import type { CoverTitleContext } from "@/lib/cover/cover-rules";
 import { DISH_RECOMMENDATION_REASONS } from "@/lib/recommendation-reasons";
 import type { RecommendedDish } from "@/types/content";
 import type { EvidenceMap } from "@/lib/content-lock";
+import { withSentenceEnd } from "@/lib/caption-emoji";
 
 export type FactGroup = {
   id: "scene" | "experience" | "primary-dish" | "secondary-dish" | "other-dish" | "opinion";
@@ -49,7 +50,7 @@ function splitSentences(caption: string) {
 
 function joinSentences(sentences: string[]) {
   return sentences
-    .map((item) => (/[。！？!?]$/.test(item) ? item : `${item}。`))
+    .map((item) => withSentenceEnd(item))
     .join("");
 }
 
@@ -114,7 +115,7 @@ export function buildNarrativeGroups(context: CoverTitleContext = {}, map: Evide
       id: "scene",
       label: "Experience / Scene",
       items: [
-        /第一次/.test(note) || /1st time/i.test(context.visitFrequency ?? "") ? "第一次来" : "",
+        /第一次来|第一次到这家|第一次来这家/.test(note) ? "第一次来" : "",
         /centralwOrld|商场|逛/.test(`${note}${enjoy.join("")}`) ? "商场/centralwOrld" : "",
         enjoy.find((item) => /温馨|翻新|面积/.test(item)) || (/舒服|温馨/.test(note) ? "氛围" : ""),
       ].filter(Boolean),
@@ -150,37 +151,15 @@ ${formatNarrativeFlowInstance(context, map)}`;
 }
 
 export function formatNarrativeFlowStaticRules() {
-  return `NARRATIVE FLOW & ATTRIBUTE CONSISTENCY — additive.
-
-Before writing the caption, decide this order and use each fact ONCE, in the best slot:
-Opening scene → arriving → what was ordered → how it tasted and who liked it → service or room → overall feeling.
-
-This is one meal, not a checklist of dish, comment, restaurant, service, and place. Do NOT stitch answers in form order. Do NOT finish the food and then add the restaurant name or the mall. Do NOT finish dish A, go to dish B, then come back to describe A. If the place is already in the opening, do not say it again.
-
-DISH CONTINUITY — the first time a dish appears, finish 点了什么 → 怎么样 → 具体感受 in that same stretch, then move on.
-Shape: 菜品 → 它的口味/口感/评价 → 下一道菜.
-BAD: 这次一定要体验下Baan Ying的芒果糯米饭。接着点了咖喱蟹肉，味道浓郁。菠萝炒饭的配料也很足。芒果特别新鲜，搭配糯米口感完美。
-GOOD: 这次一定要体验下Baan Ying的芒果糯米饭，芒果特别新鲜，搭配糯米口感刚刚好。接着点了咖喱蟹肉，味道浓郁，吃起来很满足。菠萝炒饭的配料也很足。
-If one dish has several notes (很好吃 / 芒果很新鲜 / 甜而不腻 / 糯米口感很好), merge them beside the dish name. Do not save 芒果很新鲜 for after the other dishes.
-Order the dishes, then walk forward only. After leaving a dish, do not jump back to add its taste, texture, freshness, or liking.
-Do not add a later supplement just to use every input. Drop a repeated point. Do not change the customer's evaluation.
-The only exception is an explicit look-back the customer wrote, such as 吃到后面又觉得还是第一道更好. Otherwise the caption moves in one direction.
-Before writing, group each dish's name, taste, texture, freshness, liking, and other notes. After writing, check that each dish's main description sits next to its first mention. If not, move that description back. Do not print this grouping.
-
-ATTRIBUTE OWNERSHIP is strict. A taste/texture/reason belongs to one dish only.
-Never write 咖喱蟹肉蒜香味很足 if 蒜香 belongs to 蒜炒虾仁.
-Never write 蒜炒虾仁浓厚的椰香味 / 软烂的牛肉 — those belong to 青咖喱牛肉.
-${UNIQUE_ATTRS.map((item) => `${item.dishes[0]} ← ${item.label}`).join("\n")}
-After writing, check Dish → Attribute / Reason / Opinion / Experience. Fix cross-dish mixups. Do not dump every customer word onto the primary dish.
-
-Do not restate a finished dish unless the new sentence adds a real unused customer fact. Delete the restatement.
-
-After Ending = true, do not open a new dish review. Move that sentence into the earlier dish block, or delete it.
-If the evidence says 最后 / 最后点了 / 最后吃了 / 收尾 / 作为结尾 / 甜点收尾 / 吃完刚好 / 完美结束, that dish or moment stays in the second half. Never introduce a new dish after a 收尾 sentence.
-Several dishes are not equal: one hero dish, then a shorter supporting dish, then the closing dish if there is one. Do not give every dish the same 很好吃 sentence.
-Natural flow > covering every answer. Keep explicit negatives and clear attitudes.
-
-Read-through test: each sentence should answer the last; same dish not split; no coming back; attributes on the right dish; last two sentences end, they do not start a new thread.`;
+  return `NARRATIVE FLOW — one meal, each fact once. Do not follow the questionnaire field order.
+Classify first, then write: scene, the dish they described most, other dishes and a drink, then the room and a closing feeling. Do not follow the order of the form.
+Say the mall once in the story. Do not add 这家店就在商场几楼 — Location is appended separately.
+Keep 氛围 and 坐着舒服 in one place, not between dishes. A dish and the room cannot share one sentence. A summary such as 整体感觉很满意 stays at the end. A drink needs a finished clause, with no taste they did not write.
+Then the dish they actually dwelled on, with the taste they wrote, in that same stretch. Other dishes and a named drink continue the meal. Do not give every item 很好吃，很推荐. A short drink note joins the previous dish. It does not appear as a final questionnaire answer.
+Service, the owner, and an overall feeling they actually wrote close the meal. Do not invent 方便, 舒服, 热情, or a taste to make the ending complete.
+Finish a dish's taste and judgment beside its first mention. Do not return to a dish after the next one starts. One hero dish, then a shorter supporting dish. Do not say the place again if the opening already has it.
+ATTRIBUTE OWNERSHIP — a taste belongs to one dish. Never move 蒜香 onto 咖喱蟹肉 or 椰香 onto 蒜炒虾仁.
+${UNIQUE_ATTRS.map((item) => `${item.dishes[0]} ← ${item.label}`).join("\n")}`;
 }
 
 export function formatNarrativeFlowInstance(context: CoverTitleContext = {}, map: EvidenceMap) {

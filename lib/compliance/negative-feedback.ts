@@ -170,27 +170,11 @@ Do NOT turn 踩雷 / 避雷 into 必吃推荐 / 绝对不会踩雷.
 Do NOT turn 抽奖送东西 / 为了抽奖才来 into 超大福利.
 Do NOT invent 超好吃 / 必吃 / 性价比超高 / 超划算 / 人气爆棚 / 超级推荐 / 绝对不会踩雷 / 全网第一 / 曼谷最好吃 / 必打卡 unless verified brand information already supports that exact claim. Cover keyword 必吃 is the only exception, and only in mainTitle/subTitle.
 
-Preferred neutral wording — keep the meaning, weave it in naturally. Do not paste the same sentence every time if a close variation fits better:
-贵 / 太贵 / 很贵 / 价格有点贵 → 价格偏高 / 价格相对较高 / 价格较高
-难吃 / 太难吃 / 很难吃 → 泰餐口味比较看个人喜好
-不好吃 / 我觉得不好吃 → 口味因人而异 / 口味比较因人而异
-踩雷 / 感觉踩雷了 → 可以根据个人口味选择 / 整体口味比较有个人特色
-避雷 → 建议根据个人喜好选择
-不推荐 → 适合不同口味需求的人群
-不值得 / 花钱不值得 → 可以结合预算和需求考虑
-性价比低 / 性价比很低 → 价格和个人预期有所不同
-失望 / 很失望 → 与个人预期有所不同
-不喜欢 → 个人口味偏好不同
-很普通 / 没什么特别 → 整体风味比较经典
-服务不好 → 用餐高峰期服务可能会比较慢
-态度不好 → 和店员沟通可能需要多一些耐心
-不会再来 → 更适合尝试不同类型餐厅的人
-不会回购 → 是否再次选择可以根据个人喜好决定
-抽奖送东西 / 送东西吸引顾客 → 有互动活动和礼品 / 搭配互动活动增加参与感
-为了抽奖才来 → 活动提供额外互动体验 / 店内设有互动抽奖和礼品活动
+Neutral wording, same direction, not false praise:
+贵/太贵/价格有点贵 → 价格偏高; 难吃/太难吃 → 泰餐口味比较看个人喜好; 不好吃 → 口味因人而异; 踩雷 → 可以根据个人口味选择; 避雷 → 建议根据个人喜好选择; 不推荐 → 适合不同口味需求的人群; 不值得 → 可以结合预算和需求考虑; 性价比低 → 价格和个人预期有所不同; 失望 → 与个人预期有所不同; 不喜欢 → 个人口味偏好不同; 很普通/没什么特别 → 整体风味比较经典; 服务不好 → 用餐高峰期服务可能会比较慢; 态度不好 → 和店员沟通可能需要多一些耐心; 不会再来 → 更适合尝试不同类型餐厅的人; 不会回购 → 是否再次选择可以根据个人喜好决定; 抽奖送东西 → 有互动活动和礼品; 为了抽奖才来 → 活动提供额外互动体验.
 
 These neutralized meanings apply to the Xiaohongshu caption AND any cover text derived from customer feedback. Never put the raw negative on the cover.
-If the full phrase is too long for mainTitle (4–7) or subTitle (6–10), use a shorter sibling of the SAME meaning: 口味看个人喜好 / 整体风味比较经典 / 价格看个人预期. Never 难吃 / 性价比低 / 很普通 / 服务不好 / 态度不好 / 不会回购.
+If the full phrase is too long for mainTitle (4–10) or subTitle (6–15), use a shorter sibling of the SAME meaning: 口味看个人喜好 / 整体风味比较经典 / 价格看个人预期. Never 难吃 / 性价比低 / 很普通 / 服务不好 / 态度不好 / 不会回购.
 If price or activity is relevant on cover, also fine: 价格偏高 / 互动抽奖活动 / 曼谷特色泰餐 / centralwOrld美食.
 
 COVER mainTitle / subTitle must NEVER use raw negatives: 贵 / 太贵 / 难吃 / 不好吃 / 踩雷 / 避雷 / 不推荐 / 不值得 / 失望 / 抽奖送东西 / 贵到吃不起 / 性价比低 / 很普通 / 没什么特别 / 服务不好 / 态度不好 / 不会回购.

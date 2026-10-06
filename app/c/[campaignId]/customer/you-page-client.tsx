@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { hasEntryRatingPassed } from "@/lib/entry-rating";
 import { campaignPath } from "@/lib/flow";
 
 export function YouPageClient() {
@@ -9,6 +10,7 @@ export function YouPageClient() {
   const { campaignId } = useParams<{ campaignId: string }>();
 
   useEffect(() => {
+    if (!hasEntryRatingPassed(campaignId)) return;
     const params = new URLSearchParams(window.location.search);
     const qr = params.get("qr")?.trim() || "";
     const experience = campaignPath(campaignId, "experience");

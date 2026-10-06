@@ -126,7 +126,7 @@ A Chinese caption does NOT authorize translating an English mall name into Chine
 No Chinese name provided ≠ permission to translate.
 
 ONLY these Chinese mall names are approved (from fixed location data):
-- centralwOrld → 尚泰世界购物中心. Write 尚泰世界购物中心（centralwOrld）3楼
+- Mall English is Centralworld or centralworld for the whole generation. Write 尚泰世界购物中心（that spelling）3楼
   The ONLY approved Chinese name is 尚泰世界购物中心. Never invent another one.
   PROHIBITED: 中央世界, 中央世界购物中心, 尚泰中央世界, 尚泰世界 (without 购物中心), 尚泰世界中心, or any other translation.
 - Siam Center → 暹罗中心. Write 暹罗中心（Siam Center）2楼
@@ -151,7 +151,7 @@ export function locationFactsForPrompt() {
   const ob = OFFICIAL_LOCATIONS.onebangkok;
   return {
     chineseNameRules: STRICT_MALL_CHINESE_NAME_RULES,
-    branchRules: `- ${cw.englishName}: English MUST be spelled exactly "${cw.englishName}" (capital O only). Approved Chinese name: ${cw.chineseName} ONLY. Floor: ${cw.floorZh} / ${cw.floorEn}. In Chinese write ${cw.officialLine}. NEVER write CentralWorld, Central World, CENTRALWORLD, centralworld, 中央世界, 中央世界购物中心, 尚泰中央世界, 尚泰世界中心, or 尚泰世界 without 购物中心.
+    branchRules: `- Mall English is only Centralworld or centralworld, one of them for the whole generation. Approved Chinese name: ${cw.chineseName} ONLY. Floor: ${cw.floorZh} / ${cw.floorEn}. In Chinese write 尚泰世界购物中心（that spelling）3楼. NEVER write centralwOrld, CentralWorld, Central World, or 中央世界 / 中央世界购物中心 / 尚泰中央世界 / 尚泰世界中心 / 尚泰世界 without 购物中心.
 - ${siam.englishName}: English "${siam.englishName}". Approved Chinese name: ${siam.chineseName}. Floor: ${siam.floorZh} / ${siam.floorEn}. In Chinese write ${siam.officialLine}.
 - ${t21.englishName}: English "${t21.englishName}" only. chineseName is null — NO Chinese name provided. Floor: ${t21.floorZh} / ${t21.floorEn}. MUST write ${t21.officialLine}. NEVER 终端21 / 终点21 / Terminal 21购物中心 / any translation.
 - ${ob.englishName}: English "${ob.englishName}" only. chineseName is null — NO Chinese name provided. Floor: ${ob.floorZh} / ${ob.floorEn}. MUST write ${ob.officialLine}. NEVER invent a Chinese translation.`,
@@ -661,7 +661,7 @@ export function formatLocationTimeStaticRules() {
 
 HARD RULES:
 - Restaurant name, mall, floor, and hours come only from official restaurant data. Never invent a branch, floor, address, exit, BTS/MRT, or extra brand fact.
-- centralwOrld must keep this exact casing. Never CentralWorld / Central World / central world / centralworld.
+- Mall spelling is Centralworld or centralworld for this whole generation. Restaurant spelling is Baan Ying or baan ying. Do not mix, and do not use centralwOrld, Central World, CentralWorld, BaanYing, or BAAN YING.
 - The only approved Chinese mall name is 尚泰世界购物中心. Never 中央世界 / 中央世界购物中心 / 尚泰中央世界 / 尚泰世界中心 / 尚泰世界 without 购物中心.
 - If hours appear, they must be the official locked hours. Never change the time to sound natural.
 - Do not invent 刚好路过 / 看到招牌 / 朋友推荐 / 下班后来 / 从BTS走过来 / 离某个出口很近 unless the customer wrote that.
@@ -670,7 +670,7 @@ LOCATION MODE IS RANDOM AND MUST CHANGE:
 The system picks one mode per caption and switches on the next generation. Do not use the same mode every time. Dishes in the story do not force the place into the body.
 
 INLINE (locationDisplayMode=inline) — place inside the story. No 📍/⏰ block.
-- The story must include BOTH the official mall name and Baan Ying. For centralwOrld that means the exact token centralwOrld AND Baan Ying.
+- The story must include BOTH the official mall name and the restaurant, in this generation's spelling.
 - They may share one sentence or sit in adjacent sentences. Do not write only one of them.
 - Connect them to shopping, choosing the restaurant, or the meal. Say the pair once. Do not repeat the address later in the story.
 - Good: 这次逛centralwOrld的时候顺便去了Baan Ying，咖喱蟹肉真的很合口味。 / centralwOrld 3楼的这家Baan Ying，咖喱蟹肉是我吃了还会想再点的一道。 / 在centralwOrld逛街，最后去了Baan Ying吃泰餐。
@@ -681,18 +681,7 @@ STANDALONE (locationDisplayMode=standalone) — story only, then the system appe
 - Do not write 📍/⏰ / hours / Location & Time yourself.
 - Good body: 咖喱蟹肉是这次吃下来很喜欢的一道，味道浓郁，搭配米饭刚刚好。芒果糯米饭也很新鲜，甜度不会太腻。
 
-FORBIDDEN mechanical fills:
-- Baan Ying位于centralwOrld 3楼
-- Every post 这次来到Baan Ying / 今天带大家探店Baan Ying
-- Repeating the same mall+restaurant sentence in the body and again as if it were the Location & Time line
-
-CHECKS before return:
-1) Follow this round's mode only
-2) Inline has both the mall name and Baan Ying, once, inside the story
-3) Standalone does not stuff the mall or restaurant name in just to be complete
-4) Customer opinion / tone / details kept
-5) Official facts only
-Hashtags stay out of the caption.`;
+Do not write Baan Ying位于centralwOrld 3楼, and do not open every post with 这次来到Baan Ying. Hashtags stay out of the caption.`;
 }
 
 export function formatLocationTimePlanRules(plan: LocationTimePlan, branch: string) {

@@ -27,9 +27,9 @@ export const REQUIRED_SAFE_HASHTAGS = [...REQUIRED_HASHTAGS, ...RANDOM_HASHTAG_P
 /** Exact phrases, longest-first at runtime. Required hashtags are allowlisted separately. */
 export const PHRASE_RULES: PhraseRule[] = [
   { phrase: "这家店直接封神", category: "absolute", replacement: "这家店给我的感觉很不错" },
+  { phrase: "这家店全曼谷最好", category: "absolute", replacement: "这家店给我的感觉很不错" },
   { phrase: "最好吃的泰餐", category: "hard-sell", replacement: "最近很喜欢的一家泰餐" },
   { phrase: "曼谷必吃泰餐", category: "hard-sell", replacement: "曼谷泰餐推荐" },
-  { phrase: "直接封神", category: "absolute", replacement: "这次吃下来印象很好" },
   { phrase: "曼谷必吃清单", category: "hard-sell", replacement: "曼谷探店清单" },
   { phrase: "中国驰名商标", category: "authority", replacement: "日常在用的品牌" },
   { phrase: "质量免检", category: "authority", replacement: "用起来比较放心" },
@@ -125,8 +125,6 @@ export const PHRASE_RULES: PhraseRule[] = [
   { phrase: "必打卡", category: "hard-sell", replacement: "可以去看看" },
   { phrase: "曼谷必吃", category: "hard-sell", replacement: "曼谷美食" },
   { phrase: "最好吃", category: "hard-sell", replacement: "挺好吃" },
-  { phrase: "天花板", category: "absolute", replacement: "比较喜欢" },
-  { phrase: "封神", category: "absolute", replacement: "印象很好" },
   { phrase: "无敌", category: "absolute", replacement: "挺加分" },
   { phrase: "极致", category: "absolute", replacement: "很舒服" },
   { phrase: "永久", category: "absolute", replacement: "比较耐用" },
@@ -262,7 +260,6 @@ export function allPhraseRules() {
 
 export const COMPILED_SEMANTIC_PATTERNS = [
   { pattern: /全曼谷都在吃/g, category: "absolute" as const, replacement: "很多人会来这里吃" },
-  { pattern: /直接封神/g, category: "absolute" as const, replacement: "这次吃下来印象很好" },
   { pattern: /最好吃的/g, category: "hard-sell" as const, replacement: "挺喜欢的" },
   { pattern: /全网都在/g, category: "absolute" as const, replacement: "最近挺多人" },
   { pattern: /没有之一/g, category: "absolute" as const, replacement: "属于我比较喜欢的" },

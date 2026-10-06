@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import OpenAI from "openai";
+import { applyBrandSpelling, pickBrandSpelling } from "@/lib/brand-spelling";
 import { ensureCaptionEmojis, fixFruitEmojisInTitles } from "@/lib/caption-emoji";
 import {
   buildSystemPrompt,
@@ -27,6 +28,8 @@ import {
 import { layoutCoverOverlay } from "@/lib/cover/cover-title";
 import { aggregateGenerationCost, logGenerationCost, usageFromCompletion } from "@/lib/openai-usage";
 import { ensureTitleFormats } from "@/lib/title-formats";
+import { enforceCustomerEvidence } from "@/lib/customer-evidence";
+import { separateHeadlinesFromNote } from "@/lib/title-insight";
 import { enforceXiaohongshuCompliance } from "@/lib/compliance";
 import { ensureGenerationVariation, planGenerationVariation, type GenerationMemory } from "@/lib/generation-variation";
 import { ensureContentLock } from "@/lib/content-lock";
@@ -146,6 +149,7 @@ export async function POST(request: Request) {
 
     const openai = getClient();
     const model = process.env.OPENAI_MODEL || "gpt-4o";
+    const brandSpelling = pickBrandSpelling();
     const previousTitles = payload.previousTitles ?? [];
     const completion = await openai.chat.completions.create({
       model,
@@ -159,7 +163,7 @@ export async function POST(request: Request) {
         {
           role: "user",
           content: [
-            { type: "text", text: buildUserPrompt(payload) },
+            { type: "text", text: buildUserPrompt(payload, brandSpelling) },
             ...imageParts,
           ],
         },
@@ -347,12 +351,30 @@ export async function POST(request: Request) {
     const outputTitles = locked.titles.some((title, index) => title !== groundedVaried.titles[index])
       ? fixFruitEmojisInTitles(ensureTitleFormats(locked.titles, previousTitles))
       : locked.titles;
+    const separated = separateHeadlinesFromNote({
+      titles: outputTitles,
+      coverTitle: locked.coverTitle,
+      coverSubtitle: locked.coverSubtitle,
+      note: payload.diningExperienceNote ?? "",
+    });
+    const allocated = enforceCustomerEvidence({
+      titles: separated.titles,
+      caption: locked.caption,
+      coverTitle: separated.coverTitle,
+      coverSubtitle: separated.coverSubtitle,
+      note: payload.diningExperienceNote,
+      dishes: coverContext.dishes,
+      enjoyMost: coverContext.enjoyMost,
+      recommendTo: coverContext.recommendTo,
+      branch: payload.branch,
+    });
+    const headlineTitles = allocated.titles;
     const outputCover = {
-      title: locked.coverTitle,
-      subtitle: locked.coverSubtitle,
+      title: allocated.coverTitle,
+      subtitle: allocated.coverSubtitle,
     };
     const located = finalizeOfficialLocationTime({
-      caption: ensureCaptionEmojis(locked.caption),
+      caption: ensureCaptionEmojis(allocated.caption),
       branch: payload.branch,
       placement: locationPlan.placement,
       format: locationPlan.format,
@@ -369,7 +391,15 @@ export async function POST(request: Request) {
     ]);
     logGenerationCost(cost);
 
-    const hashtags = normalizeHashtags(compliant.hashtags, payload.previousHashtags ?? []);
+    const hashtags = normalizeHashtags(compliant.hashtags, payload.previousHashtags ?? []).map((tag) =>
+      applyBrandSpelling(tag, brandSpelling),
+    ) as typeof compliant.hashtags;
+    const spelledTitles = headlineTitles.map((title) => applyBrandSpelling(title, brandSpelling)) as typeof headlineTitles;
+    const spelledCaption = applyBrandSpelling(located.caption, brandSpelling);
+    const spelledCover = {
+      title: applyBrandSpelling(outputCover.title, brandSpelling),
+      subtitle: applyBrandSpelling(outputCover.subtitle, brandSpelling),
+    };
 
     const generationId = randomUUID();
     const session = await resolveAnalyticsSession(analyticsSessionId);
@@ -396,11 +426,11 @@ export async function POST(request: Request) {
         visitFrequency: payload.visitFrequency,
         mealExpenseThb: payload.totalMealExpense,
         origin: payload.dinerOrigin,
-        titles: outputTitles,
-        caption: located.caption,
+        titles: spelledTitles,
+        caption: spelledCaption,
         hashtags,
-        coverTitle: outputCover.title,
-        coverSubtitle: outputCover.subtitle,
+        coverTitle: spelledCover.title,
+        coverSubtitle: spelledCover.subtitle,
         enjoyMost: payload.enjoyMost,
         recommendedDishes: payload.recommendedDishes,
         recommendedDishOther: payload.recommendedDishOther,
@@ -434,11 +464,11 @@ export async function POST(request: Request) {
     }
 
     return Response.json({
-      titles: outputTitles,
-      caption: located.caption,
+      titles: spelledTitles,
+      caption: spelledCaption,
       hashtags,
-      coverTitle: outputCover.title,
-      coverSubtitle: outputCover.subtitle,
+      coverTitle: spelledCover.title,
+      coverSubtitle: spelledCover.subtitle,
       selectedPhotoIndex: parsed.selectedPhotoIndex,
       selectedPhotoIndexes: parsed.selectedPhotoIndexes,
       photoSelectionReason: parsed.photoSelectionReason,

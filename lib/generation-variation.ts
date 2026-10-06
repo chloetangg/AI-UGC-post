@@ -5,6 +5,7 @@ import {
 import type { CoverTitleContext } from "@/lib/cover/cover-rules";
 import { chineseFullDishName } from "@/lib/cover/dish-names";
 import { stripGeneratedLocationTime } from "@/lib/locations";
+import { withSentenceEnd } from "@/lib/caption-emoji";
 import { neutralizeInventedPartyCopy } from "@/lib/party-size";
 import { buildEvidenceMap } from "@/lib/content-lock";
 import type { RecommendedDish } from "@/types/content";
@@ -89,7 +90,7 @@ export const LENGTH_BAND_RANGE: Record<CaptionLengthBand, { min: number; max: nu
   short: { min: 80, max: 120 },
   medium: { min: 120, max: 180 },
   long: { min: 180, max: 260 },
-  extended: { min: 260, max: 330 },
+  extended: { min: 180, max: 240 },
 };
 
 export type GenerationVariationPlan = {
@@ -119,7 +120,7 @@ const STRUCTURE_COPY: Record<ContentFocusId, string> = {
   FOOD: "FOOD — 这家吃什么？ Intention only, not a template. Prefer dishes/taste, but write it in THIS ROUND narrative path.",
   CONVENIENCE: "CONVENIENCE — 去这里吃饭方便吗？ Intention only. Pay/menu/mall may lead, food can come later.",
   EXPERIENCE: "EXPERIENCE — 这家有什么特别？ Intention only. Owner/space/service/feel, not a fixed 环境→服务→总结.",
-  FIRST_VISIT: "FIRST_VISIT — 第一次来是什么感觉？ Intention only. Do not always open 第一次来Baan Ying.",
+  FIRST_VISIT: "FIRST_VISIT — first time at Baan Ying only, and only if the note itself says 第一次来. Not a first Thai meal. Not the default opening when another hook exists.",
   SHOPPING: "SHOPPING — 逛街顺便吃。 Intention only. Do not invent 逛街 unless evidenced.",
   SIGNATURE_DISH: "SIGNATURE_DISH — 一道菜讲透。 Intention only. Describe the dish; do not announce 推荐 every time.",
 };
@@ -302,7 +303,7 @@ export function availableContentFocuses(context: CoverTitleContext = {}, facts: 
   ) {
     focuses.push("EXPERIENCE");
   }
-  if (facts.some((fact) => fact.id === "first-visit") || /1st time/i.test(context.visitFrequency ?? "") || /第一次/.test(note)) {
+  if (facts.some((fact) => fact.id === "first-visit") || /第一次来|第一次到这家|第一次来这家/.test(note)) {
     focuses.push("FIRST_VISIT");
   }
   if (
@@ -647,25 +648,9 @@ export function planGenerationVariation(input: {
 }
 
 export function formatGenerationVariationStaticRules() {
-  return `THIS ROUND INDEPENDENT DRAFT — Regenerate ≠ rewrite. Content Focus is WHAT to talk about, not a fixed template.
-
-Write: real facts → pick this round's angle → organize naturally → then check Focus.
-Do NOT: Focus → fill template → drop in customer facts.
-Do NOT cover every customer point. Do NOT swap synonyms. Do NOT use 这次最想推荐的是 + 菜名 + 评价 as the spine.
-
-BAD: listing every enjoy-most tag. BAD: 服务很好。 BAD: 整体来说这是一家环境舒适味道正宗的泰餐厅。
-GOOD: 2–5 complete but uneven sentences that serve THIS focus only, ending on a fact.
-
-CHINESE NATURALNESS: Write complete sentences. Do not glue keywords.
-BAD: 就是食材新鲜度感觉提升空间 / 服务热情周到感觉很好 / 中文菜单游客方便很多体验
-GOOD: 感觉食材的新鲜度还有一点提升空间。 / 店员服务很热情，整个用餐过程都让人觉得很舒服。
-Keep the customer's sentiment. 食物味道正宗美味 must stay positive. Do not add 提升空间 unless they wrote it.
-Do not spray 就是 / 感觉 / 其实 / 整体 / 体验 to fake spoken tone.
-Avoid AI stock unless they wrote it: 整体而言 / 值得一提的是 / 不得不说 / 给人一种 / 令人印象深刻 / 可以说是 / 作为一个 / 无论是…还是… / 如果你也… / 强烈推荐大家…
-Prefer concrete facts: 蒜香比较足，虾仁吃起来Q弹 / 店里刚翻新过，看起来比较新.
-
-Variation must NOT invent dishes, prices, promos, service, atmosphere, feelings, places, ingredients, restaurant traits, party size, or companions that are not in the customer input or confirmed restaurant data.
-If they did not write who they dined with, use 这次来吃 / 这顿吃下来. Never 两个人 / 和朋友 / 一家三口 / 带家人 / 一个人来 from dish count, photos, or spend.`;
+  return `THIS ROUND is a new draft, not a synonym swap. Follow NATURAL TELLING and SAFETY.
+Do not glue keywords: BAD 就是食材新鲜度感觉提升空间. GOOD 感觉食材的新鲜度还有一点提升空间.
+Do not add 提升空间 unless they wrote it. If they did not name companions, use 这次来吃 / 这顿吃下来.`;
 }
 
 export function formatGenerationVariationInstance(plan: GenerationVariationPlan, memories: GenerationMemory[] = []) {
@@ -691,7 +676,7 @@ THIS ROUND ENDING: ${plan.endingPattern}. Do not add a summary just to finish.
 THIS ROUND RHYTHM / DENSITY: ${plan.sentenceRhythm} / ${plan.informationDensity}
 THIS ROUND INFORMATION PRIORITY (describe these 2–5 only; skip the rest): ${plan.informationPriority.join(" → ") || "none"}
 THIS ROUND DISH ORDER: ${plan.dishOrder.join(" → ") || "none"}
-THIS ROUND LENGTH: ${plan.lengthBand} ≈ ${plan.lengthMin}–${plan.lengthMax} Chinese characters.
+THIS ROUND LENGTH: do not exceed ${plan.lengthMax} Chinese characters. At least 3 sentences. Ordinary visits 3–6 sentences; rich visits at most 8. Prefer the shorter end of ${plan.lengthBand}. Do not invent a sentence to fill the band.
 THIS ROUND TITLE ANGLES: Title 1 = ${plan.titleFocuses[0]}; Title 2 = ${plan.titleFocuses[1]}; Title 3 = ${plan.titleFocuses[2]}. Titles also need different openings and structures, not the same shell with new adjectives.
 THIS ROUND COVER: mainTitle from ${plan.coverFocusId}; subTitle from a DIFFERENT real point.
 If the customer gave little evidence, stay in a shorter allowed band — never invent to hit Long / Extended.`;
@@ -752,8 +737,8 @@ function descriptionFor(
   if (fact.id === "alipay" && context.customerType === "Tourist") {
     return variants[1] ?? variants[0] ?? fact.captionLine;
   }
-  if (fact.id === "chinese-menu" && (context.visitFrequency === "1st time" || context.customerType === "Tourist")) {
-    return "对第一次来吃饭的人来说，有中文菜单真的方便很多。";
+  if (fact.id === "chinese-menu" && context.customerType === "Tourist") {
+    return "有中文菜单，点菜方便很多。";
   }
   if (variants.length === 0) return fact.captionLine;
   return variants[Math.abs(seed) % variants.length] ?? fact.captionLine;
@@ -774,7 +759,7 @@ function joinSentences(sentences: string[]) {
     .map((sentence) => {
       const trimmed = sentence.trim();
       if (!trimmed) return "";
-      return /[。！？!?]$/.test(trimmed) ? trimmed : `${trimmed}。`;
+      return withSentenceEnd(trimmed);
     })
     .filter((sentence) => {
       if (!sentence) return false;
@@ -861,7 +846,7 @@ function structureFactOrder(facts: ExperienceFact[], plan: GenerationVariationPl
 
 function targetFactCount(plan: GenerationVariationPlan, available: number) {
   const wanted =
-    plan.lengthBand === "short" ? 2 : plan.lengthBand === "medium" ? 3 : plan.lengthBand === "long" ? 4 : 5;
+    plan.lengthBand === "short" ? 3 : plan.lengthBand === "medium" ? 4 : plan.lengthBand === "long" ? 5 : 6;
   return Math.max(1, Math.min(available, wanted));
 }
 
@@ -925,18 +910,18 @@ function openingFor(
       return tourist ? "来曼谷吃饭，方便程度对我来说还蛮重要的。" : "这顿比较让我省心的，是吃饭本身很方便。";
     case "customer-note":
       if (hasOwner) return "还有一个很容易让人记住的小细节，就是老板很帅。";
-      if (firstVisit) return "第一次来尝试Baan Ying，没有想太多。";
       if (dish) return dishLineFor(dish, "", plan.dishEntryPattern);
+      if (firstVisit) return "第一次来尝试Baan Ying，没有想太多。";
       return "这顿有几个点印象比较深。";
     case "fact-end-no-summary":
     default:
+      if (dish) return dishLineFor(dish, "", plan.dishEntryPattern);
       if (plan.openingStyle === "first-visit-first" && firstVisit) {
         return "第一次来尝试Baan Ying，没有想太多。";
       }
       if (plan.openingStyle === "owner-first" && hasOwner) {
         return "还有一个很容易让人记住的小细节，就是老板很帅。";
       }
-      if (dish) return dishLineFor(dish, "", plan.dishEntryPattern);
       return "这顿有几个点印象比较深。";
   }
 }
@@ -1014,7 +999,7 @@ function expandMentionOnly(
 function trimToBand(caption: string, plan: GenerationVariationPlan) {
   if (storyHanCount(caption) <= plan.lengthMax) return caption;
   const sentences = splitSentences(caption);
-  while (sentences.length > 2 && storyHanCount(joinSentences(sentences)) > plan.lengthMax) {
+  while (sentences.length > 3 && storyHanCount(joinSentences(sentences)) > plan.lengthMax) {
     sentences.pop();
   }
   return joinSentences(sentences);

@@ -11,6 +11,7 @@ import {
   generateContentJsonSchema,
 } from "@/lib/generate-content/prompt";
 import { generateHashtags } from "@/lib/generate-hashtags/generate";
+import { applyBrandSpelling, pickBrandSpelling } from "@/lib/brand-spelling";
 import { ensureCaptionEmojis, fixFruitEmojisInTitles } from "@/lib/caption-emoji";
 import {
   finalizeOfficialLocationTime,
@@ -117,10 +118,11 @@ export async function POST(request: Request) {
         inlineSlot: locationPlan.inlineSlot,
       });
       logGenerationCost(aggregateGenerationCost(usageCalls));
+      const brandSpelling = pickBrandSpelling();
       return Response.json({
-        titles: fixFruitEmojisInTitles(compliant.titles),
-        body: located.caption,
-        hashtags: compliant.hashtags,
+        titles: fixFruitEmojisInTitles(compliant.titles).map((title) => applyBrandSpelling(title, brandSpelling)),
+        body: applyBrandSpelling(located.caption, brandSpelling),
+        hashtags: compliant.hashtags.map((tag) => applyBrandSpelling(tag, brandSpelling)),
         locationFormat: located.format,
         locationPlacement: located.placement,
       });

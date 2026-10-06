@@ -26,7 +26,7 @@ export async function GET(
   const secure = request.nextUrl.protocol === "https:";
 
   const destination = request.nextUrl.clone();
-  destination.pathname = `/c/${campaignId}/customer`;
+  destination.pathname = `/c/${campaignId}/rating`;
   destination.search = "";
   destination.hash = "";
   const response = NextResponse.redirect(destination, 302);

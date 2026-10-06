@@ -8,22 +8,17 @@ import { photoSelectionHint, readStrategySignals } from "@/lib/content-strategy/
 export function formatStrategyLibrary(library: ContentStrategyLibrary) {
   const ksps = library.ksps
     .map((item) => {
-      const frequency = item.frequency === "low" ? " [LOW FREQUENCY]" : "";
-      return `- ${item.id} ${item.name}${frequency}: ${item.purpose}
-  Use when: ${item.useWhen.join("; ")}
-  Avoid: ${item.avoid.join("; ") || "none"}`;
+      const frequency = item.frequency === "low" ? " [LOW FREQUENCY — do not default to 1999 / Auntie Ying / brand history]" : "";
+      return `- ${item.id} ${item.name}${frequency}: ${item.purpose}`;
     })
     .join("\n");
 
   const storylines = library.storylines
-    .map(
-      (item) =>
-        `- ${item.id} ${item.name}: ${item.narrativeIntention}`,
-    )
+    .map((item) => `- ${item.id} ${item.name}: ${item.narrativeIntention}`)
     .join("\n");
 
   const angles = library.contentAngles
-    .map((item) => `- ${item.id} ${item.name}: ${item.purpose} Use when: ${item.useWhen.join("; ")}`)
+    .map((item) => `- ${item.id} ${item.name}: ${item.purpose}`)
     .join("\n");
 
   const kspMap = Object.entries(library.compatibility.kspToStorylines)
@@ -35,9 +30,7 @@ export function formatStrategyLibrary(library: ContentStrategyLibrary) {
 
   return `CONTENT STRATEGY LAYER (internal; never print KSP / Storyline / Content Angle / Search Keyword names in the consumer post)
 
-This is a DECISION LAYER, not a writing template.
-Customer evidence > photo evidence > brand context > compatibility matrix.
-Do not force a KSP because it is a brand priority. Do not invent missing facts.
+Decision layer only. Customer evidence wins. Do not force a brand-priority KSP. Follow SAFETY.
 
 KSPs:
 ${ksps}
@@ -59,7 +52,7 @@ Primary: ${library.searchKeywords.primary.join(" / ")}
 Secondary: ${library.searchKeywords.secondary.join(" / ")}
 Choose one natural keyword from the preferred mapping for this Storyline + Angle, guided by customer context.
 Integrate it naturally into at least one title. Prefer different keywords across the 3 titles. Do not keyword-stuff the caption.
-Do not use 必吃 / 最好吃 / 封神 / 顶级 / 曼谷第一 as a title hook.`;
+Do not use 必吃 / 最好吃 / 顶级 / 曼谷第一 as a title hook. 绝绝子 / 封神 / 天花板 are optional and only fit strong customer praise.`;
 }
 
 export function formatStrategySelection(

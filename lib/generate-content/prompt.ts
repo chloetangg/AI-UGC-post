@@ -3,7 +3,7 @@ import {
   type GenerateContentRequest,
 } from "@/lib/generate-content/types";
 import { formatCaptionEmojiRules } from "@/lib/caption-emoji";
-import { formatCaptionConsumerVoiceRules, formatCustomerOriginalVoiceRules, formatSpokenNaturalnessRules } from "@/lib/caption-voice";
+import { formatCaptionConsumerVoiceRules, formatCaptionShapeRules, formatCustomerHookPriorityRules, formatCustomerOriginalVoiceRules, formatSpokenNaturalnessRules } from "@/lib/caption-voice";
 import { CAPTION_NO_HASHTAG_RULES } from "@/lib/hashtags";
 import { complianceGenerationRules } from "@/lib/compliance/prompt";
 import {
@@ -43,7 +43,7 @@ export const generateContentJsonSchema = {
       body: {
         type: "string",
         description:
-          "Exactly 1 Simplified Chinese Xiaohongshu story body written as a real diner. Length follows the evidence — 2 sentences is valid. No fixed sentence/word quota. Do not invent facts. Do not include hashtags. Follow THIS ROUND LOCATION PLAN.",
+          "Exactly 1 Simplified Chinese Xiaohongshu story body written as a real diner. At least 3 sentences when the visit supports it. Longer when the evidence is richer. Not exactly 3 every time. Do not invent facts to change the length. Do not include hashtags. Follow THIS ROUND LOCATION PLAN.",
       },
     },
   },
@@ -71,7 +71,7 @@ CONTENT PRINCIPLES:
 - Avoid overly commercial language.
 - Avoid excessive exclamation marks.
 - Avoid repetitive sentence structures.
-- Caption length is not a quota. Simple visits can be 2 sentences. Richer visits can run longer. Never pad.
+- A short visit is at least 3 sentences from the same facts. A richer visit can be longer. It is not exactly 3 every time. Never pad with new facts.
 - Do not use the customer's real name in the post.
 - Origins or age may appear only if the user provided them, and only as a light natural aside.
 - Photo fields are metadata only. Do not claim you saw plating, color, or other visual details that were not described.
@@ -97,12 +97,14 @@ XIAOHONGSHU STYLE:
 - Titles should be short, catchy, and curiosity-driven.
 - Titles can use emojis naturally.
 - Use conversational Chinese.
-- Body length follows this visit's evidence. 2 sentences is valid. Do not force a 3–5 sentence intro/experience/recommend/summary template.
+- Body length follows this visit's evidence. At least 3 sentences, more when there is more to say. Do not force an intro/experience/recommend/summary template.
 - Vary sentence length, paragraphing, and opening across generations.
 - The content should feel like something a real person would post after dining at a restaurant.
 - Do not make every sentence sound promotional.
 
 ${formatCaptionEmojiRules()}
+
+${formatCaptionShapeRules()}
 
 ${formatCaptionConsumerVoiceRules()}
 
@@ -175,7 +177,9 @@ ${text(input.experience.customerType)}
 
 Is this your first time at Baan Ying:
 ${text(input.experience.visitFrequency)}
-If this is a first visit and the copy mentions first time, write 第一次来尝试Baan Ying. Never 第一次美食冒险 / 美食冒险.
+If this is a first visit and the copy mentions first time, write 第一次来尝试Baan Ying. That means first time at Baan Ying, not a first Thai meal. Never 第一次美食冒险 / 美食冒险 / 第一次吃泰餐 unless the dining note says this was their first Thai meal. Do not use 第一次 as the default hook.
+
+${formatCustomerHookPriorityRules()}
 
 What did you enjoy most:
 ${lines(input.experience.enjoyedMost)}
@@ -202,7 +206,7 @@ Generate exactly 3 different Xiaohongshu titles, in this order:
 The 3 titles must not be simple rewrites of each other.
 Generate exactly 1 Xiaohongshu body.
 The body MUST contain ZERO hashtags. Follow THIS ROUND LOCATION PLAN.
-Let the body length follow the information provided. If two sentences are enough, write two. Do not pad.
+Let the body length follow the information provided. At least 3 sentences from those facts. More when the customer wrote more. Do not pad.
 Write as a diner who just ate, not a restaurant brochure. Keep mixed like/so-so from the evidence. Do not invent flaws. Do not force a summary CTA.
 Do not add information that is not provided.
 If Favorite dish is Not provided, do not name a specific dish.

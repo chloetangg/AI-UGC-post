@@ -9,6 +9,7 @@ import { sanitizeCoverLine } from "@/lib/cover/cover-title-text";
 import { chineseFullDishName, coverDishShortName } from "@/lib/cover/dish-names";
 import type { RecommendedDish } from "@/types/content";
 import { detectedPartyKinds, customerPartySource, neutralizeInventedPartyCopy } from "@/lib/party-size";
+import { distillCustomerHook } from "@/lib/title-insight";
 
 export type CoverHookType =
   | "personal-experience"
@@ -181,16 +182,16 @@ export function extractExperienceFacts(context: CoverTitleContext = {}): Experie
     });
   }
 
-  if (/第一次/.test(spoken) || /1st time/i.test(context.visitFrequency ?? "")) {
+  if (/第一次来|第一次到这家|第一次来这家/.test(note)) {
     add({
       id: "first-visit",
       kind: "first-visit",
       hookType: "personal-experience",
-      markers: ["第一次"],
+      markers: ["第一次来"],
       coverMains: ["第一次来尝试", "第一次来吃"],
       coverSubs: ["第一次来尝试Baan Ying", "原本只是想试试看"],
-      titleHooks: ["第一次来就被服务圈粉", "第一次来曼谷吃泰餐"],
-      captionLine: "第一次来，原本只是想试试看。",
+      titleHooks: ["第一次来尝试Baan Ying", "第一次来这家泰餐"],
+      captionLine: "第一次来尝试Baan Ying，没有想太多。",
     });
   }
 
@@ -221,7 +222,7 @@ export function extractExperienceFacts(context: CoverTitleContext = {}): Experie
       coverSubs: [`这口${dishShort}很香`.slice(0, 20), "吃完还想再点", "这道真的很香"].filter(
         (line) => line.length >= 4,
       ),
-      titleHooks: [`曼谷美食｜${dishShort}很合口味`, `曼谷泰餐${dishShort}很满足`],
+      titleHooks: [`曼谷泰餐${dishShort}很满足`, `${dishShort}吃完还想再点`],
       captionLine: `${dishShort}也很合口味，这顿整体比预期更轻松。`,
     });
   }
@@ -355,7 +356,35 @@ export function extractExperienceFacts(context: CoverTitleContext = {}): Experie
     });
   }
 
+  addUncoveredCustomerClause(note, add, facts);
+
   return facts;
+}
+
+function addUncoveredCustomerClause(
+  note: string,
+  add: (fact: ExperienceFact) => void,
+  facts: ExperienceFact[],
+) {
+  const clauses = note
+    .split(/[。！？!?\n；;，,、]/)
+    .map((item) => item.trim())
+    .filter((item) => item.length >= 4 && item.length <= 18);
+  const hook = clauses.find((clause) => {
+    if (/第一次/.test(clause)) return false;
+    return !facts.some((fact) => fact.markers.some((marker) => marker.length >= 2 && clause.includes(marker)));
+  });
+  if (!hook) return;
+  add({
+    id: "customer-words",
+    kind: "emotion",
+    hookType: "personal-experience",
+    markers: [hook.slice(0, 8)],
+    coverMains: [],
+    coverSubs: [distillCustomerHook(hook, 0)],
+    titleHooks: [distillCustomerHook(hook, 0), distillCustomerHook(hook, 1)],
+    captionLine: `${hook}。`,
+  });
 }
 
 function tryCoverMain(hook: string) {
@@ -388,7 +417,7 @@ function tryCoverMain(hook: string) {
 function tryCoverSub(line: string) {
   const cleaned = sanitizeCoverLine(line);
   const units = countCoverUnits(cleaned);
-  if (units >= 6 && units <= 10) return cleaned;
+  if (units >= 6 && units <= 15) return cleaned;
   return "";
 }
 

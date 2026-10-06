@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useEffect } from "react";
+import { useEffect, useLayoutEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { CampaignHeader } from "@/components/campaign/CampaignHeader";
 import { LanguageSwitch } from "@/components/campaign/LanguageSwitch";
 import { useT } from "@/components/providers/language-provider";
+import { hasEntryRatingPassed } from "@/lib/entry-rating";
 
 const STEP_FROM_PATH: Record<string, FlowStep> = {
   customer: "customer",
@@ -46,6 +47,15 @@ export function CampaignShell({
   const isPrivacy = segment === "privacy";
   const showProgress = !isLanding && !isGenerating && !isPrivacy;
   const backStep = BACK_STEP[currentStep];
+  const isRating = segment === "rating";
+  const skipRatingGate = isRating || isPrivacy || segment === "";
+  const ratingPassed = hasEntryRatingPassed(campaignId);
+  const showStep = skipRatingGate || ratingPassed;
+
+  useLayoutEffect(() => {
+    if (skipRatingGate || ratingPassed) return;
+    router.replace(`/c/${campaignId}/rating`);
+  }, [campaignId, ratingPassed, router, skipRatingGate]);
 
   useEffect(() => {
     const next = NEXT_FLOW_STEP[currentStep];
@@ -78,8 +88,8 @@ export function CampaignShell({
           </div>
         )}
 
-        {showProgress && <StepProgress current={currentStep} />}
-        <div className="flex flex-1 flex-col">{children}</div>
+        {showProgress && showStep ? <StepProgress current={currentStep} /> : null}
+        <div className="flex flex-1 flex-col">{showStep ? children : null}</div>
       </div>
     </div>
   );

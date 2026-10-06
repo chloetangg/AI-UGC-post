@@ -56,6 +56,17 @@ const en = {
       "Discover Baan Ying, a Thai restaurant experience featuring classic Thai flavors in a relaxed and lifestyle-friendly setting.",
     customQuestion: "What did you enjoy most about your Baan Ying experience?",
   },
+  rating: {
+    title: "How was your experience?",
+    groupLabel: "Star rating",
+    starLabel: "{count} stars",
+    lowThanks: "Thank you for your feedback!",
+    lowInvite: "We'd love to invite you to join our lucky draw.",
+    lowContinue: "Continue",
+    positiveThanks: "Thank you for sharing your experience!",
+    positiveContinue: "Continue",
+    drawCta: "Join the lucky draw",
+  },
   customer: {
     title: "Appreciate your sharing!",
     subtitle: "We’ll only use this for the campaign. It takes about 30 seconds.",
@@ -455,6 +466,17 @@ const zh: typeof en = {
       "发现 Baan Ying，一家充满经典泰式风味、氛围轻松的泰国餐厅。",
     customQuestion: "这次 Baan Ying 用餐体验你最喜欢什么？",
   },
+  rating: {
+    title: "这次用餐体验怎么样？",
+    groupLabel: "星级评分",
+    starLabel: "{count} 星",
+    lowThanks: "谢谢你的点评！",
+    lowInvite: "欢迎参与我们的抽奖活动，有机会赢取惊喜礼品",
+    lowContinue: "参与抽奖",
+    positiveThanks: "谢谢你的分享！",
+    positiveContinue: "继续",
+    drawCta: "参与抽奖",
+  },
   customer: {
     title: "感谢您参与分享！",
     subtitle: "仅用于本次活动，30秒便可完成。",
@@ -848,6 +870,17 @@ const th: typeof en = {
     productDescription:
       "ค้นพบ Baan Ying ร้านอาหารไทยรสชาติคลาสสิก ในบรรยากาศสบายๆ ที่เข้ากับไลฟ์สไตล์",
     customQuestion: "คุณชอบอะไรมากที่สุดจากประสบการณ์ที่ Baan Ying?",
+  },
+  rating: {
+    title: "มื้อนี้เป็นยังไงบ้าง?",
+    groupLabel: "ให้คะแนน",
+    starLabel: "{count} ดาว",
+    lowThanks: "ขอบคุณสำหรับความคิดเห็นนะ!",
+    lowInvite: "ชวนร่วมลุ้นของรางวัลกับเรา อาจได้รับของขวัญสุดเซอร์ไพรส์",
+    lowContinue: "ร่วมลุ้นรางวัล",
+    positiveThanks: "ขอบคุณที่มาแชร์ประสบการณ์นะ!",
+    positiveContinue: "ต่อไป",
+    drawCta: "ร่วมลุ้นรางวัล",
   },
   customer: {
     title: "ขอบคุณที่ร่วมแชร์!",

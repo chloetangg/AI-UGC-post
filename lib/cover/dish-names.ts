@@ -233,15 +233,13 @@ Never 冬阴功汤 if the approved short is 冬阴功. Never 芒果 / 菠萝 / �
 If a customer-written dish is not in this table, keep its complete name. Do not shorten 泰式青咖喱鸡 to 青咖喱 or 泰式香辣打抛猪肉饭 to 打抛.
 A dish in subTitle is the ONE core reason — do not also add price or first-visit in the same line.
 If a dish was not provided, do not name a specific dish.
-Allowed cover dishes = only the recommended/mentioned list above. Never invent Pad Thai, Som Tam, or other unsupported dishes.`;
+A food or drink the customer wrote in the dining note, such as 粉红奶, counts as provided even when it is not in the dish list or this short-name table. Keep that name. Do not add ingredients, taste details, price, origin, or method they did not write.
+Allowed cover dishes = the recommended/mentioned list plus items the customer actually wrote. Never invent Pad Thai, Som Tam, or other unsupported dishes.`;
 }
 
 export function formatCoverDishNameInstance(dishes: string[] = []) {
-  const allowed = uniqueLongestFirst([
-    ...OFFICIAL_COVER_DISHES.map((item) => `${item.full}→${item.cover}`),
-    ...dishes.filter((dish) => /[\u4e00-\u9fff]/.test(dish)),
-  ]);
-  return `Allowed cover names for this customer: ${allowed.join(" / ") || "none — do not invent a dish"}`;
+  const named = dishes.filter((dish) => dish.trim());
+  return `This customer's dishes: ${named.join(" / ") || "none — do not invent a dish"}. Use the approved cover short from COVER DISH NAMES. A name they wrote that is not in that table stays in full.`;
 }
 
 export function formatCoverDishNameRules(dishes: string[] = []) {

@@ -7,6 +7,7 @@ export const ANALYTICS_TIMEZONE = "Asia/Bangkok";
 
 export const ANALYTICS_EVENT_TYPES = [
   "qr_scan",
+  "rating_submitted",
   "form_submit",
   "generation_complete",
   "xhs_publish_click",
