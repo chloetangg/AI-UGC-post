@@ -466,7 +466,7 @@ export function attachOfficialLocationTime(
   const build = (id: LocationTimeFormatId) => {
     const section = renderLocationTimeSection(id, locationLine, hoursDisplay);
     return {
-      caption: `${story}\n\n${section}`,
+      caption: story ? `${story}\n\n${section}` : section,
       format: id,
       placement: "standalone" as const,
     };
@@ -566,15 +566,304 @@ function replaceFirst(text: string, pattern: RegExp, value: string) {
   return text.replace(pattern, value);
 }
 
+const LOCATION_DISH =
+  /芒果糯米饭|蒜炒虾仁|咖喱蟹肉|青咖喱牛肉|菠萝炒饭|滑蛋饭|河虾冬阴功汤|冬阴功|青柠蒸鲈鱼|炒空心菜|酸甜酱炒河虾|粉红奶|泰奶/;
+const LOCATION_EXPERIENCE = /老板|服务|店员|氛围|环境|温馨|家庭|好吃|好喝|满意|舒服|放松|合口味/;
+
+function mallPattern(location: ReturnType<typeof officialLocationForBranch>) {
+  const parts = ["central\\s*world", "尚泰世界购物中心"];
+  if (location?.englishName && !/central/i.test(location.englishName)) {
+    parts.push(location.englishName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  }
+  if (location?.chineseName && location.chineseName !== "尚泰世界购物中心") {
+    parts.push(location.chineseName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  }
+  return new RegExp(parts.join("|"), "i");
+}
+
+function splitLocationClauses(sentence: string) {
+  return sentence
+    .replace(/[。！？!?]+$/g, "")
+    .split(/[，,]/)
+    .map((clause) => clause.trim())
+    .filter(Boolean);
+}
+
+function finishLocationSentence(text: string) {
+  const trimmed = text.trim().replace(/[，、]+$/g, "").replace(/\s{2,}/g, " ");
+  if (!trimmed) return "";
+  if (/[。！？!?]$/.test(trimmed) || /\p{Extended_Pictographic}$/u.test(trimmed)) return trimmed;
+  return `${trimmed}。`;
+}
+
+function mentionsRestaurantName(text: string) {
+  return /baan\s*ying/i.test(text);
+}
+
+/** A clause that only restates where this meal happened. Experience and dishes are not location facts. */
+function isPureLocationClause(clause: string, mallRe: RegExp) {
+  if (LOCATION_DISH.test(clause) || LOCATION_EXPERIENCE.test(clause)) return false;
+  if (/\d{1,2}:\d{2}\s*[–\-到至]\s*\d{1,2}:\d{2}|10点到22点|营业时间/.test(clause)) return true;
+  if (mallRe.test(clause) || mentionsRestaurantName(clause)) return true;
+  if (/来吃饭|去吃饭|吃一顿饭|吃了一顿/.test(clause)) return true;
+  return /这家店|这家餐厅|这家分店|这家泰餐|位于|位置很方便|位置很好找|很好找|在商场|商场里|商场内|商场里面|购物商场|来到这家|这里就在|想吃泰餐的时候|吃泰餐很方便|吃饭也很方便|用餐很方便|来吃很方便|吃起来很方便|逛街的时候|又回到|继续逛|分店位于/.test(
+    clause,
+  );
+}
+
+function stripLocationWords(clause: string, mallRe: RegExp) {
+  return clause
+    .replace(/尚泰世界购物中心（[^）]*）/g, "")
+    .replace(new RegExp(mallRe.source, "gi"), "")
+    .replace(/baan\s*ying/gi, "")
+    .replace(/这家店就在|这家分店就在|这家店位于|位于这里|就在这里|这家店的位置很方便/g, "")
+    .replace(/这家(?:泰式|泰餐)?(?:餐厅|餐馆|分店|店)/g, "")
+    .replace(/[0-9０-９]+楼/g, "")
+    .replace(/^(?:刚好)?(?:在|来到|去了|选择了|选了)?/g, "")
+    .replace(/^[的了，,\s]+/g, "")
+    .replace(/[的了，,\s]+$/g, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+function hasLocationSubstance(text: string) {
+  const plain = text.replace(/[\s。！？!?，,、的了在和与]/g, "");
+  return /[\u4e00-\u9fff]{2,}/.test(plain);
+}
+
+function collapseRepeatedMall(sentence: string) {
+  let seen = false;
+  return sentence.replace(/central\s*world|尚泰世界购物中心|Siam Center|Terminal 21|One Bangkok/gi, (match) => {
+    if (!seen) {
+      seen = true;
+      return match;
+    }
+    return "";
+  });
+}
+
+function collapseRepeatedRestaurant(sentence: string) {
+  let seen = false;
+  return sentence.replace(/baan\s*ying/gi, (match) => {
+    if (!seen) {
+      seen = true;
+      return match;
+    }
+    return "";
+  });
+}
+
+function tidyLocationSentence(sentence: string, mallName: string) {
+  let next = collapseRepeatedRestaurant(collapseRepeatedMall(sentence));
+  if (/central\s*world/i.test(next)) {
+    next = next.replace(/尚泰世界购物中心（\s*central\s*world\s*）/gi, "").replace(/尚泰世界购物中心/g, "");
+  } else if (mallName && /尚泰世界购物中心/.test(next)) {
+    next = next.replace(/尚泰世界购物中心（[^）]*）/g, mallName).replace(/尚泰世界购物中心/g, mallName);
+  }
+  next = next
+    .replace(/来\s*的/g, "刚好来")
+    .replace(/的{2,}/g, "的")
+    .replace(/[，,]\s*[，,]/g, "，")
+    .replace(/\s{2,}/g, " ")
+    .replace(/^[，,\s]+/g, "")
+    .replace(/[，,\s]+$/g, "");
+  return finishLocationSentence(next);
+}
+
+function attachRestaurantOnce(sentence: string) {
+  if (mentionsRestaurantName(sentence)) return sentence;
+  if (/吃一顿/.test(sentence)) return sentence.replace(/吃一顿/, `${OFFICIAL_RESTAURANT_NAME}吃一顿`);
+  if (/来吃饭/.test(sentence)) return sentence.replace(/来吃饭/, `来${OFFICIAL_RESTAURANT_NAME}吃饭`);
+  if (/去吃饭/.test(sentence)) return sentence.replace(/去吃饭/, `去${OFFICIAL_RESTAURANT_NAME}吃饭`);
+  const body = sentence.replace(/[。！？!?]+$/u, "");
+  if (/逛完|逛街|逛了|购物/.test(sentence)) return `${body}，来了${OFFICIAL_RESTAURANT_NAME}`;
+  if (/central\s*world/i.test(sentence)) {
+    return sentence.replace(/central\s*world/i, (match) => `${match}的${OFFICIAL_RESTAURANT_NAME}`);
+  }
+  return `${body}，来了${OFFICIAL_RESTAURANT_NAME}`;
+}
+
+function attachMallOnce(sentence: string, mallName: string) {
+  if (!mallName || /central\s*world|尚泰世界购物中心|Siam Center|Terminal 21|One Bangkok/i.test(sentence)) {
+    return sentence;
+  }
+  if (/逛完/.test(sentence)) return sentence.replace(/逛完/, `逛完${mallName}`);
+  if (/逛街/.test(sentence)) return sentence.replace(/逛街/, `在${mallName}逛街`);
+  if (mentionsRestaurantName(sentence)) {
+    return sentence.replace(/baan\s*ying/i, `${mallName}的${OFFICIAL_RESTAURANT_NAME}`);
+  }
+  const body = sentence.replace(/[。！？!?]+$/u, "");
+  return `在${mallName}，${body}`;
+}
+
+function splitCaptionParagraphs(caption: string) {
+  return caption
+    .split(/\n\s*\n/)
+    .map((block) =>
+      block
+        .split(/\n+/)
+        .flatMap((line) => line.split(/(?<=[。！？!?])/u))
+        .map((sentence) => sentence.trim())
+        .filter(Boolean)
+        .reduce<string[]>((group, sentence) => {
+          const previous = group.at(-1);
+          if (previous && /^[\p{Extended_Pictographic}\uFE0F]+$/u.test(sentence)) {
+            group[group.length - 1] = `${previous}${sentence}`;
+            return group;
+          }
+          if (sentence.replace(/[。！？!?\s]/g, "").length < 1) return group;
+          group.push(sentence);
+          return group;
+        }, []),
+    )
+    .filter((group) => group.length > 0);
+}
+
+function stripLaterLocationSentence(sentence: string, mallRe: RegExp) {
+  const kept = splitLocationClauses(sentence).flatMap((clause) => {
+    if (isPureLocationClause(clause, mallRe)) return [];
+    const next =
+      mallRe.test(clause) ||
+      mentionsRestaurantName(clause) ||
+      /这家店|这家餐厅|这家分店|这家泰餐|商场|位于|[0-9０-９]+楼/.test(clause)
+        ? stripLocationWords(clause, mallRe)
+        : clause;
+    return hasLocationSubstance(next) ? [next] : [];
+  });
+  return finishLocationSentence(kept.join("，"));
+}
+
+/**
+ * Inline captions may express "where I ate" once.
+ * Later mall names, restaurant names, and paraphrases of the same place are removed.
+ * Dishes, service, and the room stay, without the place name attached again.
+ */
+export function lockInlineLocationFact(caption: string, branch: string) {
+  const location = officialLocationForBranch(branch);
+  const mallName = location?.englishName ?? "";
+  const mallRe = mallPattern(location);
+  const source = caption.trim();
+  if (!source) return source;
+
+  let normalized = source;
+  for (const pattern of GENERIC_RESTAURANT_RE) {
+    if (pattern.test(normalized)) {
+      normalized = normalized.replace(pattern, OFFICIAL_RESTAURANT_NAME);
+      break;
+    }
+  }
+
+  const paragraphs = splitCaptionParagraphs(normalized);
+  const flat = paragraphs.flatMap((group, paragraph) => group.map((text) => ({ text, paragraph })));
+  if (flat.length === 0) return source;
+
+  const mallAt = flat.findIndex((item) => mallRe.test(item.text));
+  const restaurantAt = flat.findIndex((item) => mentionsRestaurantName(item.text));
+  const relationAt = flat.findIndex((item) =>
+    splitLocationClauses(item.text).some((clause) => isPureLocationClause(clause, mallRe)),
+  );
+  const anchor =
+    mallAt >= 0 && restaurantAt >= 0
+      ? Math.min(mallAt, restaurantAt)
+      : mallAt >= 0
+        ? mallAt
+        : restaurantAt >= 0
+          ? restaurantAt
+          : relationAt;
+
+  const donor =
+    anchor >= 0 && !mentionsRestaurantName(flat[anchor]?.text ?? "")
+      ? flat
+          .filter((_, index) => index !== anchor)
+          .flatMap((item) => splitLocationClauses(item.text))
+          .find((clause) => mentionsRestaurantName(clause) && isPureLocationClause(clause, mallRe)) ?? ""
+      : "";
+
+  let place = "";
+  const extras: string[] = [];
+  if (anchor < 0) {
+    place = mallName
+      ? `这次在${mallName}的${OFFICIAL_RESTAURANT_NAME}吃了一顿饭。`
+      : `这次来${OFFICIAL_RESTAURANT_NAME}吃了一顿饭。`;
+  } else {
+    const clauses = splitLocationClauses(flat[anchor].text);
+    const placeClauses: string[] = [];
+    for (const clause of clauses) {
+      if (isPureLocationClause(clause, mallRe)) {
+        placeClauses.push(clause);
+        continue;
+      }
+      const rest =
+        mallRe.test(clause) || mentionsRestaurantName(clause) ? stripLocationWords(clause, mallRe) : clause;
+      if (hasLocationSubstance(rest)) extras.push(rest);
+    }
+    let placeText = placeClauses.join("，");
+    if (donor && !mentionsRestaurantName(placeText)) {
+      placeText = placeText ? `${placeText}，${donor}` : donor;
+    }
+    if (!placeText) {
+      placeText = mallName
+        ? `这次在${mallName}的${OFFICIAL_RESTAURANT_NAME}吃了一顿饭`
+        : `这次来${OFFICIAL_RESTAURANT_NAME}吃了一顿饭`;
+    } else {
+      placeText = attachRestaurantOnce(placeText);
+      placeText = attachMallOnce(placeText, mallName);
+    }
+    place = tidyLocationSentence(placeText, mallName);
+  }
+
+  const kept = new Map<number, string[]>();
+  flat.forEach((item, index) => {
+    if (index === anchor) {
+      if (extras.length > 0) {
+        const group = kept.get(item.paragraph) ?? [];
+        group.push(finishLocationSentence(extras.join("，")));
+        kept.set(item.paragraph, group);
+      }
+      return;
+    }
+    const next = stripLaterLocationSentence(item.text, mallRe);
+    if (!next) return;
+    const group = kept.get(item.paragraph) ?? [];
+    group.push(next);
+    kept.set(item.paragraph, group);
+  });
+
+  const body = [...kept.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([, sentences]) => sentences.join(""))
+    .filter((block) => block.replace(/[。！？!?\s]/g, "").length >= 1);
+
+  const hours = source.match(/\d{1,2}:\d{2}\s*[–\-到至]\s*\d{1,2}:\d{2}|10点到22点/)?.[0] ?? "";
+  if (hours && place && !place.includes(hours)) {
+    place = finishLocationSentence(`${place.replace(/[。！？!?]+$/u, "")}，营业时间是${hours}`);
+  }
+
+  return [place, ...body].filter(Boolean).join("\n\n");
+}
+
 /** Inline captions need the mall and Baan Ying together, once. */
 export function ensureInlineLocationPair(caption: string, branch: string) {
-  const story = ensureCaptionRestaurantName(caption, branch);
-  const location = officialLocationForBranch(branch);
-  if (!location || story.includes(location.englishName)) return story;
-  if (story.includes(OFFICIAL_RESTAURANT_NAME)) {
-    return story.replace(OFFICIAL_RESTAURANT_NAME, `${location.englishName}的${OFFICIAL_RESTAURANT_NAME}`);
-  }
-  return story;
+  return lockInlineLocationFact(caption, branch);
+}
+
+/** Standalone stories leave the place to the system Location & Time block. */
+export function stripStandaloneLocationFacts(caption: string, branch: string) {
+  const mallRe = mallPattern(officialLocationForBranch(branch));
+  const cleaned = caption
+    .replace(/📍[^\n]*/g, "")
+    .replace(/⏰[^\n]*/g, "")
+    .trim();
+  if (!cleaned) return "";
+  return splitCaptionParagraphs(cleaned)
+    .map((sentences) =>
+      sentences
+        .map((sentence) => stripLaterLocationSentence(sentence, mallRe))
+        .filter(Boolean)
+        .join(""),
+    )
+    .filter((block) => block.replace(/[。！？!?\s]/g, "").length >= 1)
+    .join("\n\n");
 }
 
 /** Keep restaurant identity in the caption body without a fixed address dump. */
@@ -669,17 +958,15 @@ HARD RULES:
 LOCATION MODE IS RANDOM AND MUST CHANGE:
 The system picks one mode per caption and switches on the next generation. Do not use the same mode every time. Dishes in the story do not force the place into the body.
 
-INLINE (locationDisplayMode=inline) — place inside the story. No 📍/⏰ block.
-- The story must include BOTH the official mall name and the restaurant, in this generation's spelling.
-- They may share one sentence or sit in adjacent sentences. Do not write only one of them.
-- Connect them to shopping, choosing the restaurant, or the meal. Say the pair once. Do not repeat the address later in the story.
-- Good: 这次逛centralwOrld的时候顺便去了Baan Ying，咖喱蟹肉真的很合口味。 / centralwOrld 3楼的这家Baan Ying，咖喱蟹肉是我吃了还会想再点的一道。 / 在centralwOrld逛街，最后去了Baan Ying吃泰餐。
-- Bad: 这次在centralwOrld逛街，吃了一家很好吃的餐厅。 / 这次来到Baan Ying，咖喱蟹肉很好吃。 / 咖喱蟹肉很好吃。Baan Ying在centralwOrld 3楼。
+INLINE (locationDisplayMode=inline) — one LOCATION FACT in the story. No 📍/⏰ block.
+- Mall name and Baan Ying must share one opening scene: shopping, choosing the restaurant, or arriving for the meal. After that sentence, the place is used up.
+- Do not say the mall again, the restaurant again, or the same relationship in other words (这家店就在商场 / 位置很方便 / 商场里吃泰餐 / 刚好在商场). A later 环境 or 服务 line keeps the experience and drops the place name.
+- Good: 这次在centralwOrld逛街，选择了Baan Ying。 Then the dishes. Bad: that opening, then 刚好在centralwOrld，想吃泰餐也比较方便, then Baan Ying的环境不错。
 
-STANDALONE (locationDisplayMode=standalone) — story only, then the system appends Location & Time.
-- Do NOT add centralwOrld or Baan Ying just to make the post complete. Write the dishes, taste, room, and service.
-- Do not write 📍/⏰ / hours / Location & Time yourself.
-- Good body: 咖喱蟹肉是这次吃下来很喜欢的一道，味道浓郁，搭配米饭刚刚好。芒果糯米饭也很新鲜，甜度不会太腻。
+STANDALONE (locationDisplayMode=standalone) — the story is the meal only. The system appends Location & Time.
+- Do not write the mall, Baan Ying, the floor, hours, 📍, or ⏰. Not even once.
+- Do not say the restaurant is in the mall, or that eating there is convenient, in any wording.
+- Good body: 咖喱蟹肉是这次吃下来很喜欢的一道。芒果糯米饭也很新鲜。
 
 Do not write Baan Ying位于centralwOrld 3楼, and do not open every post with 这次来到Baan Ying. Hashtags stay out of the caption.`;
 }
@@ -693,10 +980,10 @@ export function formatLocationTimePlanRules(plan: LocationTimePlan, branch: stri
     : `${OFFICIAL_RESTAURANT_NAME} only — this branch has no mall, so do not invent one`;
   const previousHint =
     plan.placement === "standalone"
-      ? `THIS ROUND LOCATION PLAN: standalone. Do NOT put ${OFFICIAL_RESTAURANT_NAME} or the mall into the story just to identify the restaurant. Write the meal. Do NOT write Location & Time, 📍, ⏰, or hours. The system appends locked Version ${plan.format ? LOCATION_TIME_VERSION[plan.format] : "1–6"} after your caption.`
-      : `THIS ROUND LOCATION PLAN: inline. The story must contain ${inlinePair}, once, tied to shopping, choosing the restaurant, or the meal. Same sentence or adjacent sentences. Do not write only one of them. Do not repeat the pair. No 📍/⏰ block. No Location & Time after the story.
+      ? `THIS ROUND LOCATION PLAN: standalone. The story must not contain the mall, ${OFFICIAL_RESTAURANT_NAME}, the floor, hours, 📍, or ⏰, and must not restate that the restaurant is in the mall. Write the dishes, taste, service, and room. The system appends locked Version ${plan.format ? LOCATION_TIME_VERSION[plan.format] : "1–6"} after your caption.`
+      : `THIS ROUND LOCATION PLAN: inline. The story must contain ${inlinePair} in one opening sentence, tied to shopping, choosing the restaurant, or the meal. Do not write only one of them. After that sentence, do not name the mall or the restaurant again, and do not rephrase the same place. No 📍/⏰ block. No Location & Time after the story.
 Style: ${plan.inlineStyle === "location-hours" && hoursDisplay !== "none — do not invent hours" ? "location + official hours" : "location only, no hours"}.
-The mall and Baan Ying open the visit as one scene, before the dishes. Do not append either one after the food, and do not say the same place again later.
+The mall and Baan Ying open the visit in one sentence, before the dishes. Do not name either one again, and do not restate that the restaurant is in the mall or that eating there is convenient.
 If hours are requested, use the official hours exactly (${hoursDisplay}). 10点到22点 is allowed only when those are the same official numbers.`;
 
   return `Official restaurant name (locked): ${OFFICIAL_RESTAURANT_NAME}
@@ -720,7 +1007,9 @@ export function finalizeOfficialLocationTime(input: {
   const plan = planLocationTime(input);
   const cleaned = sanitizeOfficialMallNames(stripGeneratedLocationTime(input.caption));
   const story =
-    plan.placement === "inline" ? ensureInlineLocationPair(cleaned, input.branch) : cleaned;
+    plan.placement === "inline"
+      ? ensureInlineLocationPair(cleaned, input.branch)
+      : stripStandaloneLocationFacts(cleaned, input.branch);
 
   if (plan.placement === "inline") {
     return { caption: story, placement: "inline" as const, format: "" as const };

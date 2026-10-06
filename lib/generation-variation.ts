@@ -888,12 +888,12 @@ function openingFor(
         ? pickUnusedLine(
             [
               "在centralwOrld逛了一圈，想找一家泰餐吃饭，最后选了Baan Ying。",
-              "刚好在centralwOrld，想吃泰餐的时候就过来了。",
+              "刚好在centralwOrld，想吃泰餐的时候就来了Baan Ying。",
             ],
             seed,
             used,
           )
-        : "刚好在centralwOrld，想找一家泰餐吃饭。";
+        : "刚好在centralwOrld的Baan Ying，想找一家泰餐吃饭。";
     case "dining-feel":
     case "atmosphere-to-food":
       return pickUnusedLine(
@@ -905,7 +905,7 @@ function openingFor(
       );
     case "convenience-to-food":
       if (facts.some((fact) => fact.id === "mall-stop" || fact.id === "mall-chain")) {
-        return "刚好在centralwOrld，想吃泰餐的时候也比较方便。";
+        return "刚好在centralwOrld的Baan Ying，想吃泰餐的时候也比较方便。";
       }
       return tourist ? "来曼谷吃饭，方便程度对我来说还蛮重要的。" : "这顿比较让我省心的，是吃饭本身很方便。";
     case "customer-note":
@@ -958,8 +958,8 @@ function rebuildCaption(
   }
   const lastDish = plan.dishOrder[0] || "";
   if (plan.endingPattern === "scene" && facts.some((fact) => fact.id === "mall-chain" || fact.id === "mall-stop")) {
-    if (!/centralwOrld|商场/.test(sentences.at(-1) ?? "")) {
-      sentences.push("刚好在centralwOrld，想吃泰餐的时候也比较方便。");
+    if (!sentences.some((sentence) => /central\s*world|商场|baan\s*ying/i.test(sentence))) {
+      sentences.push("刚好在centralwOrld的Baan Ying，想吃泰餐的时候也比较方便。");
     }
   } else if (plan.endingPattern === "personal-judgment" && lastDish) {
     if (!/还会点|还会想再点/.test(sentences.at(-1) ?? "")) {

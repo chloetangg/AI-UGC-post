@@ -153,7 +153,7 @@ ${formatNarrativeFlowInstance(context, map)}`;
 export function formatNarrativeFlowStaticRules() {
   return `NARRATIVE FLOW — one meal, each fact once. Do not follow the questionnaire field order.
 Classify first, then write: scene, the dish they described most, other dishes and a drink, then the room and a closing feeling. Do not follow the order of the form.
-Say the mall once in the story. Do not add 这家店就在商场几楼 — Location is appended separately.
+Inline: the mall and Baan Ying share one opening sentence and do not come back in any wording. Standalone: do not put that place in the story; Location is appended separately. Do not add 这家店就在商场几楼.
 Keep 氛围 and 坐着舒服 in one place, not between dishes. A dish and the room cannot share one sentence. A summary such as 整体感觉很满意 stays at the end. A drink needs a finished clause, with no taste they did not write.
 Then the dish they actually dwelled on, with the taste they wrote, in that same stretch. Other dishes and a named drink continue the meal. Do not give every item 很好吃，很推荐. A short drink note joins the previous dish. It does not appear as a final questionnaire answer.
 Service, the owner, and an overall feeling they actually wrote close the meal. Do not invent 方便, 舒服, 热情, or a taste to make the ending complete.

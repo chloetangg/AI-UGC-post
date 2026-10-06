@@ -42,7 +42,7 @@ BAD: 咖喱蟹肉好吃，餐厅环境也不错 / 曼谷美食｜咖喱蟹肉很
 GOOD: 青咖喱牛肉越吃越喜欢 / centralwOrld这家泰餐厅空间真的很宽敞
 No 最 / 第一 / 最好吃 / 顶级. 绝绝子 / 封神 / 天花板 only on strong praise they already gave.
 
-CAPTION is one meal, not a list of answers. Follow THIS ROUND LOCATION PLAN: inline names the mall and Baan Ying once, inside the opening; standalone leaves them out for the system Location & Time block. Do not say the place again later, and do not invent a shopping trip they did not mention. If they did mention it, the mall trip belongs at the start.
+CAPTION is one meal, not a restaurant introduction. Follow THIS ROUND LOCATION PLAN: inline puts the mall and Baan Ying in one opening sentence, then never again — not the names, and not "这家店就在商场里 / 刚好在商场 / 位置很好找". After that, the subject is the dish, the staff, or the meal, not Baan Ying. Standalone names neither the mall nor the restaurant; the system adds Location & Time. Do not invent a shopping trip they did not mention.
 A person's reaction sits with that dish. Service sits with how the meal felt. Same kind of information stays together.
 Name a dish and finish its taste, texture, and judgment there. Do not return to it after the next dish. A 最后/收尾 dish stays in the second half. Do not start a new dish after that.
 One hero dish, then a shorter supporting dish. Skipping a point is allowed.`;
@@ -51,7 +51,7 @@ One hero dish, then a shorter supporting dish. Skipping a point is allowed.`;
 export function formatCaptionShapeRules() {
   return `CAPTION LENGTH — at least 3 sentences from the same facts. Ordinary notes: 3–6 sentences. Rich notes: at most 8. Do not make every post exactly 3, and do not invent a sentence to get longer. Pick the strongest points; do not write every questionnaire answer.
 Paragraphs are blocks separated by a blank line (\\n\\n in the caption string). Each paragraph is at most 3 sentences, usually 2 or 3. A one-sentence paragraph is only for real emphasis. Do not put a blank line after every sentence.
-Keep place + room + mall together, a dish with its taste and reason together, and the owner with the service together.`;
+Keep a dish with its taste and reason, and the owner with the service. The room comes after the food and does not rename the mall or the restaurant.`;
 }
 
 export function formatCustomerHookPriorityRules() {
