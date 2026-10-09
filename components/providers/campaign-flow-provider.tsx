@@ -186,7 +186,7 @@ function subscribeToFlow(campaignId: string, onStoreChange: () => void) {
 function getFlowSnapshot(campaignId: string) {
   const cached = memoryStore.get(campaignId);
   const loaded = cached ?? readPersisted(campaignId);
-  const productFeedback = withDefaultBranch(loaded.productFeedback);
+  const productFeedback = withDefaultBranch(loaded.productFeedback, campaignId);
   const next =
     productFeedback.branch === loaded.productFeedback.branch
       ? loaded
@@ -221,7 +221,7 @@ function patchFlow(campaignId: string, partial: Partial<PersistedFlow>) {
   const next = {
     ...current,
     ...partial,
-    productFeedback: withDefaultBranch(partial.productFeedback ?? current.productFeedback),
+    productFeedback: withDefaultBranch(partial.productFeedback ?? current.productFeedback, campaignId),
   };
   memoryStore.set(campaignId, next);
   listeners.get(campaignId)?.forEach((listener) => listener());
@@ -236,7 +236,7 @@ function draftFromGenerated(generated: GeneratedContent): ResultDraft {
   };
 }
 
-async function composeCoverFromState(cover: CoverState, files: File[]) {
+async function composeCoverFromState(cover: CoverState, files: File[], diningNote = "") {
   const templateId = isCoverTemplateId(cover.selectedCoverTemplateId)
     ? cover.selectedCoverTemplateId
     : DEFAULT_COVER_TEMPLATE_ID;
@@ -251,7 +251,7 @@ async function composeCoverFromState(cover: CoverState, files: File[]) {
   if (!chosen[0] || !cover.coverTitle) {
     throw new Error("Cover generation failed");
   }
-  const overlay = layoutCoverOverlay(cover.coverTitle, cover.coverSubtitle);
+  const overlay = layoutCoverOverlay(cover.coverTitle, cover.coverSubtitle, [], { diningNote });
   if (!overlay.title) {
     throw new Error("Cover generation failed");
   }
@@ -307,7 +307,7 @@ export function CampaignFlowProvider({
 
   const setProductFeedback = useCallback(
     (productFeedback: ProductFeedback) => {
-      patchFlow(campaignId, { productFeedback: withDefaultBranch(productFeedback) });
+      patchFlow(campaignId, { productFeedback: withDefaultBranch(productFeedback, campaignId) });
     },
     [campaignId],
   );
@@ -740,7 +740,11 @@ export function CampaignFlowProvider({
     if (coverFile) {
       try {
         setCoverComposing(true);
-        const imageUrl = await composeCoverFromState(nextCover, files);
+        const imageUrl = await composeCoverFromState(
+          nextCover,
+          files,
+          current.productFeedback.diningExperienceNote,
+        );
         patchFlow(campaignId, {
           cover: {
             ...nextCover,
@@ -807,7 +811,11 @@ export function CampaignFlowProvider({
       }
       try {
         setCoverComposing(true);
-        const imageUrl = await composeCoverFromState(latest, files);
+        const imageUrl = await composeCoverFromState(
+          latest,
+          files,
+          getFlowSnapshot(campaignId).productFeedback.diningExperienceNote,
+        );
         const after = getFlowSnapshot(campaignId).cover;
         if (
           after &&

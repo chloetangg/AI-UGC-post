@@ -1,12 +1,11 @@
-import { STORY_EMOJI_POOL } from "@/lib/caption-emoji";
+import { customerBannedEmoji, STORY_EMOJI_POOL } from "@/lib/caption-emoji";
+import type { HumanStyleId } from "@/lib/human-style/library";
 
 const FLAG = "🇹🇭";
 const EMOJI_RE = /\p{Extended_Pictographic}/gu;
 const EMOJI_ONE = /\p{Extended_Pictographic}/u;
 const COLON_RE = /[:：]/;
 const FLAG_KEYWORD_COLON_RE = /^🇹🇭\s*\S{2,12}\s*[:：]/;
-const MOOD_EMOJIS = ["😋", "😍", "🥰", "✨", "❤️", "🤤", "🥹", "👀", "😳", "🤯"] as const;
-
 export type TitleEmojiPlacement = "none" | "flag-only" | "start" | "middle" | "end";
 
 export type TitleFormatAnalysis = {
@@ -77,35 +76,24 @@ function seedFrom(text: string) {
   return [...text].reduce((sum, char) => sum + char.charCodeAt(0), 0);
 }
 
-/** Pick one approved emoji that matches the title. 🇹🇭 is never a decorative title emoji. */
+/** One approved emoji that matches this title. Empty when nothing in the title matches. */
 export function pickTitleEmoji(title: string): string {
-  const text = stripFlagPrefix(title).replace(/🇹🇭/g, "");
+  const text = stripFlagPrefix(title).replace(EMOJI_RE, "");
+  if (/青柠蒸鲈鱼|鲈鱼/.test(text)) return "🐟";
+  if (/蟹/.test(text)) return "🦀";
+  if (/虾|冬阴功/.test(text)) return "🍤";
   if (/芒果/.test(text)) return "🥭";
   if (/柠檬|檸檬|青柠/.test(text)) return "🍋";
-  if (/蟹/.test(text)) return "🦀";
-  if (/虾/.test(text)) return "🍤";
-  if (/冬阴功|汤/.test(text)) return "🍜";
   if (/咖喱/.test(text)) return "🍛";
-  if (/饭/.test(text)) return "🍚";
+  if (/炒饭|糯米饭|滑蛋饭/.test(text)) return "🍚";
   if (/辣/.test(text)) return "🌶️";
-  return MOOD_EMOJIS[seedFrom(text) % MOOD_EMOJIS.length] ?? "😋";
-}
-
-function stripNonFlagEmojis(title: string) {
-  const flag = title.trimStart().startsWith(FLAG) ? FLAG : "";
-  const rest = stripFlagPrefix(title.trim()).replace(EMOJI_RE, "").replace(/\s{2,}/g, " ").trim();
-  return `${flag}${rest}`;
+  if (/舒服|放松/.test(text)) return "😌";
+  if (/好吃|好喝/.test(text)) return "😋";
+  return "";
 }
 
 function stripAllVisual(title: string) {
   return stripFlagPrefix(title).replace(EMOJI_RE, "").replace(/\s{2,}/g, " ").trim();
-}
-
-function attachTitleVisual(title: string, kind: "flag" | "pool") {
-  const rest = stripAllVisual(title);
-  if (!rest) return title;
-  if (kind === "flag") return `${FLAG}${rest}`;
-  return `${rest}${pickTitleEmoji(rest)}`;
 }
 
 function previousTitle1HadVisual(previousTitles: string[]) {
@@ -117,25 +105,15 @@ function previousTitle1HadFlag(previousTitles: string[]) {
   return (previousTitles[0]?.trim() ?? "").startsWith(FLAG);
 }
 
-function nextVisualIndex(previousTitles: string[], titles: string[]): 0 | 1 | 2 {
-  if (previousTitle1HadVisual(previousTitles)) return 1;
-  return seedFrom(titles.join("") || previousTitles.join("") || "title") % 2 === 0 ? 0 : 2;
-}
-
-function nextVisualKind(): "pool" {
-  return "pool";
-}
-
 function removeFlags(title: string) {
   return title.replace(/🇹🇭/g, "").replace(/\s{2,}/g, " ").trim();
 }
 
-/** About 1 leading flag per 10 titles: at most one title in a batch of 3, and not after a batch that already had one. */
-function shouldPrefixLeadingFlag(previousTitles: string[]) {
-  const previous = previousTitles.map((title) => title.trim()).filter(Boolean);
-  if (previous.some((title) => title.startsWith(FLAG))) return false;
-  const chance = previous.length === 0 ? 0.3 : 0.5;
-  return Math.random() < chance;
+/** About 1 leading flag per 5 titles. A batch of 3 holds at most one, so about 3 in 5 batches get one. */
+const LEADING_FLAG_BATCH_CHANCE = 0.6;
+
+function shouldPrefixLeadingFlag() {
+  return Math.random() < LEADING_FLAG_BATCH_CHANCE;
 }
 
 function applyLeadingFlagFrequency(
@@ -143,11 +121,13 @@ function applyLeadingFlagFrequency(
   previousTitles: string[],
 ): [string, string, string] {
   const next = titles.map(removeFlags) as [string, string, string];
-  if (!shouldPrefixLeadingFlag(previousTitles)) return next;
+  if (!shouldPrefixLeadingFlag()) return next;
+  const blocked = previousTitle1HadFlag(previousTitles) ? new Set([0]) : new Set<number>();
   const decorated = next
     .map((title, index) => (analyzeTitleFormat(title).hasNonFlagEmoji ? index : -1))
-    .filter((index): index is 0 | 1 | 2 => index >= 0);
-  const pool = decorated.length > 0 ? decorated : ([0, 1, 2] as const);
+    .filter((index): index is 0 | 1 | 2 => index >= 0 && !blocked.has(index));
+  const open = ([0, 1, 2] as const).filter((index) => !blocked.has(index));
+  const pool = decorated.length > 0 ? decorated : open;
   const slot = pool[Math.floor(Math.random() * pool.length)] ?? 1;
   if (!next[slot]) return next;
   next[slot] = `${FLAG}${next[slot]}`;
@@ -177,9 +157,8 @@ export function evaluateTitleFormats(titles: string[], previousTitles: string[] 
   if (misplacedFlag > 0) reasons.push("🇹🇭 may only be the first character of a title.");
   if (multiFlag > 0) reasons.push("A title may contain at most one 🇹🇭.");
   if (colonCount === 3) reasons.push("Do not put a colon in all 3 titles.");
+  if (emojiCount === 3) reasons.push("At least one of the 3 titles stays plain text.");
   if (visualCount === 3) reasons.push("Do not put emoji/flag in all 3 titles.");
-  if (visualCount === 0) reasons.push("Do not leave all 3 titles without any emoji or 🇹🇭.");
-  if (emojiCount === 3) reasons.push("Do not put a decorative emoji in all 3 titles.");
   if (uniqueSignatures.size < 2) {
     reasons.push("At least 2 titles must use different sentence or punctuation structures.");
   }
@@ -201,13 +180,68 @@ export function evaluateTitleFormats(titles: string[], previousTitles: string[] 
   return { ok: reasons.length === 0, analyses, reasons };
 }
 
+export type TitleFormatOptions = {
+  style?: HumanStyleId;
+  note?: string;
+  caption?: string;
+};
+
+const FOOD_EMOJI = /[🍛🦀🍤🍚🍜🥭🍋🌶️🐟]/u;
+
+function stripDecorative(title: string) {
+  const flag = title.trimStart().startsWith(FLAG) ? FLAG : "";
+  const plain = stripFlagPrefix(title).replace(EMOJI_RE, "").replace(/\s{2,}/g, " ").trim();
+  return `${flag}${plain}`.trim();
+}
+
+function withDecorative(title: string, emoji: string, atStart: boolean) {
+  const flag = title.trimStart().startsWith(FLAG) ? FLAG : "";
+  const plain = stripFlagPrefix(title).replace(EMOJI_RE, "").replace(/\s{2,}/g, " ").trim();
+  return atStart && !flag ? `${emoji}${plain}` : `${flag}${plain}${emoji}`;
+}
+
+function alignTitleEmoji(title: string) {
+  const current = nonFlagEmojiChars(title)[0] ?? "";
+  if (!current) return title;
+  const expected = pickTitleEmoji(title);
+  const atStart = analyzeTitleFormat(title).emojiPlacement !== "end";
+  if (expected && current !== expected) return withDecorative(title, expected, atStart);
+  if (!expected && FOOD_EMOJI.test(current)) return stripDecorative(title);
+  return title;
+}
+
+function choosePlainTitle(
+  titles: [string, string, string],
+  style: HumanStyleId | undefined,
+  blocked: Set<number>,
+): 0 | 1 | 2 | null {
+  const open = ([0, 1, 2] as const).filter((index) => pickTitleEmoji(titles[index] ?? "") && !blocked.has(index));
+  if (open.length === 0) return null;
+  if (style === "foodie" || style === "travel") {
+    const dish = open.find((index) => /虾|蟹|鱼|饭|芒果|咖喱|冬阴功/.test(titles[index] ?? ""));
+    if (dish !== undefined) return dish;
+  }
+  if (style === "short" || style === "casual" || style === "local") {
+    const shortest = [...open].sort((a, b) => (titles[a] ?? "").length - (titles[b] ?? "").length)[0];
+    return shortest ?? open[0] ?? null;
+  }
+  return open[seedFrom(titles.join("|")) % open.length] ?? null;
+}
+
+function captionCopiesTitleEmoji(caption: string, emoji: string) {
+  const story = caption.replace(/\n*[📍⏰][\s\S]*$/u, "").trim();
+  const first = (story.split(/(?<=[。！？!?])/)[0] ?? story).replace(/^🇹🇭/u, "").trim();
+  return first.startsWith(emoji);
+}
+
 /**
- * Mix flag / pool emoji / plain titles. Title 1 is not reserved for 🇹🇭.
- * Does not rewrite the wording.
+ * Keep the wording. Make sure a normal batch has 1 or 2 title emojis, at the start or the end.
+ * A customer ban adds none.
  */
 export function ensureTitleFormats(
   titles: [string, string, string],
   previousTitles: string[] = [],
+  options: TitleFormatOptions = {},
 ): [string, string, string] {
   const next: [string, string, string] = [
     removeFlags(titles[0]),
@@ -236,32 +270,56 @@ export function ensureTitleFormats(
     next[2] = next[2].replace(COLON_RE, "，");
   }
 
-  const allVisual = next.every((title) => analyzeTitleFormat(title).hasVisual);
-  if (allVisual) {
-    next[1] = stripAllVisual(next[1]);
-    if (prev1Visual) next[0] = stripAllVisual(next[0]);
-  }
-
-  if (next.every((title) => !analyzeTitleFormat(title).hasVisual)) {
-    const slot = nextVisualIndex(previousTitles, next);
-    next[slot] = attachTitleVisual(next[slot], nextVisualKind());
-  }
-
   if (prev1Visual && analyzeTitleFormat(next[0]).hasVisual) {
     next[0] = stripAllVisual(next[0]);
-    if (next.every((title) => !analyzeTitleFormat(title).hasVisual)) {
-      next[1] = attachTitleVisual(next[1], "pool");
+  }
+
+  if (customerBannedEmoji(options.note ?? "")) {
+    return next.map((title) => stripDecorative(title)) as [string, string, string];
+  }
+
+  for (let index = 0; index < next.length; index += 1) {
+    next[index] = alignTitleEmoji(next[index] ?? "");
+  }
+  const decorated = () =>
+    next
+      .map((title, index) => ((nonFlagEmojiChars(title).length > 0 ? index : -1)))
+      .filter((index): index is 0 | 1 | 2 => index >= 0);
+  const tooMany = decorated();
+  const extra = tooMany[2];
+  if (tooMany.length === 3 && extra !== undefined) next[extra] = stripDecorative(next[extra] ?? "");
+
+  if (decorated().length === 0) {
+    const blocked = prev1Visual ? new Set<number>([0]) : new Set<number>();
+    const slot = choosePlainTitle(next, options.style, blocked);
+    const emoji = slot === null ? "" : pickTitleEmoji(next[slot] ?? "");
+    if (slot !== null && emoji) {
+      const captionEmoji = options.caption?.match(/\p{Extended_Pictographic}/u)?.[0] ?? "";
+      const atStart = seedFrom(next.join("|")) % 2 === 0 && captionEmoji !== emoji;
+      next[slot] = withDecorative(next[slot] ?? "", emoji, atStart);
     }
   }
 
-  const check = evaluateTitleFormats(next, previousTitles);
-  if (check.ok) return applyLeadingFlagFrequency(next, previousTitles);
-
-  if (check.reasons.some((reason) => reason.includes("without any emoji"))) {
-    const slot = prev1Visual ? 1 : nextVisualIndex(previousTitles, next);
-    if (!analyzeTitleFormat(next[slot]).hasVisual) {
-      next[slot] = attachTitleVisual(next[slot], "pool");
+  const placed = decorated();
+  if (placed.length >= 2) {
+    const first = placed[0];
+    const second = placed[1];
+    if (
+      first !== undefined &&
+      second !== undefined &&
+      analyzeTitleFormat(next[first] ?? "").emojiPlacement === analyzeTitleFormat(next[second] ?? "").emojiPlacement
+    ) {
+      const emoji = nonFlagEmojiChars(next[second] ?? "")[0] ?? "";
+      if (emoji) next[second] = withDecorative(next[second] ?? "", emoji, analyzeTitleFormat(next[second] ?? "").emojiPlacement !== "start");
     }
+  }
+  const lead = next.findIndex((title, index) => {
+    const emoji = nonFlagEmojiChars(title)[0] ?? "";
+    return emoji && captionCopiesTitleEmoji(options.caption ?? "", emoji) && analyzeTitleFormat(title).emojiPlacement === "start" && index >= 0;
+  });
+  if (lead >= 0) {
+    const emoji = nonFlagEmojiChars(next[lead] ?? "")[0] ?? "";
+    if (emoji) next[lead] = withDecorative(next[lead] ?? "", emoji, false);
   }
 
   return applyLeadingFlagFrequency(next, previousTitles);
@@ -269,8 +327,9 @@ export function ensureTitleFormats(
 
 export function formatTitleFormatRules() {
   const pool = STORY_EMOJI_POOL.join(" ");
-  return `TITLE FORMAT — the 3 titles must look different. At least one is plain text. At least one has exactly one emoji from: ${pool}
-Match the food: 蟹→🦀, 虾→🍤, 芒果→🥭, 柠檬/青柠→🍋, 饭→🍚, 冬阴功→🍜, 咖喱→🍛. No emoji outside this list. No comma, ｜, or colon that adds a second selling point.
-🇹🇭 is rare, about 1 in 10 titles, first character only, on at most one title in a batch. Most batches have none. Never 🇹🇭 in the middle or at the end, and never 🇹🇭 + keyword + ｜.
+  return `TITLE FORMAT — the 3 titles must look different. At least one is plain text. At least one of the 3 has a single emoji from: ${pool}
+Usually one or two titles have one each. Do not leave all 3 without an emoji, and do not put one on all 3. Match the food: 蟹→🦀, 虾/冬阴功→🍤, 芒果→🥭, 柠檬/青柠→🍋, 青柠蒸鲈鱼/鲈鱼→🐟, 炒饭/糯米饭→🍚, 咖喱→🍛. No emoji outside this list, and no emoji that names a different food. Place it by THIS ROUND HUMAN STYLE, at the start or the end, not after the dish name, and not in the same spot as the caption. Do not use the same emoji position on every title that has one. No comma, ｜, or colon that adds a second selling point.
+If the customer said 不要表情 / 不要 emoji / 无表情, add no title emoji. That request overrides the batch minimum.
+🇹🇭 appears about 1 in 5 titles, first character only, on at most one title in a batch. Never 🇹🇭 in the middle or at the end, and never 🇹🇭 + keyword + ｜.
 If the previous title 1 had a decorative emoji, this title 1 is plain. Do not copy the previous 3-structure.`;
 }

@@ -1,12 +1,31 @@
+import { getBranch } from "@/lib/branches/registry";
+import { DeploymentMismatchError, getDeploymentConfig, isCurrentDeploymentRef } from "@/lib/deployment/config";
 import { isMobileDevice } from "@/lib/rednote-publish";
 
-/** Baan Ying (centralwOrld) only. Never a homepage, search page, or another branch. */
+/** centralwOrld shop. Other branches resolve their own shop id. */
 export const DIANPING_SHOP_UUID = "k9fdoJpGAdqK1XGc";
 
-export const DIANPING_SHOP_WEB_URL =
-  "https://m.dianping.com/shopinfo/k9fdoJpGAdqK1XGc?msource=Appshare2021&utm_source=shop_share&issilencelogin=0";
+const SHARE_QUERY = "msource=Appshare2021&utm_source=shop_share&issilencelogin=0";
 
-const DIANPING_SHOP_APP_SCHEME = `dianping://shopinfo?shopUuid=${DIANPING_SHOP_UUID}`;
+export function dianpingShopWebUrl(shopId: string) {
+  return `https://m.dianping.com/shopinfo/${shopId}?${SHARE_QUERY}`;
+}
+
+export function dianpingShopForCampaign(campaignOrBranchId?: string) {
+  const deployment = getDeploymentConfig();
+  if (campaignOrBranchId?.trim() && !isCurrentDeploymentRef(campaignOrBranchId)) {
+    throw new DeploymentMismatchError(
+      `Deployment ${deployment.deploymentId} cannot open another branch's Dianping shop`,
+    );
+  }
+  const branch = getBranch(deployment.branchId);
+  if (!branch?.dianpingShopId) {
+    throw new DeploymentMismatchError(`Deployment ${deployment.deploymentId} has no Dianping shop`);
+  }
+  return { shopId: branch.dianpingShopId, webUrl: dianpingShopWebUrl(branch.dianpingShopId) };
+}
+
+export const DIANPING_SHOP_WEB_URL = dianpingShopWebUrl(DIANPING_SHOP_UUID);
 
 export type OpenDianpingShopResult = "desktop" | "app" | "fallback";
 
@@ -14,41 +33,42 @@ function isAndroid() {
   return typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent || "");
 }
 
-function openWebShop(target: "_self" | "_blank") {
+function openWebShop(webUrl: string, target: "_self" | "_blank") {
   if (target === "_blank") {
-    const opened = window.open(DIANPING_SHOP_WEB_URL, "_blank", "noopener,noreferrer");
-    if (!opened) window.location.assign(DIANPING_SHOP_WEB_URL);
+    const opened = window.open(webUrl, "_blank", "noopener,noreferrer");
+    if (!opened) window.location.assign(webUrl);
     return;
   }
-  window.location.assign(DIANPING_SHOP_WEB_URL);
+  window.location.assign(webUrl);
 }
 
-function tryOpenAppScheme() {
+function tryOpenAppScheme(shopId: string, webUrl: string) {
   if (isAndroid()) {
     const intent = [
-      `intent://shopinfo?shopUuid=${DIANPING_SHOP_UUID}`,
+      `intent://shopinfo?shopUuid=${shopId}`,
       "#Intent;",
       "scheme=dianping;",
       "package=com.dianping.v1;",
-      `S.browser_fallback_url=${encodeURIComponent(DIANPING_SHOP_WEB_URL)};`,
+      `S.browser_fallback_url=${encodeURIComponent(webUrl)};`,
       "end",
     ].join("");
     window.location.href = intent;
     return;
   }
-  window.location.href = DIANPING_SHOP_APP_SCHEME;
+  window.location.href = `dianping://shopinfo?shopUuid=${shopId}`;
 }
 
 /**
- * Open the Baan Ying (centralwOrld) Dianping shop page.
+ * Open this campaign's Dianping shop page.
  * Desktop: official m.dianping.com shop URL.
  * Mobile: try the shop-specific app scheme, then the same official shop URL.
  */
-export function openDianpingShop(): Promise<OpenDianpingShopResult> {
+export function openDianpingShop(campaignOrBranchId?: string): Promise<OpenDianpingShopResult> {
   if (typeof window === "undefined") return Promise.resolve("fallback");
+  const shop = dianpingShopForCampaign(campaignOrBranchId);
 
   if (!isMobileDevice()) {
-    openWebShop("_blank");
+    openWebShop(shop.webUrl, "_blank");
     return Promise.resolve("desktop");
   }
 
@@ -75,14 +95,14 @@ export function openDianpingShop(): Promise<OpenDianpingShopResult> {
         finish("app");
         return;
       }
-      openWebShop("_self");
+      openWebShop(shop.webUrl, "_self");
       finish("fallback");
     }, 1200);
 
     try {
-      tryOpenAppScheme();
+      tryOpenAppScheme(shop.shopId, shop.webUrl);
     } catch {
-      openWebShop("_self");
+      openWebShop(shop.webUrl, "_self");
       finish("fallback");
     }
   });

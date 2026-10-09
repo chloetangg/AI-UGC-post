@@ -2,6 +2,7 @@ import {
   countCoverUnits,
   hasCoverTitleKeyword,
   isCoverKeywordStuffing,
+  selectedCoverLocation,
   type CoverTitleContext,
 } from "@/lib/cover/cover-rules";
 import { isNaturalCoverChinese } from "@/lib/cover/cover-natural";
@@ -60,8 +61,8 @@ export function isWeakSeoCover(title: string) {
   const cleaned = sanitizeCoverLine(title);
   if (!cleaned) return true;
   if (BANNED_DISCOVERY_COVERS.test(cleaned)) return true;
-  let leftover = cleaned;
-  for (const keyword of ["centralwOrld", "曼谷", "泰餐", "美食", "必吃"]) {
+  let leftover = cleaned.replace(/central\s*world|siam\s*center|terminal\s*21|one\s*bangkok/gi, "");
+  for (const keyword of ["曼谷", "泰餐", "美食", "必吃"]) {
     leftover = leftover.split(keyword).join("");
   }
   leftover = leftover.replace(SEO_ONLY_LEFTOVER, "").replace(/\s+/g, "");
@@ -254,6 +255,7 @@ export function extractExperienceFacts(context: CoverTitleContext = {}): Experie
   }
 
   if (/在购物商场里的泰餐连锁/.test(enjoy) || /购物商场|在商场里/.test(note)) {
+    const mall = mallToken(context);
     add({
       id: "mall-chain",
       kind: "scene",
@@ -261,7 +263,10 @@ export function extractExperienceFacts(context: CoverTitleContext = {}): Experie
       markers: ["商场"],
       coverMains: ["商场里吃泰餐", "逛街后来吃"],
       coverSubs: ["商场里吃饭很方便", "逛街后来吃刚刚好"],
-      titleHooks: ["centralwOrld逛街顺便吃泰餐", "商场里吃泰餐很方便"],
+      titleHooks: [
+        customerNamedMall(context) ? `${mall}逛街顺便吃泰餐` : "逛街顺便吃泰餐",
+        "商场里吃泰餐很方便",
+      ],
       captionLine: "在购物商场里吃饭，行程上很方便。",
     });
   }
@@ -513,7 +518,8 @@ export function previousPrimaryExperienceId(context: CoverTitleContext = {}, pre
   return facts.find((fact) => textHasFact(hay, fact))?.id ?? "";
 }
 
-export function formatEvidencePriorityStaticRules() {
+export function formatEvidencePriorityStaticRules(branch = "") {
+  const mall = selectedCoverLocation(branch) || CANONICAL_CENTRALWORLD;
   return `EVIDENCE PRIORITY — do this internally before writing JSON. Do not print this block.
 
 CUSTOMER INPUT → EXTRACT REAL FACTS → PICK THE MOST ATTRACTIVE TRUE FACTS → WRITE TITLE / COVER TITLE / COVER SUBTITLE.
@@ -524,12 +530,12 @@ TITLE / COVER MATERIAL PRIORITY
 Priority 1 — customer-written experience, feelings, review points, recommend reasons (dining note + custom other text).
 Priority 2 — customer-selected restaurant highlights / enjoy-most tags.
 Priority 3 — customer-selected dishes and their real recommend reasons.
-Priority 4 — confirmed restaurant facts only, e.g. dining location centralwOrld, confirmed menu/payment/atmosphere already in the system.
+Priority 4 — confirmed restaurant facts only, e.g. dining location ${mall}, confirmed menu/payment/atmosphere already in the system.
 Do not invent an experience, like, selling point, scene, price, promo, or “必吃/隐藏宝藏” conclusion that is not in the input.
 
 USER DETAIL PRESERVATION: 老板很帅 ≠ 店员很亲切. 服务很好 ≠ 环境很好. 老板很亲切 ≠ 店里很温馨. You may rewrite the wording, not the fact. Do not invent a boss, service, atmosphere, or emotion the customer did not write.
 
-centralwOrld RULE — Title 1 + Title 2 + Title 3 + Cover Title + Cover Subtitle must contain the exact token "centralwOrld" at least once. Only this spelling counts. Never CentralWorld / Centralworld / centralworld / Central World / central world / 尚泰世界 as a substitute. Weave it naturally in ONE place only. Do not repeat it. Do not stuff it. If a title already has a customer fact, prefer weaving into that line (e.g. centralwOrld逛街顺便吃泰餐) rather than a separate keyword dump.
+CURRENT MALL RULE — if a title or the cover names a mall, it is "${mall}" only. Do not name another mall, floor, or opening hours. Do not require the mall in the titles or the cover. Do not rewrite a customer fact into ${mall}逛街顺便吃泰餐, 商场里吃泰餐, or 曼谷必吃泰餐. The mall is supporting information, not the default topic.
 
 Forbidden unless the customer or confirmed data actually said it: 曼谷今天也太好吃了 / 隐藏在曼谷的宝藏餐厅 / 泰国本地人才知道的美食 / 第一次来曼谷一定要吃 / 曼谷美食天花板 / 隐藏宝藏 / 美食天花板.
 
@@ -538,10 +544,10 @@ TITLE = one hook from real input. CAPTION = the full true story. COVER = the sho
 If the note is 老板很帅，服务很好: Title may use 老板, Caption may use 服务, Cover may use 遇到帅老板. Do not put 老板很帅 in all three.
 
 TITLE ANGLES (must be obviously different, all from real facts):
-1 = location + dining, or personal experience from PRIMARY
-2 = a different customer experience / enjoy-most highlight
-3 = restaurant trait / dish / scene from real input
-Not the same sentence with swapped adjectives. Do not add unrelated details just to look different.
+1 = the customer's own reason, relationship, or reaction when the note has one. Not location + 泰餐.
+2 = a different point they wrote or selected
+3 = another unused true point: a dish, a person, or a trait they actually mentioned
+Not the same sentence with swapped adjectives. Do not add a mall or a cuisine label just to look different.
 Forbidden trio: 曼谷美食发现 / 曼谷美食推荐 / 曼谷泰餐推荐`;
 }
 
@@ -554,7 +560,7 @@ export function formatEvidencePriorityInstance(context: CoverTitleContext = {}, 
   const food = facts.find((fact) => fact.kind === "food");
   const allowedMaterial = facts.length
     ? facts.map((fact) => `${fact.id}: ${fact.markers.join("/")}`).join("; ")
-    : "confirmed dining location centralwOrld + selected dishes/reasons only";
+    : `confirmed dining location ${selectedCoverLocation(context.branch) || CANONICAL_CENTRALWORLD} + selected dishes/reasons only`;
   return `ALLOWED TITLE MATERIAL THIS VISIT: ${allowedMaterial}
 
 THIS VISIT INTERNAL BRIEF:
@@ -573,11 +579,11 @@ COVER HOOK TYPE this round: prefer ${
 Previous cover hook type: ${previousHook || "none"}
 Previous primary experience: ${previousPrimary || "none"}
 Previous title angle: ${context.previousTitleAngle || "none"}
-Do not default to 曼谷美食发现 / 曼谷泰餐推荐 / 曼谷美食推荐. If validation fails, rebuild from PRIMARY EXPERIENCE + one pool keyword, e.g. 曼谷泰餐遇到帅老板, never 曼谷+美食+发现.`;
+Do not default to 曼谷美食发现 / 曼谷泰餐推荐 / 曼谷美食推荐 / 商场里吃泰餐. If a line is only a place or a cuisine label, rebuild it from PRIMARY EXPERIENCE. A pool keyword may sit inside that line. It does not become the topic.`;
 }
 
 export function formatEvidencePriorityRules(context: CoverTitleContext = {}, previousTitles: string[] = []) {
-  return `${formatEvidencePriorityStaticRules()}
+  return `${formatEvidencePriorityStaticRules(context.branch)}
 
 ${formatEvidencePriorityInstance(context, previousTitles)}`;
 }
@@ -607,7 +613,7 @@ export function ensureEvidenceLedCopy(input: {
     isWeakSeoCover(coverTitle) ||
     (previousType === "discovery" && classifyCoverHookType(coverTitle, coverSubtitle) === "discovery");
 
-  if (preferred && (coverIsWeak || (facts.length > 0 && layersWithFacts(titles, caption, coverTitle, coverSubtitle, facts) < 2))) {
+  if (preferred && coverIsWeak) {
     coverTitle = preferred.title;
     coverSubtitle = preferred.subtitle;
   }
@@ -615,7 +621,10 @@ export function ensureEvidenceLedCopy(input: {
   if (facts.length > 0 && layersWithFacts(titles, caption, coverTitle, coverSubtitle, facts) < 2) {
     const primary = facts[0];
     if (!textHasFact(caption, primary)) caption = injectFactIntoCaption(caption, primary);
-    if (!titles.some((title) => textHasFact(title, primary))) {
+    if (
+      headlineNeedsEvidenceReplacement(titles[0]) &&
+      !titles.some((title) => textHasFact(title, primary))
+    ) {
       const hook = primary.titleHooks[0] ?? tryCoverMain(primary.coverMains[0]);
       if (hook) titles[0] = titles[0].trimStart().startsWith("🇹🇭") ? `🇹🇭${hook}` : hook;
     }
@@ -637,35 +646,17 @@ export function ensureEvidenceLedCopy(input: {
   };
 }
 
-const ENJOY_MARKERS: Record<string, string[]> = {
-  有中文菜单: ["中文菜单"],
-  餐厅面积很大: ["面积", "环境大"],
-  在购物商场里的泰餐连锁: ["商场", "逛街"],
-  刚刚翻新环境很好: ["翻新"],
-  店员服务热情周到: ["服务", "热情"],
-  店里菜品选择丰富: ["菜品", "选择"],
-  食物味道正宗美味: ["正宗"],
-  餐厅风格有满满的家庭式温馨氛围: ["温馨"],
-  支付可以使用支付宝: ["支付宝"],
-};
-
-const NOTE_MARKERS = [
-  "老板",
-  "帅",
-  "服务",
-  "中文菜单",
-  "支付宝",
-  "逛",
-  "舒服",
-  "温馨",
-  "第一次",
-  "正宗",
-  "翻新",
-  "家人",
-] as const;
-
 export function normalizeExactCentralworld(text: string) {
   return text.replace(/central\s*world/gi, CANONICAL_CENTRALWORLD);
+}
+
+function mallToken(context: CoverTitleContext) {
+  return selectedCoverLocation(context.branch) || CANONICAL_CENTRALWORLD;
+}
+
+function mentionsMallToken(text: string, token: string) {
+  if (/central/i.test(token)) return /central\s*world/i.test(text);
+  return text.toLowerCase().includes(token.toLowerCase());
 }
 
 export function copyMentionsExactCentralworld(fields: string[]) {
@@ -678,46 +669,22 @@ function hasMallEvidence(context: CoverTitleContext) {
   return /在购物商场里的泰餐连锁/.test(enjoy) || /逛|商场/.test(note);
 }
 
-function collectGroundingMarkers(context: CoverTitleContext, facts: ExperienceFact[]) {
-  const markers = new Set<string>();
-  for (const fact of facts) {
-    for (const marker of fact.markers) {
-      if (marker.length >= 2) markers.add(marker);
-    }
-  }
-  for (const tag of context.enjoyMost ?? []) {
-    const aliases = ENJOY_MARKERS[tag];
-    if (aliases) {
-      for (const alias of aliases) markers.add(alias);
-    } else if (tag && tag !== "其他" && tag.length >= 2) {
-      markers.add(tag.slice(0, 6));
-    }
-  }
-  for (const dish of context.dishes ?? []) {
-    if (!dish || dish === "Others") continue;
-    const short = coverDishShortName(chineseFullDishName(dish as RecommendedDish) || dish);
-    if (short) markers.add(short);
-  }
-  for (const reason of context.recommendTo ?? []) {
-    if (reason && reason !== "其他" && reason.length >= 2) markers.add(reason.slice(0, 4));
-  }
-  const note = context.diningNote ?? "";
-  for (const token of NOTE_MARKERS) {
-    if (note.includes(token)) markers.add(token);
-  }
-  return [...markers];
+/** The customer wrote this mall's name. The branch field and the word 商场 do not count. */
+function customerNamedMall(context: CoverTitleContext) {
+  const blob = [context.diningNote ?? "", ...(context.enjoyMost ?? []), ...(context.recommendTo ?? [])].join("\n");
+  const token = mallToken(context);
+  if (!token || /central/i.test(token)) return /central\s*world|尚泰世界/i.test(blob);
+  return blob.toLowerCase().includes(token.toLowerCase());
 }
 
-function isGroundedHeadline(text: string, markers: string[], facts: ExperienceFact[]) {
-  const cleaned = text.replace(/🇹🇭/g, "");
-  if (!cleaned.trim()) return false;
-  if (GENERIC_UNGROUNDED_TITLE.test(cleaned)) return false;
-  if (WEAK_SEO_TITLE_ONLY.test(cleaned.replace(/\s+/g, ""))) return false;
-  if (DISCOVERY_TITLE_SHELL.test(cleaned) && !markers.some((marker) => cleaned.includes(marker))) {
-    return false;
-  }
-  if (facts.some((fact) => textHasFact(cleaned, fact))) return true;
-  return markers.some((marker) => marker.length >= 2 && cleaned.includes(marker));
+/** A blank line, or a line that is only a stock SEO / discovery shell, can be replaced. */
+export function headlineNeedsEvidenceReplacement(text: string) {
+  const cleaned = text.replace(/🇹🇭/g, "").trim();
+  if (!cleaned) return true;
+  if (GENERIC_UNGROUNDED_TITLE.test(cleaned)) return true;
+  if (WEAK_SEO_TITLE_ONLY.test(cleaned.replace(/\s+/g, ""))) return true;
+  if (DISCOVERY_TITLE_SHELL.test(cleaned)) return true;
+  return isWeakSeoCover(cleaned);
 }
 
 function usableTitleHooks(facts: ExperienceFact[], context: CoverTitleContext) {
@@ -748,7 +715,6 @@ function keepLeadingFlag(original: string, next: string) {
 function rewriteUngroundedTitles(
   titles: [string, string, string],
   facts: ExperienceFact[],
-  markers: string[],
   context: CoverTitleContext,
 ): [string, string, string] {
   const hooks = usableTitleHooks(facts, context);
@@ -757,7 +723,7 @@ function rewriteUngroundedTitles(
   let hookIndex = 0;
   const used = new Set<string>();
   for (let index = 0; index < next.length; index += 1) {
-    if (isGroundedHeadline(next[index], markers, facts)) continue;
+    if (!headlineNeedsEvidenceReplacement(next[index])) continue;
     let hook = hooks[hookIndex % hooks.length] ?? hooks[0];
     hookIndex += 1;
     if (used.has(hook) && hooks.length > 1) {
@@ -771,43 +737,24 @@ function rewriteUngroundedTitles(
 }
 
 function weaveCentralworld(title: string, context: CoverTitleContext) {
+  const mallName = mallToken(context);
   const text = normalizeExactCentralworld(title);
-  if (text.includes(CANONICAL_CENTRALWORLD)) return text;
+  if (mentionsMallToken(text, mallName)) return text;
+  if (!customerNamedMall(context)) return text;
   const mall = hasMallEvidence(context);
   const flag = text.startsWith("🇹🇭") ? "🇹🇭" : "";
   const body = text.replace(/^🇹🇭/, "");
 
-  if (mall && /逛街/.test(body)) return `${flag}${body.replace("逛街", `${CANONICAL_CENTRALWORLD}逛街`)}`;
-  if (mall && /逛完/.test(body)) return `${flag}${body.replace("逛完", `${CANONICAL_CENTRALWORLD}逛完`)}`;
-  if (mall && /商场/.test(body)) return `${flag}${body.replace("商场", `${CANONICAL_CENTRALWORLD}商场`)}`;
-  if (/[，,]/.test(body) || body.includes("｜")) {
-    const head = body.split(/[，,｜]/)[0]?.trim() || body;
-    if (/逛/.test(head)) return `${flag}${head.replace("逛", `${CANONICAL_CENTRALWORLD}逛`)}`;
-    return `${flag}在${CANONICAL_CENTRALWORLD}${head.replace(/^在/, "")}`;
-  }
-  return `${flag}${CANONICAL_CENTRALWORLD}${body}`;
+  if (mall && /逛街/.test(body)) return `${flag}${body.replace("逛街", `${mallName}逛街`)}`;
+  if (mall && /逛完/.test(body)) return `${flag}${body.replace("逛完", `${mallName}逛完`)}`;
+  if (mall && /商场/.test(body)) return `${flag}${body.replace("商场", `${mallName}商场`)}`;
+  return text;
 }
 
-function naturalCentralworldTitle(
-  title: string,
-  context: CoverTitleContext,
-  facts: ExperienceFact[],
-) {
+function naturalCentralworldTitle(title: string, context: CoverTitleContext) {
   const current = normalizeExactCentralworld(title);
-  if (current.includes(CANONICAL_CENTRALWORLD)) return current;
-  if (/逛|商场/.test(current) || isGroundedHeadline(current, collectGroundingMarkers(context, facts), facts)) {
-    return weaveCentralworld(current, context);
-  }
-  const mall = hasMallEvidence(context);
-  const flag = current.trimStart().startsWith("🇹🇭") ? "🇹🇭" : "";
-  const enjoy = (context.enjoyMost ?? []).join(" ");
-  const note = context.diningNote ?? "";
-  if (mall && /中文菜单/.test(`${enjoy} ${note}`)) {
-    return `${flag}在centralwOrld吃泰餐点菜有中文菜单`;
-  }
-  if (mall) return `${flag}centralwOrld逛街顺便吃泰餐`;
-  const hook = facts[0]?.titleHooks[0] ?? "";
-  if (hook) return keepLeadingFlag(current, `${CANONICAL_CENTRALWORLD}${hook.replace(/^曼谷/, "")}`);
+  if (mentionsMallToken(current, mallToken(context))) return current;
+  if (!customerNamedMall(context) || !/逛|商场/.test(current)) return current;
   return weaveCentralworld(current, context);
 }
 
@@ -825,7 +772,6 @@ export function ensureGroundedHeadlineCopy(input: {
 }) {
   const context = input.context ?? {};
   const facts = extractExperienceFacts(context);
-  const markers = collectGroundingMarkers(context, facts);
   let titles: [string, string, string] = [
     normalizeExactCentralworld(input.titles[0]),
     normalizeExactCentralworld(input.titles[1]),
@@ -834,22 +780,21 @@ export function ensureGroundedHeadlineCopy(input: {
   let coverTitle = normalizeExactCentralworld(input.coverTitle);
   let coverSubtitle = normalizeExactCentralworld(input.coverSubtitle);
 
-  titles = rewriteUngroundedTitles(titles, facts, markers, context);
+  titles = rewriteUngroundedTitles(titles, facts, context);
 
-  if (!isGroundedHeadline(coverTitle, markers, facts) && facts.length > 0) {
+  const coverTitleNeeds = headlineNeedsEvidenceReplacement(coverTitle);
+  const coverSubtitleNeeds = headlineNeedsEvidenceReplacement(coverSubtitle);
+  if ((coverTitleNeeds || coverSubtitleNeeds) && facts.length > 0) {
     const pair = evidenceLedCoverPairs(context)[0];
     if (pair) {
-      coverTitle = pair.title;
-      if (!isGroundedHeadline(coverSubtitle, markers, facts)) coverSubtitle = pair.subtitle;
+      if (coverTitleNeeds) coverTitle = pair.title;
+      if (coverSubtitleNeeds && pair.subtitle) coverSubtitle = pair.subtitle;
     }
-  } else if (!isGroundedHeadline(coverSubtitle, markers, facts) && facts.length > 0) {
-    const pair = evidenceLedCoverPairs(context)[0];
-    if (pair?.subtitle) coverSubtitle = pair.subtitle;
   }
 
-  if (!copyMentionsExactCentralworld([...titles, coverTitle, coverSubtitle])) {
+  if (![...titles, coverTitle, coverSubtitle].some((field) => mentionsMallToken(field, mallToken(context)))) {
     const index = pickCentralworldTitleIndex(titles);
-    titles[index] = naturalCentralworldTitle(titles[index], context, facts);
+    titles[index] = naturalCentralworldTitle(titles[index], context);
   }
 
   return {

@@ -89,6 +89,8 @@ export type AnalyticsReport = {
   startDate: string | null;
   endDate: string | null;
   timezone: string;
+  branchId: string;
+  branchName: string;
   summary: AnalyticsSummary;
   conversion: AnalyticsConversion;
   daily: AnalyticsDailyRow[];

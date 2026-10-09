@@ -17,12 +17,11 @@ import {
   normalizeCoverLocations,
   packsMultipleCoverEvidence,
   inventsUnsupportedCoverClaim,
-  subtitleFromCoverContext,
-  uniqueCoverPoolKeywords,
   usesUnselectedCoverLocation,
   type CoverTitleContext,
 } from "./cover-rules";
 import { sanitizeCoverAbsoluteLanguage } from "./cover-absolute";
+import { selectOneValidSubtitle, validateSubtitleCandidate } from "./subtitle-units";
 import {
   isIncompleteCoverAction,
   isNaturalCoverChinese,
@@ -179,7 +178,9 @@ export function isAcceptableSubtitle(
   const cleaned = prepareCoverLine(subtitle);
   const units = countCoverUnits(cleaned);
   if (!cleaned) return false;
-  if (units < MIN_SUB_TITLE_CHARS || units > maxSubtitleUnits(cleaned, context)) return false;
+  const verdict = validateSubtitleCandidate(cleaned, context.diningNote ?? "");
+  if (!verdict.ok) return false;
+  if (units > maxSubtitleUnits(cleaned, context)) return false;
   if (looksIncompleteCover(cleaned)) return false;
   if (FORBIDDEN_COVER_CLAIMS.test(cleaned)) return false;
   if (containsHarshNegative(cleaned)) return false;
@@ -328,7 +329,62 @@ function applyCoverDishNames(
   return { title: prepareCoverLine(nextTitle), subtitle: prepareCoverLine(nextSubtitle) };
 }
 
-export function layoutCoverOverlay(
+function customerSaid(context: CoverTitleContext, pattern: RegExp) {
+  const blob = [context.diningNote ?? "", ...(context.recommendTo ?? []), ...(context.enjoyMost ?? [])].join("\n");
+  return pattern.test(blob);
+}
+
+/** A specific readable line stays. Keyword quota and a one-or-two-unit length miss do not reject it. */
+function substantiveCoverLine(
+  text: string,
+  role: "main" | "sub",
+  postTitles: string[],
+  context: CoverTitleContext,
+  mainTitle = "",
+) {
+  const cleaned = prepareCoverLine(text);
+  if (!cleaned) return false;
+  if (!isNaturalCoverChinese(cleaned)) return false;
+  if (looksIncompleteCover(cleaned)) return false;
+  if (FORBIDDEN_COVER_CLAIMS.test(cleaned)) return false;
+  if (containsHarshNegative(cleaned)) return false;
+  if (/#|📍|⏰|http|www\.|\+\d/.test(cleaned)) return false;
+  if (isCoverKeywordStuffing(cleaned)) return false;
+  if (isWeakSeoCover(cleaned)) return false;
+  if (usesUnselectedCoverLocation(cleaned, context.branch)) return false;
+  if (role === "main" && postTitles.some((postTitle) => copiedFromPostTitle(cleaned, postTitle))) return false;
+  if (role === "sub") {
+    if (looksLikeCoverTemplateSpeak(cleaned)) return false;
+    if (GENERIC_SUBTITLE.test(cleaned)) return false;
+    if (packsMultipleCoverEvidence(cleaned, context)) return false;
+    if (hasIllegalCoverDishShort(cleaned, context.dishes)) return false;
+    if (inventsUnsupportedCoverClaim(cleaned, context)) return false;
+    if (mainTitle && repeatsMain(mainTitle, cleaned)) return false;
+    const verdict = validateSubtitleCandidate(cleaned, context.diningNote ?? "");
+    if (!verdict.ok && verdict.reason !== "INVALID_LENGTH") return false;
+  }
+  return true;
+}
+
+function inventedTaste(text: string, context: CoverTitleContext) {
+  if (/很香|有点特别/.test(text) && !customerSaid(context, /香/)) return true;
+  if (/很满足/.test(text) && !customerSaid(context, /满足/)) return true;
+  if (/很好吃|好好吃/.test(text) && !customerSaid(context, /好吃/)) return true;
+  return false;
+}
+
+function replacementMain(context: CoverTitleContext, currentSubtitle: string) {
+  for (const pair of evidenceLedCoverPairs(context)) {
+    const title = prepareCoverLine(pair.title);
+    if (!title || title === currentSubtitle) continue;
+    if (isWeakSeoCover(title) || !isNaturalCoverChinese(title) || looksIncompleteCover(title)) continue;
+    if (inventedTaste(title, context)) continue;
+    return title;
+  }
+  return "";
+}
+
+function chooseCoverOverlay(
   rawTitle: string,
   rawSubtitle = "",
   postTitles: string[] = [],
@@ -340,57 +396,46 @@ export function layoutCoverOverlay(
     postTitles,
     context,
   );
-  const first = expanded.title;
-  const second = expanded.subtitle;
-  const hooked = subtitleFromCoverContext(context);
-  const preferHook =
-    /^(这口)?[\u4e00-\u9fff]{2,8}(很好吃|很有家常味)$/.test(second) &&
-    hooked !== second &&
-    isAcceptableCoverOverlay(first, hooked, postTitles, context);
+  let title = expanded.title;
+  let subtitle = expanded.subtitle;
+  if (!title.trim() && !subtitle.trim()) return pickFallbackPair(postTitles, context);
 
-  if (preferHook) {
-    return { title: first, subtitle: hooked };
+  const repairedTitle = repairIncompleteCoverAction(title, context);
+  if (repairedTitle !== title && !substantiveCoverLine(title, "main", postTitles, context)) {
+    title = repairedTitle;
   }
-
-  const repairedTitle = repairIncompleteCoverAction(first, context);
-  if (repairedTitle !== first) {
-    if (isAcceptableCoverOverlay(repairedTitle, second, postTitles, context)) {
-      return { title: repairedTitle, subtitle: second };
-    }
-    if (isAcceptableCoverOverlay(repairedTitle, hooked, postTitles, context)) {
-      return { title: repairedTitle, subtitle: hooked };
+  if (!substantiveCoverLine(title, "main", postTitles, context)) {
+    const replacement = replacementMain(context, subtitle);
+    if (replacement) title = replacement;
+  }
+  if (!substantiveCoverLine(subtitle, "sub", postTitles, context, title)) {
+    const verdict = validateSubtitleCandidate(prepareCoverLine(subtitle), context.diningNote ?? "");
+    if (!subtitle.trim() || (verdict.ok === false && verdict.reason !== "INVALID_LENGTH")) {
+      const next = selectOneValidSubtitle({ note: context.diningNote, preferred: subtitle });
+      if (next && !inventedTaste(next, context)) subtitle = next;
     }
   }
+  return { title, subtitle };
+}
 
-  if (isAcceptableCoverOverlay(first, second, postTitles, context)) {
-    const evidencePairs = evidenceLedCoverPairs(context);
-    if (isWeakSeoCover(first) && evidencePairs.length > 0) {
-      const evidence = pickFallbackPair(postTitles, context);
-      if (
-        !isWeakSeoCover(evidence.title) &&
-        isAcceptableCoverOverlay(evidence.title, evidence.subtitle, postTitles, context)
-      ) {
-        return { title: evidence.title, subtitle: evidence.subtitle };
-      }
-    }
-    return { title: first, subtitle: second };
+export function layoutCoverOverlay(
+  rawTitle: string,
+  rawSubtitle = "",
+  postTitles: string[] = [],
+  context: CoverTitleContext = {},
+) {
+  const picked = chooseCoverOverlay(rawTitle, rawSubtitle, postTitles, context);
+  if (substantiveCoverLine(picked.subtitle, "sub", postTitles, context, picked.title)) {
+    return picked;
   }
-
-  if (
-    isAcceptableMainTitle(first, postTitles, context) &&
-    uniqueCoverPoolKeywords(first).length <= 3
-  ) {
-    const subtitle = subtitleFromCoverContext(context);
-    if (isAcceptableCoverOverlay(first, subtitle, postTitles, context)) {
-      return { title: first, subtitle };
-    }
-    const fallback = pickFallbackPair(postTitles, context);
-    if (isAcceptableCoverOverlay(first, fallback.subtitle, postTitles, context)) {
-      return { title: first, subtitle: fallback.subtitle };
-    }
-  }
-
-  return pickFallbackPair(postTitles, context);
+  const subtitle = selectOneValidSubtitle({
+    note: context.diningNote,
+    preferred: picked.subtitle,
+  });
+  return {
+    title: picked.title,
+    subtitle: inventedTaste(subtitle, context) ? picked.subtitle : subtitle,
+  };
 }
 
 export function normalizeCoverTitle(raw: string, postTitles: string[] = [], context: CoverTitleContext = {}) {

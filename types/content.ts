@@ -1,12 +1,14 @@
 import {
   BAAN_YING_BRANCHES,
   DEFAULT_BAAN_YING_BRANCH,
+  OFFICIAL_LOCATIONS,
   type BaanYingBranch,
   type InlineLocationSlot,
   type InlineLocationStyle,
   type LocationPlacement,
   type LocationTimeFormatId,
 } from "@/lib/locations";
+import { getDeploymentConfig } from "@/lib/deployment/config";
 
 export { BAAN_YING_BRANCHES, DEFAULT_BAAN_YING_BRANCH };
 export type { BaanYingBranch, InlineLocationSlot, InlineLocationStyle, LocationPlacement, LocationTimeFormatId };
@@ -177,10 +179,12 @@ export const emptyProductFeedback: ProductFeedback = {
   diningExperienceNote: "",
 };
 
-export function withDefaultBranch(feedback: ProductFeedback): ProductFeedback {
+export function withDefaultBranch(feedback: ProductFeedback, _campaignId?: string): ProductFeedback {
+  const deployment = getDeploymentConfig();
+  const branch = OFFICIAL_LOCATIONS[deployment.locationId];
   return {
     ...feedback,
-    branch: DEFAULT_BAAN_YING_BRANCH,
+    branch: branch.surveyValue,
     mealExpenseRange: (MEAL_EXPENSE_RANGES as readonly string[]).includes(feedback.mealExpenseRange)
       ? feedback.mealExpenseRange
       : "",
@@ -313,6 +317,8 @@ export type GeneratePostInput = {
     informationDensity?: string;
     structureType: string;
     lengthLevel: string;
+    humanStyle?: string;
+    emojiMode?: string;
   }>;
   campaignId?: string;
   submissionId?: string;

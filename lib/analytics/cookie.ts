@@ -1,4 +1,5 @@
 import { createId } from "@/lib/id";
+import { getDeploymentConfig, isCurrentDeploymentRef } from "@/lib/deployment/config";
 
 export { ANALYTICS_QR_COOKIE, ANALYTICS_SESSION_COOKIE } from "@/lib/analytics/types";
 
@@ -20,9 +21,10 @@ export function sanitizeQrCodeId(raw: string) {
 }
 
 export function campaignIdFromQrCode(qrCodeId: string) {
+  const deployment = getDeploymentConfig();
   const id = sanitizeQrCodeId(qrCodeId);
-  if (id === "baan-ying" || id.startsWith("baan-ying-")) return "baan-ying";
-  return "baan-ying";
+  if (isCurrentDeploymentRef(id)) return deployment.campaignId;
+  return deployment.campaignId;
 }
 
 export function newAnalyticsSessionId() {

@@ -42,6 +42,7 @@ export function formatPartySizeRules(context: CoverTitleContext = {}) {
   return `PARTY SIZE — only if the customer explicitly wrote or selected who they dined with.
 Allowed headcount this visit: ${kinds.length ? kinds.join(", ") : "NONE — do not invent a headcount."}
 ${namedReaction ? "The note names a person's reaction. Keep that person and what they liked or disliked. Do not drop them." : "If no person is named, write 这次来吃 / 这顿吃下来 / 来这里吃."}
+A recommendation is not a headcount. 跟着同事的推荐 / 朋友推荐过来 stays that reason. Do not rewrite it as 逛完商场, and do not turn it into 和同事一起 unless they said they came together.
 Never invent 两个人 / 和朋友 / 一家三口 / 适合一家人 / 一个人来 / 带家人 / 我们几个人 / 适合儿童 / 儿童必点 / 适合带孩子 / 亲子用餐.
 A named reaction is not a selling point. 小孩子很喜欢滑蛋饭 stays 小朋友很喜欢这道滑蛋饭. It must not become 适合儿童 or 很适合带孩子来.
 Do not infer party size from tourist/local, dish count, photo count, spend, table photos, or other form answers.
@@ -108,5 +109,5 @@ export function neutralizeInventedPartyCopy(text: string, context: CoverTitleCon
       next = next.replace(pattern, replacement);
     }
   }
-  return next.replace(/\s{2,}/g, " ").replace(/，{2,}/g, "，").trim();
+  return next.replace(/[^\S\n]{2,}/g, " ").replace(/，{2,}/g, "，").trim();
 }

@@ -1,3 +1,5 @@
+import { hashtagPoolForBranchId } from "@/lib/branches/hashtag-pools";
+
 export const REQUIRED_HASHTAGS = ["#BaanYing曼谷"] as const;
 export const RANDOM_HASHTAG_POOL = [
   "#centralworld",
@@ -48,7 +50,9 @@ Do NOT add a hashtag block after the caption or after Location & Time.
 Do NOT ask this caption generator to generate hashtags.
 If a previous caption included hashtags, ignore them and do not copy them.`;
 
-export const HASHTAGS_JSON_FIELD_RULES = `HASHTAGS — JSON field "hashtags" only. Never put hashtags in titles or caption.
+export function formatHashtagFieldRules(branchId?: string) {
+  const pool = (branchId ? hashtagPoolForBranchId(branchId) : RANDOM_HASHTAG_POOL).join(" ");
+  return `HASHTAGS — JSON field "hashtags" only. Never put hashtags in titles or caption.
 
 Exactly 5 hashtags:
 - Always include #BaanYing曼谷
@@ -56,10 +60,13 @@ Exactly 5 hashtags:
 - Shuffle all 5 into a random order. #BaanYing曼谷 is NOT always first.
 
 Approved pool ONLY:
-${POOL_HASHTAG_LINE}
+${pool}
 
 The 4 random tags MUST be different from each other and should differ from previousHashtags when another set exists.
-Never pick #BaanYing曼谷 as one of the 4 random tags. Never output a tag outside this pool.`;
+Never pick #BaanYing曼谷 as one of the 4 random tags. Never output a tag from another branch.`;
+}
+
+export const HASHTAGS_JSON_FIELD_RULES = formatHashtagFieldRules();
 
 export const STRICT_HASHTAG_RULES = `【HASHTAG GENERATION — SEPARATE MODULE】
 
@@ -126,19 +133,19 @@ function sameTagSet(left: string[], right: string[]) {
   return left.every((tag) => right.some((item) => tagKey(item) === tagKey(tag)));
 }
 
-function pickRandomPoolHashtags(exclude: string[] = []): string[] {
+function pickRandomPoolHashtags(exclude: string[] = [], pool: readonly string[] = RANDOM_HASHTAG_POOL): string[] {
   const blocked = new Set(exclude.map(tagKey));
-  const available = RANDOM_HASHTAG_POOL.filter((tag) => !blocked.has(tagKey(tag)));
-  const source = available.length >= DYNAMIC_HASHTAG_COUNT ? available : [...RANDOM_HASHTAG_POOL];
+  const available = pool.filter((tag) => !blocked.has(tagKey(tag)));
+  const source = available.length >= DYNAMIC_HASHTAG_COUNT ? available : [...pool];
   return shuffleTags([...source]).slice(0, DYNAMIC_HASHTAG_COUNT);
 }
 
-function fillPoolHashtags(current: string[], exclude: string[]) {
+function fillPoolHashtags(current: string[], exclude: string[], pool: readonly string[] = RANDOM_HASHTAG_POOL) {
   const extras = [...current];
   const seen = new Set(extras.map(tagKey));
   const [firstPass, secondPass] = [
-    pickRandomPoolHashtags([...REQUIRED_HASHTAGS, ...extras, ...exclude]),
-    pickRandomPoolHashtags([...REQUIRED_HASHTAGS, ...extras]),
+    pickRandomPoolHashtags([...REQUIRED_HASHTAGS, ...extras, ...exclude], pool),
+    pickRandomPoolHashtags([...REQUIRED_HASHTAGS, ...extras], pool),
   ];
   for (const tag of [...firstPass, ...secondPass]) {
     if (extras.length === DYNAMIC_HASHTAG_COUNT) break;
@@ -183,17 +190,22 @@ function orderHashtags(candidates: string[], extras: string[], required: string)
 export function normalizeHashtags(
   candidates: string[] = [],
   previousHashtags: string[] = [],
-  options: { shuffle?: boolean } = {},
+  options: { shuffle?: boolean; branchId?: string } = {},
 ): GeneratedHashtags {
   const shuffle = options.shuffle !== false;
+  const pool = options.branchId ? hashtagPoolForBranchId(options.branchId) : RANDOM_HASHTAG_POOL;
+  const poolKeys = new Set(pool.map((tag) => tag.toLowerCase()));
+  const allowed = (tag: string) => poolKeys.has(tagKey(tag));
   const required = REQUIRED_HASHTAGS[0];
   const seen = new Set([tagKey(required)]);
-  const previousRandom = previousRandomTags(previousHashtags);
+  const previousRandom = (previousHashtags ?? [])
+    .map(formatHashtag)
+    .filter((tag) => tag && allowed(tag) && !isRequiredHashtag(tag));
   let extras: string[] = [];
 
   for (const candidate of candidates) {
     const tag = formatHashtag(candidate);
-    if (!tag || seen.has(tagKey(tag)) || !isPoolHashtag(tag)) continue;
+    if (!tag || seen.has(tagKey(tag)) || !allowed(tag)) continue;
     seen.add(tagKey(tag));
     extras.push(tag);
     if (extras.length === DYNAMIC_HASHTAG_COUNT) break;
@@ -203,7 +215,7 @@ export function normalizeHashtags(
     extras = [];
   }
 
-  extras = fillPoolHashtags(extras, previousRandom);
+  extras = fillPoolHashtags(extras, previousRandom, pool);
   const ordered = orderHashtags(candidates, extras, required);
   return asFive(shuffle ? shuffleTags(ordered) : ordered);
 }

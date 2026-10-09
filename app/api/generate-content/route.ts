@@ -11,12 +11,17 @@ import {
   generateContentJsonSchema,
 } from "@/lib/generate-content/prompt";
 import { generateHashtags } from "@/lib/generate-hashtags/generate";
+import { getBranchBySurvey } from "@/lib/branches/registry";
+import { DeploymentMismatchError } from "@/lib/deployment/config";
+import { assertDeploymentOutput } from "@/lib/deployment/isolation";
 import { applyBrandSpelling, pickBrandSpelling } from "@/lib/brand-spelling";
+import { normalizeHashtags } from "@/lib/hashtags";
 import { ensureCaptionEmojis, fixFruitEmojisInTitles } from "@/lib/caption-emoji";
 import {
   finalizeOfficialLocationTime,
   planLocationTime,
   resolveDiningBranch,
+  scrubForeignBranchFacts,
   stripGeneratedLocationTime,
 } from "@/lib/locations";
 import { enforceXiaohongshuCompliance } from "@/lib/compliance";
@@ -66,7 +71,7 @@ export async function POST(request: Request) {
           json_schema: generateContentJsonSchema,
         },
         messages: [
-          { role: "system", content: buildGenerateContentSystemPrompt() },
+          { role: "system", content: buildGenerateContentSystemPrompt(diningBranch) },
           { role: "user", content: buildGenerateContentUserPrompt(payload, locationPlan) },
         ],
       });
@@ -118,19 +123,33 @@ export async function POST(request: Request) {
         inlineSlot: locationPlan.inlineSlot,
       });
       logGenerationCost(aggregateGenerationCost(usageCalls));
-      const brandSpelling = pickBrandSpelling();
+      const branchConfig = getBranchBySurvey(diningBranch);
+      const brandSpelling = pickBrandSpelling(branchConfig);
+      hashtags = normalizeHashtags(compliant.hashtags, [], {
+        branchId: branchConfig?.id,
+      });
+      const titles = fixFruitEmojisInTitles(compliant.titles).map((title) =>
+        applyBrandSpelling(scrubForeignBranchFacts(title, diningBranch), brandSpelling),
+      );
+      const body = applyBrandSpelling(located.caption, brandSpelling);
+      const spelledHashtags = hashtags.map((tag) => applyBrandSpelling(tag, brandSpelling));
+      assertDeploymentOutput([titles.join("\n"), body, spelledHashtags.join(" ")].join("\n"));
       return Response.json({
-        titles: fixFruitEmojisInTitles(compliant.titles).map((title) => applyBrandSpelling(title, brandSpelling)),
-        body: applyBrandSpelling(located.caption, brandSpelling),
-        hashtags: compliant.hashtags.map((tag) => applyBrandSpelling(tag, brandSpelling)),
+        titles,
+        body,
+        hashtags: spelledHashtags,
         locationFormat: located.format,
         locationPlacement: located.placement,
       });
     } catch (error) {
+      if (error instanceof DeploymentMismatchError) throw error;
       if (error instanceof GenerateContentError) throw error;
       throw new GenerateContentError("invalid_ai_response", "Invalid AI response", 502);
     }
   } catch (error) {
+    if (error instanceof DeploymentMismatchError) {
+      return jsonError("invalid_request", error.message, 400);
+    }
     if (error instanceof GenerateContentError) {
       return jsonError(error.code, error.message, error.status);
     }

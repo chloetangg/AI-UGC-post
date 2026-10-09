@@ -2077,6 +2077,10 @@ export async function composeCover(request: ComposeRequest): Promise<ComposeResu
     };
   }
 
+  if (subtitleLayout?.measured.truncated || (subtitleLayout && subtitleLayout.measured.lines.join("") !== subtitleLayout.text)) {
+    throw new CoverComposeError("Cover subtitle does not fit the template without clipping", 422);
+  }
+
   const svg = await satori(
     <CoverMarkup
       photoDataUrl={photo.dataUrl}

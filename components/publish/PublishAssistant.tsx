@@ -18,7 +18,7 @@ import {
   type RednotePublishPackage,
 } from "@/lib/rednote-publish";
 import { sharePost } from "@/lib/publish/share";
-import { DIANPING_SHOP_WEB_URL } from "@/lib/publish/dianping-shop";
+import { dianpingShopForCampaign } from "@/lib/publish/dianping-shop";
 import { openTrackedDianpingShop } from "@/lib/publish/track-dianping";
 import type { PublishPlatform } from "@/lib/publish/types";
 import { trackAnalyticsEvent } from "@/lib/analytics/track-client";
@@ -32,7 +32,8 @@ export function PublishAssistant({
   slides: FinalSlide[];
 }) {
   const t = useT();
-  const { generationId } = useCampaignFlow();
+  const { generationId, campaignId } = useCampaignFlow();
+  const dianpingShopUrl = dianpingShopForCampaign(campaignId).webUrl;
   const mobile = useSyncExternalStore(emptySubscribe, isMobileDevice, () => false);
   const fileShare = useSyncExternalStore(emptySubscribe, canShareFiles, () => false);
   const downloads = useMemo(() => collectRednoteDownloads(pkg), [pkg]);
@@ -160,7 +161,7 @@ export function PublishAssistant({
     if (busy) return;
     setBusy(true);
     setDianpingFallback(false);
-    const result = await openTrackedDianpingShop(generationId);
+    const result = await openTrackedDianpingShop(generationId, campaignId);
     if (result === "fallback" || result === "desktop") setDianpingFallback(true);
     setBusy(false);
   }
@@ -241,7 +242,7 @@ export function PublishAssistant({
 
         {dianpingFallback && !dianpingOpen ? (
           <a
-            href={DIANPING_SHOP_WEB_URL}
+            href={dianpingShopUrl}
             target="_blank"
             rel="noreferrer"
             className="block text-center text-sm font-semibold text-primary underline-offset-2 hover:underline"

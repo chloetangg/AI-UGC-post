@@ -1,5 +1,5 @@
 import type OpenAI from "openai";
-import { costFromTokens, pricingForModel } from "@/lib/openai-pricing";
+import { costFromTokens, knownPricingForModel } from "@/lib/openai-pricing";
 
 export type OpenAICallUsage = {
   label: string;
@@ -25,6 +25,7 @@ export type GenerationCostReport = {
   imageInputCost: number;
   totalCost: number;
   usageMissingCalls: number;
+  costKnown: boolean;
 };
 
 export function usageFromCompletion(
@@ -46,7 +47,10 @@ export function usageFromCompletion(
 }
 
 function costForCall(call: OpenAICallUsage) {
-  const pricing = pricingForModel(call.model);
+  const pricing = knownPricingForModel(call.model);
+  if (!pricing || call.usageMissing) {
+    return { inputCost: 0, outputCost: 0, imageInputCost: 0, totalCost: 0, priced: false };
+  }
   const cached = Math.min(call.cachedInputTokens, call.inputTokens);
   const billedInput = Math.max(call.inputTokens - cached, 0);
   const inputCost =
@@ -54,7 +58,7 @@ function costForCall(call: OpenAICallUsage) {
     costFromTokens(cached, pricing.cachedInputPerMillion);
   const outputCost = costFromTokens(call.outputTokens, pricing.outputPerMillion);
   const imageInputCost = costFromTokens(call.imageInputTokens, pricing.inputPerMillion);
-  return { inputCost, outputCost, imageInputCost, totalCost: inputCost + outputCost };
+  return { inputCost, outputCost, imageInputCost, totalCost: inputCost + outputCost, priced: true };
 }
 
 export function aggregateGenerationCost(calls: OpenAICallUsage[]): GenerationCostReport {
@@ -71,6 +75,7 @@ export function aggregateGenerationCost(calls: OpenAICallUsage[]): GenerationCos
       acc.outputCost += cost.outputCost;
       acc.imageInputCost += cost.imageInputCost;
       acc.totalCost += cost.totalCost;
+      if (!cost.priced) acc.costKnown = false;
       if (call.usageMissing) acc.usageMissingCalls += 1;
       return acc;
     },
@@ -85,6 +90,7 @@ export function aggregateGenerationCost(calls: OpenAICallUsage[]): GenerationCos
       imageInputCost: 0,
       totalCost: 0,
       usageMissingCalls: 0,
+      costKnown: calls.length > 0,
     },
   );
 
@@ -106,9 +112,9 @@ export function formatGenerationCostLog(report: GenerationCostReport) {
     `Input Tokens: ${report.inputTokens}`,
     `Output Tokens: ${report.outputTokens}`,
     `Total Tokens: ${report.totalTokens}`,
-    `Input Cost: ${usd(report.inputCost)}`,
-    `Output Cost: ${usd(report.outputCost)}`,
-    `Total Cost: ${usd(report.totalCost)}`,
+    report.costKnown ? `Input Cost: ${usd(report.inputCost)}` : "Input Cost: unavailable",
+    report.costKnown ? `Output Cost: ${usd(report.outputCost)}` : "Output Cost: unavailable",
+    report.costKnown ? `Total Cost: ${usd(report.totalCost)}` : "Total Cost: unavailable",
   ];
 
   if (report.imageInputTokens > 0) {
@@ -121,6 +127,10 @@ export function formatGenerationCostLog(report: GenerationCostReport) {
   }
 
   lines.splice(2, 0, `Calls: ${report.calls}`);
+
+  if (!report.costKnown) {
+    lines.push("Cost was not estimated. Token counts above are from the provider; there is no price for this model.");
+  }
 
   if (report.usageMissingCalls > 0) {
     lines.push(`Missing usage on ${report.usageMissingCalls} call(s); those tokens were recorded as 0.`);

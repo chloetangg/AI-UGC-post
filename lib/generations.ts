@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { assertCurrentDeploymentRequest } from "@/lib/deployment/config";
 import { getDb } from "@/lib/mongodb";
 import { persistGeneration } from "@/lib/analytics/persist";
 import type { GenerationCostReport } from "@/lib/openai-usage";
@@ -11,6 +12,7 @@ export type GenerationDocument = {
   createdAt: Date;
   campaignId: string;
   brandId: string;
+  branchId?: string;
   submissionId: string;
   sessionId?: string;
   branch?: string;
@@ -40,7 +42,7 @@ export type GenerationDocument = {
     inputTokens: number;
     outputTokens: number;
     totalTokens: number;
-    cost: number;
+    cost: number | null;
   };
   businessMetrics?: {
     revenueModel: string;
@@ -53,6 +55,7 @@ export type InsertGenerationInput = {
   generationId?: string;
   campaignId?: string;
   brandId?: string;
+  branchId?: string;
   submissionId?: string;
   sessionId?: string;
   branch?: string;
@@ -103,12 +106,18 @@ function mealExpenseThb(value: number | null | undefined) {
 }
 
 export async function insertGeneration(input: InsertGenerationInput) {
+  const deployment = assertCurrentDeploymentRequest({
+    campaignId: input.campaignId,
+    brandId: input.brandId,
+    branchId: input.branchId,
+  });
   const db = await getDb();
   const document: GenerationDocument = {
     generationId: input.generationId?.trim() || randomUUID(),
     createdAt: new Date(),
-    campaignId: input.campaignId?.trim() || "baan-ying",
-    brandId: input.brandId?.trim() || "baan-ying",
+    campaignId: deployment.campaignId,
+    brandId: deployment.brandId,
+    branchId: deployment.branchId,
     submissionId: input.submissionId?.trim() || "",
     sessionId: input.sessionId?.trim() || "",
     branch: input.branch?.trim() || "",
@@ -144,7 +153,7 @@ export async function insertGeneration(input: InsertGenerationInput) {
       inputTokens: input.cost.inputTokens,
       outputTokens: input.cost.outputTokens,
       totalTokens: input.cost.totalTokens,
-      cost: input.cost.totalCost,
+      cost: input.cost.costKnown ? input.cost.totalCost : null,
     },
   };
 

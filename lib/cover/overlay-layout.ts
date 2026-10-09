@@ -224,15 +224,17 @@ function fitSubtitle(
     Math.round(mainSize * SUBTITLE_TO_TITLE_RATIO_MIN),
   );
 
-  const oneLine = fitSingleLine(text, wideSlot, font, startSize, minSize, 0);
+  const fitFloor = Math.min(minSize, 36);
+  const oneLine = fitSingleLine(text, wideSlot, font, startSize, fitFloor, 0);
   if (oneLine.fits) return oneLine.measured;
 
-  const twoLine = fitTwoLineSubtitle(text, wideSlot, font, startSize, minSize);
-  if (twoLine && (twoLineFits(twoLine, wideSlot.maxWidth) || subChars >= 8)) {
-    if (!oneLine.fits || twoLine.fontSize >= oneLine.size) return twoLine;
-  }
+  const twoLine = fitTwoLineSubtitle(text, wideSlot, font, startSize, fitFloor);
+  if (twoLine && twoLineFits(twoLine, wideSlot.maxWidth)) return twoLine;
 
-  return twoLine && twoLine.fontSize >= oneLine.size ? twoLine : oneLine.measured;
+  return {
+    ...(twoLine && twoLine.fontSize >= oneLine.size ? twoLine : oneLine.measured),
+    truncated: true,
+  };
 }
 
 export function resolveOverlayLines(options: {

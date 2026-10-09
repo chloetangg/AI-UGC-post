@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { getDeploymentConfig } from "@/lib/deployment/config";
+import { DASHBOARD_BRANCHES } from "@/lib/deployment/databases";
 import type { AnalyticsRange, AnalyticsReport } from "@/lib/analytics/types";
 
 const RANGES: Array<{ id: AnalyticsRange; label: string }> = [
@@ -22,6 +24,7 @@ function formatRate(value: number) {
 
 export default function AnalyticsDashboardPage() {
   const [range, setRange] = useState<AnalyticsRange>("last_7_days");
+  const [branchId, setBranchId] = useState(() => getDeploymentConfig().branchId);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [report, setReport] = useState<AnalyticsReport | null>(null);
@@ -30,6 +33,7 @@ export default function AnalyticsDashboardPage() {
 
   const query = useMemo(() => {
     const params = new URLSearchParams();
+    params.set("branch", branchId);
     if (startDate || endDate) {
       if (startDate) params.set("startDate", startDate);
       if (endDate) params.set("endDate", endDate);
@@ -37,7 +41,7 @@ export default function AnalyticsDashboardPage() {
       params.set("range", range);
     }
     return params.toString();
-  }, [endDate, range, startDate]);
+  }, [branchId, endDate, range, startDate]);
 
   useEffect(() => {
     let cancelled = false;
@@ -74,8 +78,26 @@ export default function AnalyticsDashboardPage() {
           <h1 className="font-display text-3xl text-foreground">Analytics</h1>
           <p className="text-sm text-muted-foreground">
             QR scans, form submissions, generations, Rednote and Dianping publish clicks. Dates use Asia/Bangkok.
+            Each branch is stored in its own database.
           </p>
         </header>
+
+        <div className="flex flex-wrap gap-2">
+          {DASHBOARD_BRANCHES.map((branch) => (
+            <button
+              key={branch.id}
+              type="button"
+              className={`rounded-full px-3 py-1.5 text-sm ${
+                branchId === branch.id
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-card text-foreground ring-1 ring-border"
+              }`}
+              onClick={() => setBranchId(branch.id)}
+            >
+              {branch.name}
+            </button>
+          ))}
+        </div>
 
         <div className="flex flex-wrap gap-2">
           {RANGES.map((item) => (

@@ -1,4 +1,5 @@
 import { stripTrailingHashtagBlock } from "@/lib/hashtags";
+import { DeploymentMismatchError, getDeploymentConfig } from "@/lib/deployment/config";
 
 export const BAAN_YING_BRANCHES = [
   "Baan Ying (centralwOrld, 3rd Floor)",
@@ -13,8 +14,14 @@ export type BaanYingBranch = (typeof BAAN_YING_BRANCHES)[number];
 /** System-assigned dining location. Customers no longer select a branch. */
 export const DEFAULT_BAAN_YING_BRANCH: BaanYingBranch = "Baan Ying (centralwOrld, 3rd Floor)";
 
-export function resolveDiningBranch(_branch?: string | null): BaanYingBranch {
-  return DEFAULT_BAAN_YING_BRANCH;
+export function resolveDiningBranch(branch?: string | null): BaanYingBranch {
+  const deployment = getDeploymentConfig();
+  const own = OFFICIAL_LOCATIONS[deployment.locationId];
+  const key = branch ? branchKey(branch) : "";
+  if (key && key !== own.id) {
+    throw new DeploymentMismatchError(`Deployment ${deployment.deploymentId} cannot use ${key}`);
+  }
+  return own.surveyValue;
 }
 
 const LEGACY_BAAN_YING_BRANCHES: Record<string, BaanYingBranch> = {
@@ -144,26 +151,25 @@ Do not generate any Chinese translation or localized name.
 
 If the system does not have an explicitly provided Chinese mall name: English mall name only. NEVER translate the English mall name into Chinese just because the caption is Simplified Chinese.`;
 
-export function locationFactsForPrompt() {
-  const cw = OFFICIAL_LOCATIONS.centralworld;
-  const siam = OFFICIAL_LOCATIONS.siam;
-  const t21 = OFFICIAL_LOCATIONS.terminal21;
-  const ob = OFFICIAL_LOCATIONS.onebangkok;
+export function locationFactsForPrompt(branch?: string) {
+  const key = branch ? branchKey(branch) : "";
+  const current = key ? OFFICIAL_LOCATIONS[key] : null;
+  if (!current) {
+    return {
+      chineseNameRules: "Use only the current branch's official mall name. Do not invent a Chinese mall name.",
+      branchRules: "No branch was resolved. Do not invent a mall, floor, or hours.",
+      hours: "Do not invent hours.",
+      examples: "",
+    };
+  }
+  const chinese = current.chineseName
+    ? `Approved Chinese name: ${current.chineseName}. Write ${current.officialLine}.`
+    : `No Chinese mall name. Write ${current.officialLine}. Do not translate the English name.`;
   return {
-    chineseNameRules: STRICT_MALL_CHINESE_NAME_RULES,
-    branchRules: `- Mall English is only Centralworld or centralworld, one of them for the whole generation. Approved Chinese name: ${cw.chineseName} ONLY. Floor: ${cw.floorZh} / ${cw.floorEn}. In Chinese write 尚泰世界购物中心（that spelling）3楼. NEVER write centralwOrld, CentralWorld, Central World, or 中央世界 / 中央世界购物中心 / 尚泰中央世界 / 尚泰世界中心 / 尚泰世界 without 购物中心.
-- ${siam.englishName}: English "${siam.englishName}". Approved Chinese name: ${siam.chineseName}. Floor: ${siam.floorZh} / ${siam.floorEn}. In Chinese write ${siam.officialLine}.
-- ${t21.englishName}: English "${t21.englishName}" only. chineseName is null — NO Chinese name provided. Floor: ${t21.floorZh} / ${t21.floorEn}. MUST write ${t21.officialLine}. NEVER 终端21 / 终点21 / Terminal 21购物中心 / any translation.
-- ${ob.englishName}: English "${ob.englishName}" only. chineseName is null — NO Chinese name provided. Floor: ${ob.floorZh} / ${ob.floorEn}. MUST write ${ob.officialLine}. NEVER invent a Chinese translation.`,
-    hours: `- Baan Ying at ${cw.officialLine}: ${cw.hours}
-- Baan Ying at ${siam.officialLine}: ${siam.hours}
-- Baan Ying at ${ob.officialLine}: ${ob.hours}
-- Baan Ying at ${t21.officialLine}: ${t21.hours}
-- Generic "Baan Ying" with no mall: do not invent hours.`,
-    examples: `📍 ${cw.officialLine}
-📍 ${siam.officialLine}
-📍 ${t21.officialLine}
-📍 ${ob.officialLine}`,
+    chineseNameRules: `Chinese mall names MUST NOT be invented. ${chinese} Do not mention any other mall.`,
+    branchRules: `- This branch only: ${current.officialLine}. Floor: ${current.floorZh} / ${current.floorEn}. ${chinese}`,
+    hours: `- ${current.officialLine}: ${current.hoursDisplay}. Do not use another branch's hours.`,
+    examples: `📍 ${current.officialLine}`,
   };
 }
 
@@ -284,7 +290,7 @@ Baan Ying
 ⏰ 时间
 
 If official hours are missing: Version 1 and 6 omit ⏰; Version 2 and 5 cannot be used; Version 3 and 4 are allowed.
-Never invent hours. Never change mall names, floors, centralwOrld casing, or One Bangkok weekday/Sunday hours.`;
+Never invent hours. Never change this branch's mall spelling, floor, or official hours.`;
 
 export function isLocationTimeFormatId(value: unknown): value is LocationTimeFormatId {
   return LOCATION_TIME_FORMAT_IDS.includes(value as LocationTimeFormatId);
@@ -571,13 +577,11 @@ const LOCATION_DISH =
 const LOCATION_EXPERIENCE = /老板|服务|店员|氛围|环境|温馨|家庭|好吃|好喝|满意|舒服|放松|合口味/;
 
 function mallPattern(location: ReturnType<typeof officialLocationForBranch>) {
-  const parts = ["central\\s*world", "尚泰世界购物中心"];
-  if (location?.englishName && !/central/i.test(location.englishName)) {
-    parts.push(location.englishName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  if (!location || location.id === "centralworld") {
+    return /central\s*world|尚泰世界购物中心/i;
   }
-  if (location?.chineseName && location.chineseName !== "尚泰世界购物中心") {
-    parts.push(location.chineseName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
-  }
+  const parts = [location.englishName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")];
+  if (location.chineseName) parts.push(location.chineseName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
   return new RegExp(parts.join("|"), "i");
 }
 
@@ -596,6 +600,20 @@ function finishLocationSentence(text: string) {
   return `${trimmed}。`;
 }
 
+function hasSentenceBoundary(text: string) {
+  const trimmed = text.trimEnd();
+  return /[。！？!?]$/.test(trimmed) || /\p{Extended_Pictographic}$/u.test(trimmed);
+}
+
+/** Sentences split from separate lines still need a boundary before they are joined. */
+function joinSentencePieces(pieces: string[]) {
+  return pieces.filter(Boolean).reduce((joined, piece) => {
+    if (!joined) return piece;
+    if (hasSentenceBoundary(joined)) return `${joined}${piece}`;
+    return `${joined.replace(/[，,]\s*$/u, "")}。${piece}`;
+  }, "");
+}
+
 function mentionsRestaurantName(text: string) {
   return /baan\s*ying/i.test(text);
 }
@@ -606,6 +624,7 @@ function isPureLocationClause(clause: string, mallRe: RegExp) {
   if (/\d{1,2}:\d{2}\s*[–\-到至]\s*\d{1,2}:\d{2}|10点到22点|营业时间/.test(clause)) return true;
   if (mallRe.test(clause) || mentionsRestaurantName(clause)) return true;
   if (/来吃饭|去吃饭|吃一顿饭|吃了一顿/.test(clause)) return true;
+  if (/刚好在|刚好来|想吃泰餐|吃泰餐[^。]{0,8}方便|来吃[^。]{0,6}方便/.test(clause)) return true;
   return /这家店|这家餐厅|这家分店|这家泰餐|位于|位置很方便|位置很好找|很好找|在商场|商场里|商场内|商场里面|购物商场|来到这家|这里就在|想吃泰餐的时候|吃泰餐很方便|吃饭也很方便|用餐很方便|来吃很方便|吃起来很方便|逛街的时候|又回到|继续逛|分店位于/.test(
     clause,
   );
@@ -631,9 +650,9 @@ function hasLocationSubstance(text: string) {
   return /[\u4e00-\u9fff]{2,}/.test(plain);
 }
 
-function collapseRepeatedMall(sentence: string) {
+function collapseRepeatedMall(sentence: string, mallRe: RegExp) {
   let seen = false;
-  return sentence.replace(/central\s*world|尚泰世界购物中心|Siam Center|Terminal 21|One Bangkok/gi, (match) => {
+  return sentence.replace(new RegExp(mallRe.source, "gi"), (match) => {
     if (!seen) {
       seen = true;
       return match;
@@ -653,13 +672,9 @@ function collapseRepeatedRestaurant(sentence: string) {
   });
 }
 
-function tidyLocationSentence(sentence: string, mallName: string) {
-  let next = collapseRepeatedRestaurant(collapseRepeatedMall(sentence));
-  if (/central\s*world/i.test(next)) {
-    next = next.replace(/尚泰世界购物中心（\s*central\s*world\s*）/gi, "").replace(/尚泰世界购物中心/g, "");
-  } else if (mallName && /尚泰世界购物中心/.test(next)) {
-    next = next.replace(/尚泰世界购物中心（[^）]*）/g, mallName).replace(/尚泰世界购物中心/g, mallName);
-  }
+function tidyLocationSentence(sentence: string, mallName: string, mallRe: RegExp, chineseName: string | null) {
+  let next = collapseRepeatedRestaurant(collapseRepeatedMall(sentence, mallRe));
+  if (chineseName && mallRe.test(next)) next = next.replace(new RegExp(chineseName, "g"), "");
   next = next
     .replace(/来\s*的/g, "刚好来")
     .replace(/的{2,}/g, "的")
@@ -677,16 +692,18 @@ function attachRestaurantOnce(sentence: string) {
   if (/去吃饭/.test(sentence)) return sentence.replace(/去吃饭/, `去${OFFICIAL_RESTAURANT_NAME}吃饭`);
   const body = sentence.replace(/[。！？!?]+$/u, "");
   if (/逛完|逛街|逛了|购物/.test(sentence)) return `${body}，来了${OFFICIAL_RESTAURANT_NAME}`;
-  if (/central\s*world/i.test(sentence)) {
-    return sentence.replace(/central\s*world/i, (match) => `${match}的${OFFICIAL_RESTAURANT_NAME}`);
+  if (/central\s*world|siam\s*center|terminal\s*21|one\s*bangkok|尚泰世界购物中心|暹罗中心/i.test(sentence)) {
+    return sentence.replace(
+      /central\s*world|siam\s*center|terminal\s*21|one\s*bangkok|尚泰世界购物中心|暹罗中心/i,
+      (match) => `${match}的${OFFICIAL_RESTAURANT_NAME}`,
+    );
   }
+  if (/约上|过来|提过|推荐|朋友|同事|老婆|家人|喜欢|好吃/.test(sentence)) return sentence;
   return `${body}，来了${OFFICIAL_RESTAURANT_NAME}`;
 }
 
-function attachMallOnce(sentence: string, mallName: string) {
-  if (!mallName || /central\s*world|尚泰世界购物中心|Siam Center|Terminal 21|One Bangkok/i.test(sentence)) {
-    return sentence;
-  }
+function attachMallOnce(sentence: string, mallName: string, mallRe: RegExp) {
+  if (!mallName || mallRe.test(sentence)) return sentence;
   if (/逛完/.test(sentence)) return sentence.replace(/逛完/, `逛完${mallName}`);
   if (/逛街/.test(sentence)) return sentence.replace(/逛街/, `在${mallName}逛街`);
   if (mentionsRestaurantName(sentence)) {
@@ -721,6 +738,10 @@ function splitCaptionParagraphs(caption: string) {
 
 function stripLaterLocationSentence(sentence: string, mallRe: RegExp) {
   const kept = splitLocationClauses(sentence).flatMap((clause) => {
+    if (/朋友|同事|听说|约上|终于|之前提过|推荐/.test(clause)) {
+      const next = mallRe.test(clause) || mentionsRestaurantName(clause) ? stripLocationWords(clause, mallRe) : clause;
+      return hasLocationSubstance(next) ? [next] : [];
+    }
     if (isPureLocationClause(clause, mallRe)) return [];
     const next =
       mallRe.test(clause) ||
@@ -733,6 +754,17 @@ function stripLaterLocationSentence(sentence: string, mallRe: RegExp) {
   return finishLocationSentence(kept.join("，"));
 }
 
+/** "在centralwOrld的Baan Ying。" is a repeated opener. A sentence that also tells the visit is not. */
+function isBareStoreOpener(sentence: string, mallRe: RegExp) {
+  if (!mallRe.test(sentence) && !mentionsRestaurantName(sentence)) return false;
+  const rest = sentence
+    .replace(/[。！？!?\s]/g, "")
+    .replace(new RegExp(mallRe.source, "gi"), "")
+    .replace(/baan\s*ying/gi, "")
+    .replace(/[在的里]/g, "");
+  return rest.length === 0;
+}
+
 /**
  * Inline captions may express "where I ate" once.
  * Later mall names, restaurant names, and paraphrases of the same place are removed.
@@ -742,7 +774,7 @@ export function lockInlineLocationFact(caption: string, branch: string) {
   const location = officialLocationForBranch(branch);
   const mallName = location?.englishName ?? "";
   const mallRe = mallPattern(location);
-  const source = caption.trim();
+  const source = scrubForeignBranchFacts(caption, branch).trim();
   if (!source) return source;
 
   let normalized = source;
@@ -756,6 +788,24 @@ export function lockInlineLocationFact(caption: string, branch: string) {
   const paragraphs = splitCaptionParagraphs(normalized);
   const flat = paragraphs.flatMap((group, paragraph) => group.map((text) => ({ text, paragraph })));
   if (flat.length === 0) return source;
+
+  const alreadyNamesStore = flat.some(
+    (item) => (mallRe.test(item.text) || mentionsRestaurantName(item.text)) && !isBareStoreOpener(item.text, mallRe),
+  );
+  if (alreadyNamesStore) {
+    const kept = new Map<number, string[]>();
+    for (const item of flat) {
+      if (isBareStoreOpener(item.text, mallRe)) continue;
+      const group = kept.get(item.paragraph) ?? [];
+      group.push(item.text);
+      kept.set(item.paragraph, group);
+    }
+    return [...kept.entries()]
+      .sort((left, right) => left[0] - right[0])
+      .map(([, sentences]) => joinSentencePieces(sentences))
+      .filter((block) => block.replace(/[。！？!?\s]/g, "").length >= 1)
+      .join("\n\n");
+  }
 
   const mallAt = flat.findIndex((item) => mallRe.test(item.text));
   const restaurantAt = flat.findIndex((item) => mentionsRestaurantName(item.text));
@@ -781,10 +831,16 @@ export function lockInlineLocationFact(caption: string, branch: string) {
 
   let place = "";
   const extras: string[] = [];
+  const firstText = flat[0]?.text ?? "";
+  const firstIsMeal =
+    LOCATION_DISH.test(firstText) || LOCATION_EXPERIENCE.test(firstText);
   if (anchor < 0) {
-    place = mallName
-      ? `这次在${mallName}的${OFFICIAL_RESTAURANT_NAME}吃了一顿饭。`
-      : `这次来${OFFICIAL_RESTAURANT_NAME}吃了一顿饭。`;
+    // A dish line is not a place to hang the store. The standalone block carries the address.
+    if (firstText && !firstIsMeal) {
+      const embedded = attachMallOnce(attachRestaurantOnce(firstText), mallName, mallRe);
+      const tidy = tidyLocationSentence(embedded, mallName, mallRe, location?.chineseName ?? null);
+      place = isBareStoreOpener(tidy, mallRe) ? "" : tidy;
+    }
   } else {
     const clauses = splitLocationClauses(flat[anchor].text);
     const placeClauses: string[] = [];
@@ -802,19 +858,22 @@ export function lockInlineLocationFact(caption: string, branch: string) {
       placeText = placeText ? `${placeText}，${donor}` : donor;
     }
     if (!placeText) {
-      placeText = mallName
-        ? `这次在${mallName}的${OFFICIAL_RESTAURANT_NAME}吃了一顿饭`
-        : `这次来${OFFICIAL_RESTAURANT_NAME}吃了一顿饭`;
+      const story = extras.splice(0, extras.length).join("，");
+      placeText = story
+        ? attachMallOnce(attachRestaurantOnce(story), mallName, mallRe)
+        : mallName
+          ? `这次在${mallName}的${OFFICIAL_RESTAURANT_NAME}吃了一顿饭`
+          : `这次来${OFFICIAL_RESTAURANT_NAME}吃了一顿饭`;
     } else {
       placeText = attachRestaurantOnce(placeText);
-      placeText = attachMallOnce(placeText, mallName);
+      placeText = attachMallOnce(placeText, mallName, mallRe);
     }
-    place = tidyLocationSentence(placeText, mallName);
+    place = tidyLocationSentence(placeText, mallName, mallRe, location?.chineseName ?? null);
   }
 
   const kept = new Map<number, string[]>();
   flat.forEach((item, index) => {
-    if (index === anchor) {
+    if (index === anchor || (anchor < 0 && index === 0 && !firstIsMeal)) {
       if (extras.length > 0) {
         const group = kept.get(item.paragraph) ?? [];
         group.push(finishLocationSentence(extras.join("，")));
@@ -831,15 +890,42 @@ export function lockInlineLocationFact(caption: string, branch: string) {
 
   const body = [...kept.entries()]
     .sort((a, b) => a[0] - b[0])
-    .map(([, sentences]) => sentences.join(""))
-    .filter((block) => block.replace(/[。！？!?\s]/g, "").length >= 1);
+    .map(([, sentences]) => joinSentencePieces(sentences))
+    .filter((block) => block.replace(/[。！？!?\s]/g, "").length >= 1)
+    .filter((block) => !isBareRestaurantName(block));
 
   const hours = source.match(/\d{1,2}:\d{2}\s*[–\-到至]\s*\d{1,2}:\d{2}|10点到22点/)?.[0] ?? "";
   if (hours && place && !place.includes(hours)) {
     place = finishLocationSentence(`${place.replace(/[。！？!?]+$/u, "")}，营业时间是${hours}`);
   }
 
-  return [place, ...body].filter(Boolean).join("\n\n");
+  return joinPlaceWithArrival([place, ...body].filter(Boolean));
+}
+
+function sentencePieces(block: string) {
+  return block
+    .split(/(?<=[。！？!?])/u)
+    .map((sentence) => sentence.trim())
+    .filter(Boolean);
+}
+
+function isArrivalFollowUp(block: string) {
+  const sentences = sentencePieces(block);
+  return (
+    sentences.length > 0 &&
+    sentences.every(
+      (sentence) =>
+        /朋友|同事|听说|约上|终于|之前提过|推荐/.test(sentence) &&
+        !/炒饭|冬阴功|鲈鱼|芒果|咖喱|虾仁|空心菜|服务/.test(sentence),
+    )
+  );
+}
+
+/** The place sentence and a following "finally came" line are one arrival, not two topics. */
+function joinPlaceWithArrival(blocks: string[]) {
+  if (blocks.length < 2 || !isArrivalFollowUp(blocks[1])) return blocks.join("\n\n");
+  if (sentencePieces(blocks[0]).length + sentencePieces(blocks[1]).length > 3) return blocks.join("\n\n");
+  return [joinSentencePieces([blocks[0], blocks[1]]), ...blocks.slice(2)].join("\n\n");
 }
 
 /** Inline captions need the mall and Baan Ying together, once. */
@@ -850,7 +936,7 @@ export function ensureInlineLocationPair(caption: string, branch: string) {
 /** Standalone stories leave the place to the system Location & Time block. */
 export function stripStandaloneLocationFacts(caption: string, branch: string) {
   const mallRe = mallPattern(officialLocationForBranch(branch));
-  const cleaned = caption
+  const cleaned = scrubForeignBranchFacts(caption, branch)
     .replace(/📍[^\n]*/g, "")
     .replace(/⏰[^\n]*/g, "")
     .trim();
@@ -863,7 +949,12 @@ export function stripStandaloneLocationFacts(caption: string, branch: string) {
         .join(""),
     )
     .filter((block) => block.replace(/[。！？!?\s]/g, "").length >= 1)
+    .filter((block) => !isBareRestaurantName(block))
     .join("\n\n");
+}
+
+function isBareRestaurantName(block: string) {
+  return /^baan\s*ying$/i.test(block.replace(/[。！？!?\s]/g, ""));
 }
 
 /** Keep restaurant identity in the caption body without a fixed address dump. */
@@ -945,13 +1036,18 @@ export function planLocationTime(input: {
   };
 }
 
-export function formatLocationTimeStaticRules() {
+export function formatLocationTimeStaticRules(branch = "") {
+  const location = officialLocationForBranch(branch);
+  const mall = location?.englishName || "this branch's mall";
+  const chineseRule = location?.chineseName
+    ? `The only approved Chinese name for this mall is ${location.chineseName}.`
+    : "Use this branch's official mall name. Do not invent a Chinese mall name.";
   return `LOCATION DISPLAY MODE (locationDisplayMode / THIS ROUND LOCATION PLAN) — official facts only. Follow that one mode only. Never mix inline and standalone logic.
 
 HARD RULES:
-- Restaurant name, mall, floor, and hours come only from official restaurant data. Never invent a branch, floor, address, exit, BTS/MRT, or extra brand fact.
-- Mall spelling is Centralworld or centralworld for this whole generation. Restaurant spelling is Baan Ying or baan ying. Do not mix, and do not use centralwOrld, Central World, CentralWorld, BaanYing, or BAAN YING.
-- The only approved Chinese mall name is 尚泰世界购物中心. Never 中央世界 / 中央世界购物中心 / 尚泰中央世界 / 尚泰世界中心 / 尚泰世界 without 购物中心.
+- Restaurant name, mall, floor, and hours come only from the current branch. Never invent a branch, floor, address, exit, BTS/MRT, or another mall.
+- Mall and restaurant spelling come from this generation's branch. Do not mix casings, and do not name a different mall.
+- ${chineseRule} Never 中央世界 / 中央世界购物中心 / 尚泰中央世界 / 尚泰世界中心.
 - If hours appear, they must be the official locked hours. Never change the time to sound natural.
 - Do not invent 刚好路过 / 看到招牌 / 朋友推荐 / 下班后来 / 从BTS走过来 / 离某个出口很近 unless the customer wrote that.
 
@@ -959,16 +1055,16 @@ LOCATION MODE IS RANDOM AND MUST CHANGE:
 The system picks one mode per caption and switches on the next generation. Do not use the same mode every time. Dishes in the story do not force the place into the body.
 
 INLINE (locationDisplayMode=inline) — one LOCATION FACT in the story. No 📍/⏰ block.
-- Mall name and Baan Ying must share one opening scene: shopping, choosing the restaurant, or arriving for the meal. After that sentence, the place is used up.
-- Do not say the mall again, the restaurant again, or the same relationship in other words (这家店就在商场 / 位置很方便 / 商场里吃泰餐 / 刚好在商场). A later 环境 or 服务 line keeps the experience and drops the place name.
-- Good: 这次在centralwOrld逛街，选择了Baan Ying。 Then the dishes. Bad: that opening, then 刚好在centralwOrld，想吃泰餐也比较方便, then Baan Ying的环境不错。
+- Mall name and Baan Ying share one sentence. Fold them into the customer's own reason when they gave one. Do not replace that reason, and do not add a second sentence that only introduces the restaurant.
+- Do not write 这次在${mall}的Baan Ying吃了一顿饭 / 这次在${mall}逛街，选择了Baan Ying / 逛完商场来吃泰餐 unless they actually wrote a shopping trip.
+- After that one sentence, do not say the mall again, the restaurant again, or the same relationship in other words (这家店就在商场 / 位置很方便 / 商场里吃泰餐 / 刚好在商场). A later 环境 or 服务 line keeps the experience and drops the place name.
 
 STANDALONE (locationDisplayMode=standalone) — the story is the meal only. The system appends Location & Time.
 - Do not write the mall, Baan Ying, the floor, hours, 📍, or ⏰. Not even once.
 - Do not say the restaurant is in the mall, or that eating there is convenient, in any wording.
 - Good body: 咖喱蟹肉是这次吃下来很喜欢的一道。芒果糯米饭也很新鲜。
 
-Do not write Baan Ying位于centralwOrld 3楼, and do not open every post with 这次来到Baan Ying. Hashtags stay out of the caption.`;
+Do not write a floor or hours inside the story, and do not open every post with 这次来到Baan Ying. Hashtags stay out of the caption.`;
 }
 
 export function formatLocationTimePlanRules(plan: LocationTimePlan, branch: string) {
@@ -981,9 +1077,9 @@ export function formatLocationTimePlanRules(plan: LocationTimePlan, branch: stri
   const previousHint =
     plan.placement === "standalone"
       ? `THIS ROUND LOCATION PLAN: standalone. The story must not contain the mall, ${OFFICIAL_RESTAURANT_NAME}, the floor, hours, 📍, or ⏰, and must not restate that the restaurant is in the mall. Write the dishes, taste, service, and room. The system appends locked Version ${plan.format ? LOCATION_TIME_VERSION[plan.format] : "1–6"} after your caption.`
-      : `THIS ROUND LOCATION PLAN: inline. The story must contain ${inlinePair} in one opening sentence, tied to shopping, choosing the restaurant, or the meal. Do not write only one of them. After that sentence, do not name the mall or the restaurant again, and do not rephrase the same place. No 📍/⏰ block. No Location & Time after the story.
+      : `THIS ROUND LOCATION PLAN: inline. The story contains ${inlinePair} once, inside the customer's own opening when they gave a reason for coming. Do not write only one of them. Do not add 这次在商场的Baan Ying吃了一顿饭, and do not start from the mall when their note already has a reason. After that sentence, do not name the mall or the restaurant again, and do not rephrase the same place. No 📍/⏰ block. No Location & Time after the story.
 Style: ${plan.inlineStyle === "location-hours" && hoursDisplay !== "none — do not invent hours" ? "location + official hours" : "location only, no hours"}.
-The mall and Baan Ying open the visit in one sentence, before the dishes. Do not name either one again, and do not restate that the restaurant is in the mall or that eating there is convenient.
+Do not name either place again, and do not restate that the restaurant is in the mall or that eating there is convenient.
 If hours are requested, use the official hours exactly (${hoursDisplay}). 10点到22点 is allowed only when those are the same official numbers.`;
 
   return `Official restaurant name (locked): ${OFFICIAL_RESTAURANT_NAME}
@@ -991,6 +1087,29 @@ Official dining location (locked): ${locationLine}
 Official hours (locked): ${hoursDisplay}
 ${previousHint}
 Do not invent a shopping / passing-by / transit reason unless the dining note supports it.`;
+}
+
+export function scrubForeignBranchFacts(text: string, branch: string) {
+  const currentKey = branchKey(branch);
+  const current = currentKey ? OFFICIAL_LOCATIONS[currentKey] : OFFICIAL_LOCATIONS.centralworld;
+  let next = text;
+  for (const location of Object.values(OFFICIAL_LOCATIONS)) {
+    if (location.id === current.id) continue;
+    if (location.id === "centralworld") next = next.replace(/central\s*world/gi, "");
+    else next = next.replace(new RegExp(location.englishName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi"), "");
+    if (location.chineseName) next = next.split(location.chineseName).join("");
+    if (location.id === "siam") next = next.replace(/siam\s*center/gi, "");
+    if (location.hoursDisplay !== current.hoursDisplay) next = next.split(location.hoursDisplay).join("");
+    if (location.floorZh && location.floorZh !== current.floorZh) {
+      next = next.replace(new RegExp(`(?<![0-9０-９])${location.floorZh}`, "g"), "");
+    }
+  }
+  return next
+    .replace(/[，,]{2,}/g, "，")
+    .replace(/的{2,}/g, "的")
+    .replace(/[^\S\n]{2,}/g, " ")
+    .replace(/^[，, \t]+/gm, "")
+    .trim();
 }
 
 export function finalizeOfficialLocationTime(input: {
@@ -1005,7 +1124,10 @@ export function finalizeOfficialLocationTime(input: {
   inlineSlot?: InlineLocationSlot | "";
 }) {
   const plan = planLocationTime(input);
-  const cleaned = sanitizeOfficialMallNames(stripGeneratedLocationTime(input.caption));
+  const cleaned = scrubForeignBranchFacts(
+    sanitizeOfficialMallNames(stripGeneratedLocationTime(input.caption)),
+    input.branch,
+  );
   const story =
     plan.placement === "inline"
       ? ensureInlineLocationPair(cleaned, input.branch)

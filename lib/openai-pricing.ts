@@ -49,15 +49,17 @@ export const OPENAI_MODEL_PRICING: Record<string, ModelTokenPricing> = {
   },
 };
 
-export function pricingForModel(model: string): ModelTokenPricing {
+export function knownPricingForModel(model: string): ModelTokenPricing | null {
   const exact = OPENAI_MODEL_PRICING[model];
   if (exact) return exact;
 
   const aliases = Object.keys(OPENAI_MODEL_PRICING).sort((a, b) => b.length - a.length);
   const prefix = aliases.find((id) => model === id || model.startsWith(`${id}-`));
-  if (prefix) return OPENAI_MODEL_PRICING[prefix];
+  return prefix ? OPENAI_MODEL_PRICING[prefix] : null;
+}
 
-  return OPENAI_MODEL_PRICING[DEFAULT_OPENAI_MODEL];
+export function pricingForModel(model: string): ModelTokenPricing {
+  return knownPricingForModel(model) ?? OPENAI_MODEL_PRICING[DEFAULT_OPENAI_MODEL];
 }
 
 export function costFromTokens(tokens: number, usdPerMillion: number) {

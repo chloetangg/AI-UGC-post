@@ -61,7 +61,7 @@ export function ExperiencePageClient() {
   const t = useT();
   const [touched, setTouched] = useState(false);
   const [leaving, setLeaving] = useState(false);
-  const feedback = withDefaultBranch({ ...emptyProductFeedback, ...productFeedback });
+  const feedback = withDefaultBranch({ ...emptyProductFeedback, ...productFeedback }, campaignId);
   const visitFrequency = VISIT_FREQUENCIES.includes(feedback.visitFrequency as VisitFrequency)
     ? feedback.visitFrequency
     : "";
@@ -90,7 +90,7 @@ export function ExperiencePageClient() {
     setTouched(true);
     if (!ready) return;
     setLeaving(true);
-    setProductFeedback(withDefaultBranch(feedback));
+    setProductFeedback(withDefaultBranch(feedback, campaignId));
     void saveFeelExpense();
     startTransition(() => {
       router.push(campaignPath(campaignId, "generating"));

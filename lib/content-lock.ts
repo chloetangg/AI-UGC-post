@@ -1,5 +1,5 @@
 import { collectFullDishNames, coverDishShortName, chineseFullDishName, OFFICIAL_COVER_DISHES } from "@/lib/cover/dish-names";
-import type { CoverTitleContext } from "@/lib/cover/cover-rules";
+import { selectedCoverLocation, type CoverTitleContext } from "@/lib/cover/cover-rules";
 import type { RecommendedDish } from "@/types/content";
 import { ensureNarrativeFlow, ownerOfPhrase } from "@/lib/narrative-flow";
 import { isUnnaturalHeadline, naturalCoverFallback } from "@/lib/cover/cover-natural";
@@ -104,7 +104,10 @@ export function buildEvidenceMap(context: CoverTitleContext = {}): EvidenceMap {
   const atmosphere = enjoy.find((item) => /面积|温馨|翻新|环境/.test(item)) || (/舒服|放松|温馨|翻新/.test(note) ? "环境舒适" : "");
   const service = enjoy.find((item) => /服务|中文菜单/.test(item)) || (/服务|老板/.test(note) ? "服务或老板" : "");
   const convenience = enjoy.find((item) => /支付宝|商场/.test(item)) || (/支付宝|商场/.test(note) ? "用餐方便" : "");
-  const location = /centralwOrld|商场/.test(`${note}${enjoy.join("")}`) ? "centralwOrld" : "";
+  const mall = selectedCoverLocation(context.branch) || "centralwOrld";
+  const location = /商场|逛街|central\s*world|siam\s*center|terminal\s*21|one\s*bangkok|暹罗中心|尚泰世界/i.test(`${note}${enjoy.join("")}`)
+    ? mall
+    : "";
   const visitStatus = /第一次来|第一次到这家|第一次来这家/.test(note)
     ? "customer wrote a first visit to this restaurant"
     : /1st time/i.test(context.visitFrequency ?? "")
@@ -203,7 +206,7 @@ export function neutralizeSemanticConflicts(text: string, context: CoverTitleCon
   if (context.visitFrequency === "1st time" && !/经常|每次|又来/.test(context.diningNote ?? "")) {
     next = next.replace(/每次来/g, "这次来").replace(/又来了/g, "这次来");
   }
-  return next.replace(/\s{2,}/g, " ").replace(/，{2,}/g, "，").trim();
+  return next.replace(/[^\S\n]{2,}/g, " ").replace(/，{2,}/g, "，").trim();
 }
 
 function replaceDishName(text: string, from: string, to: string, forCover = false) {
@@ -228,6 +231,20 @@ function dishLineFromEvidence(map: EvidenceMap, context: CoverTitleContext) {
   return `${dish}这次还蛮喜欢的。`;
 }
 
+const DISH_MARKERS = ["芒果", "菠萝", "蟹", "虾", "蒜", "鲈鱼", "青柠", "咖喱", "冬阴功", "空心菜", "糯米"];
+
+/** "芒果很新鲜" belongs to 芒果糯米饭. Do not move that evaluation onto another dish name. */
+function evaluationBelongsToNamedDish(line: string, dish: string, target: string) {
+  let residue = line;
+  for (const term of dishTerms(dish).sort((a, b) => b.length - a.length)) {
+    if (term.length >= 2) residue = residue.split(term).join("");
+  }
+  if (/配料|新鲜|下饭|开胃|Q弹|蒜香|粘度|软烂|酥脆/.test(residue)) return true;
+  return DISH_MARKERS.some(
+    (marker) => residue.includes(marker) && !target.includes(marker) && !dishTerms(target).some((term) => term.includes(marker)),
+  );
+}
+
 function alignLineToPrimary(line: string, map: EvidenceMap, captionDishes: string[], forCover = false) {
   const named = dishesInText(line);
   const captionHero = captionDishes.includes(map.primaryContent) ? map.primaryContent : captionDishes[0] || "";
@@ -235,6 +252,7 @@ function alignLineToPrimary(line: string, map: EvidenceMap, captionDishes: strin
   const isolated = named.filter((dish) => {
     if (!target) return false;
     if (dish === target) return false;
+    if (evaluationBelongsToNamedDish(line, dish, target)) return false;
     if (captionDishes.includes(dish) && named.includes(target)) return false;
     if (map.primaryKind === "dish" && dish !== map.primaryContent && (named.length === 1 || !captionDishes.includes(dish))) {
       return true;

@@ -6,7 +6,16 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:modelark": "npx tsx scripts/test-modelark.ts",
+    "test:modelark-response": "npx tsx scripts/validate-modelark-response.ts",
+    "test:modelark-titles": "npx tsx scripts/validate-modelark-title-retry.ts",
+    "test:modelark-json": "npx tsx scripts/validate-modelark-json.ts",
+    "test:style-emoji": "npx tsx scripts/validate-style-emoji.ts",
+    "test:sentence-integrity": "npx tsx scripts/validate-sentence-integrity.ts",
+    "test:generation-diagnostics": "npx tsx scripts/validate-generation-diagnostics.ts",
+    "test:postprocess-diagnostics": "npx tsx scripts/validate-postprocess-diagnostics.ts",
+    "diagnostics:generation": "npx tsx scripts/show-generation-diagnostics.ts"
   },
   "dependencies": {
     "@radix-ui/react-checkbox": "^1.3.11",

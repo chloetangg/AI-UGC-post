@@ -1,9 +1,11 @@
 import { arrangeDiningStory } from "@/lib/caption-story";
+import { headlineNeedsEvidenceReplacement } from "@/lib/content-evidence";
 import { chineseFullDishName } from "@/lib/cover/dish-names";
 import { isAcceptableCoverOverlay } from "@/lib/cover/cover-title";
-import type { CoverTitleContext } from "@/lib/cover/cover-rules";
+import { selectedCoverLocation, type CoverTitleContext } from "@/lib/cover/cover-rules";
 import { keywordInTitle } from "@/lib/title-keywords";
 import { isCopiedCustomerLine } from "@/lib/title-insight";
+import { parseReviewIntoEvaluationUnits } from "@/lib/cover/subtitle-units";
 
 export type CustomerEvidenceCategory =
   | "CUSTOMER_FOOD"
@@ -34,10 +36,14 @@ const EXTRA_TASTE = /香甜|浓郁|清爽|冰凉|冰冰|奶香|解暑|清甜|顺
 const GENERIC_DRINK = /泰式饮品|特色饮品|店里的饮品|这里的饮料|店里的饮料|饮品|饮料/g;
 
 function clauses(note: string) {
-  return note
+  const parts = note
     .split(/[。！？!?\n；;，,、]+/)
     .map((item) => item.trim())
     .filter((item) => item.length >= 2);
+  return parts.flatMap((part) => {
+    const units = parseReviewIntoEvaluationUnits(part);
+    return units.length > 1 ? units : [part];
+  });
 }
 
 function bareVisit(clause: string) {
@@ -61,7 +67,31 @@ function pushUnique(list: EvidencePoint[], point: EvidencePoint | null) {
   list.push(point);
 }
 
-function fromClause(clause: string): EvidencePoint | null {
+function placeName(branch?: string) {
+  return selectedCoverLocation(branch) || "centralwOrld";
+}
+
+function mentionsPlace(clause: string, mall: string) {
+  if (/central/i.test(mall)) return /central\s*world|尚泰世界/.test(clause);
+  return new RegExp(mall.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i").test(clause);
+}
+
+function faithfulDishLine(dish: string, clause: string) {
+  const text = clause.replace(/[。！？!?\s]+$/g, "");
+  if (/新鲜/.test(text)) {
+    if (text.includes("的芒果很新鲜")) return `${text.includes(dish) ? text : `${dish}的芒果很新鲜`}。`;
+    if (text.includes("芒果很新鲜")) return `${dish}的芒果很新鲜。`;
+    return `${dish}很新鲜。`;
+  }
+  if (/配料/.test(text)) return `${dish}配料很足。`;
+  if (/下饭/.test(text)) return `${dish}很下饭。`;
+  if (/Q弹/.test(text)) return `${dish}很Q弹。`;
+  if (/蒜香/.test(text)) return `${dish}蒜香很足。`;
+  if (/好吃/.test(text)) return `${dish}真的很好吃。`;
+  return `${text}。`;
+}
+
+function fromClause(clause: string, mall = "centralwOrld"): EvidencePoint | null {
   if (!clause || bareVisit(clause)) return null;
   const drink = drinkEntity(clause);
   if (drink && /好|喜欢|推荐|惊喜|不错/.test(clause)) {
@@ -91,28 +121,29 @@ function fromClause(clause: string): EvidencePoint | null {
     };
   }
   const dish = clause.match(/芒果糯米饭|蒜炒虾仁|咖喱蟹肉|青咖喱牛肉|菠萝炒饭|滑蛋饭|河虾冬阴功汤|冬阴功|青柠蒸鲈鱼|炒空心菜|酸甜酱炒河虾/)?.[0];
-  if (dish && /好|喜欢|推荐|Q弹|蒜香|甜|新鲜|不错/.test(clause) && !/吃饭/.test(clause.replace(dish, ""))) {
+  if (dish && /好|喜欢|推荐|Q弹|蒜香|甜|新鲜|不错|配料|下饭/.test(clause) && !/吃饭/.test(clause.replace(dish, ""))) {
+    const line = faithfulDishLine(dish, clause);
     return {
       source: "customer",
       category: "CUSTOMER_FOOD",
       text: clause,
       entity: dish,
-      titleHook: `${dish}真的很好吃`,
-      captionLine: `${dish}真的很好吃。`,
-      coverLine: `${dish}真的很好吃`,
+      titleHook: line.replace(/。$/, ""),
+      captionLine: line,
+      coverLine: line.replace(/。$/, ""),
       priority: 1,
     };
   }
   if (/方便/.test(clause) || /逛完|逛街/.test(clause)) {
-    const hasMall = /centralwOrld/.test(clause);
+    const hasMall = mentionsPlace(clause, mall);
     return {
       source: "customer",
       category: "CUSTOMER_SCENE",
       text: clause,
-      entity: hasMall ? "centralwOrld" : "方便",
-      titleHook: hasMall ? "逛完centralwOrld来吃饭很方便" : "来这里吃饭很方便",
-      captionLine: hasMall ? "逛完centralwOrld来吃饭很方便。" : "来这里吃饭很方便。",
-      coverLine: hasMall ? "逛完centralwOrld来吃饭很方便" : "来这里吃饭很方便",
+      entity: hasMall ? mall : "方便",
+      titleHook: hasMall ? `逛完${mall}来吃饭很方便` : "来这里吃饭很方便",
+      captionLine: hasMall ? `逛完${mall}来吃饭很方便。` : "来这里吃饭很方便。",
+      coverLine: hasMall ? `逛完${mall}来吃饭很方便` : "来这里吃饭很方便",
       priority: 3,
     };
   }
@@ -149,11 +180,13 @@ export function collectCustomerEvidence(input: {
   dishes?: string[];
   enjoyMost?: string[];
   recommendTo?: string[];
+  branch?: string;
 }) {
   const note = input.note?.trim() ?? "";
+  const mall = placeName(input.branch);
   const customer: EvidencePoint[] = [];
-  for (const clause of clauses(note)) pushUnique(customer, fromClause(clause));
-  for (const reason of input.recommendTo ?? []) pushUnique(customer, fromClause(reason));
+  for (const clause of clauses(note)) pushUnique(customer, fromClause(clause, mall));
+  for (const reason of input.recommendTo ?? []) pushUnique(customer, fromClause(reason, mall));
   customer.sort((a, b) => a.priority - b.priority || b.entity.length - a.entity.length);
 
   const other: EvidencePoint[] = [];
@@ -172,15 +205,15 @@ export function collectCustomerEvidence(input: {
       priority: 10,
     });
   }
-  if (!customer.some((item) => item.entity === "centralwOrld") && !other.some((item) => item.entity === "centralwOrld")) {
+  if (!customer.some((item) => item.entity === mall) && !other.some((item) => item.entity === mall)) {
     other.push({
       source: "other",
       category: "OTHER_PLACE",
-      text: "centralwOrld",
-      entity: "centralwOrld",
-      titleHook: "centralwOrld这家泰餐值得记",
+      text: mall,
+      entity: mall,
+      titleHook: `${mall}这家泰餐值得记`,
       captionLine: "",
-      coverLine: "centralwOrld泰餐推荐",
+      coverLine: `${mall}泰餐推荐`,
       priority: 11,
     });
   }
@@ -192,6 +225,7 @@ export function formatCustomerEvidencePlan(input: {
   dishes?: string[];
   enjoyMost?: string[];
   recommendTo?: string[];
+  branch?: string;
 }) {
   const { customer, other } = collectCustomerEvidence(input);
   if (customer.length === 0) {
@@ -206,11 +240,10 @@ Pool A, customer-owned. Keep the exact name. 粉红奶 must not become 饮品.
 ${customerLines}
 Pool B, other evidence. Use it to vary the titles. Do not let it replace Pool A.
 ${otherLines || "- none"}
-Title 1 = a hook from the first Pool A item, not the whole sentence.
-Title 2 = a different Pool B item.
-Title 3 = another unused item.
-One of mainTitle / subTitle uses Pool A. The other uses a different point.
-evidenceSource.title1 = "customer". evidenceSource.title2 = "other".`;
+Title 1 = a hook from the customer's own reason or the strongest Pool A item, not the whole sentence and not the mall.
+Title 2 and Title 3 = different unused points from this visit. Use Pool B only when Pool A does not have another true point. Do not spend a title on the mall by default.
+mainTitle comes from the personal story when there is one. subTitle uses a different point, not a synonym.
+evidenceSource.title1 = "customer" when Title 1 uses Pool A.`;
 }
 
 function mentions(text: string, point: EvidencePoint) {
@@ -219,6 +252,49 @@ function mentions(text: string, point: EvidencePoint) {
 
 function plain(text: string) {
   return text.replace(/[^\p{Script=Han}a-zA-Z0-9]/gu, "");
+}
+
+const PAIRED_DISH =
+  /芒果糯米饭|蒜炒虾仁|咖喱蟹肉|青咖喱牛肉|菠萝炒饭|滑蛋饭|河虾冬阴功汤|冬阴功|青柠蒸鲈鱼|炒空心菜|酸甜酱炒河虾/;
+const FOREIGN_DISH_MARKERS = ["芒果", "菠萝", "蟹", "虾", "蒜", "鲈鱼", "青柠", "咖喱", "冬阴功", "空心菜", "糯米"];
+
+function dishMismatch(title: string) {
+  const dish = title.match(PAIRED_DISH)?.[0] ?? "";
+  if (!dish) return false;
+  const residue = title.replace(PAIRED_DISH, "");
+  return FOREIGN_DISH_MARKERS.some((marker) => residue.includes(marker) && !dish.includes(marker));
+}
+
+const GENERIC_TEMPLATE_TITLE = /真的很好吃|真的好好吃|超好吃|值得一试|值得点|值得推荐/;
+
+function titleShouldStay(title: string) {
+  if (dishMismatch(title)) return false;
+  const cleaned = title.replace(/🇹🇭/g, "").trim();
+  if (GENERIC_TEMPLATE_TITLE.test(cleaned)) return false;
+  return !headlineNeedsEvidenceReplacement(cleaned);
+}
+
+function faithfulFoodHook(point: EvidencePoint) {
+  if (point.category === "CUSTOMER_FOOD" && point.entity) {
+    if (/新鲜/.test(point.text)) return `${point.entity}很新鲜`;
+    if (/配料/.test(point.text)) return `${point.entity}配料很足`;
+    if (/下饭/.test(point.text)) return `${point.entity}很下饭`;
+    if (/Q弹/.test(point.text)) return `${point.entity}很Q弹`;
+    if (/蒜香/.test(point.text)) return `${point.entity}蒜香很足`;
+  }
+  return point.titleHook;
+}
+
+function repairMismatchedDish(title: string, point: EvidencePoint) {
+  const named = title.match(PAIRED_DISH)?.[0] ?? "";
+  if (!named || point.category !== "CUSTOMER_FOOD" || !point.entity || named === point.entity) return "";
+  if (!dishMismatch(title)) return "";
+  const residue = title.replace(PAIRED_DISH, "");
+  const evaluationBelongsToPoint = FOREIGN_DISH_MARKERS.some(
+    (marker) => residue.includes(marker) && point.entity.includes(marker),
+  );
+  if (!evaluationBelongsToPoint) return "";
+  return title.replace(named, point.entity);
 }
 
 function titleUsesPointFaithfully(title: string, point: EvidencePoint) {
@@ -271,11 +347,12 @@ function coverPair(
   titles: [string, string, string],
   context: CoverTitleContext,
 ) {
+  const mall = placeName(context.branch);
   const mains = [
-    other?.entity === "centralwOrld" ? "centralwOrld泰餐推荐" : "",
+    other?.entity === mall ? `${mall}泰餐推荐` : "",
     "曼谷美食推荐",
     "曼谷泰餐推荐",
-    "centralwOrld泰餐推荐",
+    `${mall}泰餐推荐`,
     other?.category === "OTHER_DISH" ? `曼谷必吃${other.coverLine}`.slice(0, 12) : "",
   ].filter(Boolean);
   const subs = [customer.coverLine, customer.titleHook].filter((line) => line.length >= 6 && line.length <= 15);
@@ -319,8 +396,12 @@ export function enforceCustomerEvidence(input: {
       coverSubtitle: input.coverSubtitle,
     };
   }
-  if (!titleUsesPointFaithfully(titles[0], primary) || isCopiedCustomerLine(titles[0], input.note ?? "")) {
-    titles[0] = preserveFlag(titles[0], primary.titleHook);
+  if (
+    !titleShouldStay(titles[0]) &&
+    (!titleUsesPointFaithfully(titles[0], primary) || isCopiedCustomerLine(titles[0], input.note ?? ""))
+  ) {
+    const repaired = repairMismatchedDish(titles[0], primary);
+    titles[0] = preserveFlag(titles[0], repaired || faithfulFoodHook(primary));
   }
 
   const used = new Set<string>([primary.entity]);
@@ -328,7 +409,7 @@ export function enforceCustomerEvidence(input: {
     (item) => mentions(titles[1], item) && !used.has(item.entity) && titleUsesPointFaithfully(titles[1], item),
   );
   const second = otherHit ?? other.find((item) => !used.has(item.entity));
-  if (second && !otherHit) titles[1] = preserveFlag(titles[1], second.titleHook);
+  if (second && !otherHit && !titleShouldStay(titles[1])) titles[1] = preserveFlag(titles[1], second.titleHook);
   if (second) used.add(second.entity);
 
   const pools = [...customer, ...other];
@@ -336,38 +417,36 @@ export function enforceCustomerEvidence(input: {
     (item) => !used.has(item.entity) && mentions(titles[2], item) && titleUsesPointFaithfully(titles[2], item),
   );
   const third = title3Hit ?? pools.find((item) => !used.has(item.entity));
-  if (third && !title3Hit) titles[2] = preserveFlag(titles[2], third.titleHook);
+  if (third && !title3Hit && !titleShouldStay(titles[2])) titles[2] = preserveFlag(titles[2], third.titleHook);
   if (third) used.add(third.entity);
 
-  if (!titles.some((title) => keywordInTitle(title))) {
+  if (!titles.some((title) => keywordInTitle(title)) && !titleShouldStay(titles[1])) {
     const dish = other.find((item) => item.category === "OTHER_DISH");
     titles[1] = dish ? `曼谷泰餐的${dish.entity}值得点` : titles[1].includes("曼谷") ? titles[1] : `曼谷泰餐${titles[1]}`;
   }
 
-  const coverContext: CoverTitleContext = {
-    diningNote: input.note,
-    dishes: input.dishes,
-    enjoyMost: input.enjoyMost,
-    recommendTo: input.recommendTo,
-    branch: input.branch,
-    sourceTexts: titles,
-  };
   let coverTitle = input.coverTitle;
   let coverSubtitle = input.coverSubtitle;
-  const coverBlob = `${coverTitle}\n${coverSubtitle}`;
-  const coverHasCustomer = customer.some((item) => mentions(coverBlob, item));
-  const coverRepeatsOnePoint =
-    customer.filter((item) => mentions(coverTitle, item)).some((item) => mentions(coverSubtitle, item));
-  if (!coverHasCustomer || coverRepeatsOnePoint) {
-    const pair = coverPair(primary, second?.source === "other" ? second : other[0], titles, coverContext);
-    coverTitle = pair.title;
-    coverSubtitle = pair.subtitle;
+  for (const point of customer) {
+    const repairedTitle = repairMismatchedDish(coverTitle, point);
+    if (repairedTitle) coverTitle = repairedTitle;
+    const repairedSubtitle = repairMismatchedDish(coverSubtitle, point);
+    if (repairedSubtitle) coverSubtitle = repairedSubtitle;
   }
-
-  const headlineBlob = `${titles.join("\n")}\n${coverTitle}\n${coverSubtitle}`;
-  if (!headlineBlob.includes("centralwOrld")) {
-    const mallMain = "centralwOrld泰餐推荐";
-    if (isAcceptableCoverOverlay(mallMain, coverSubtitle, titles, coverContext)) coverTitle = mallMain;
+  const coverTitleBroken = headlineNeedsEvidenceReplacement(coverTitle);
+  const coverSubtitleBroken = headlineNeedsEvidenceReplacement(coverSubtitle);
+  if (coverTitleBroken || coverSubtitleBroken) {
+    const coverContext: CoverTitleContext = {
+      diningNote: input.note,
+      dishes: input.dishes,
+      enjoyMost: input.enjoyMost,
+      recommendTo: input.recommendTo,
+      branch: input.branch,
+      sourceTexts: titles,
+    };
+    const pair = coverPair(primary, second?.source === "other" ? second : other[0], titles, coverContext);
+    if (coverTitleBroken) coverTitle = pair.title;
+    if (coverSubtitleBroken) coverSubtitle = pair.subtitle;
   }
 
   let caption = input.caption;
@@ -381,5 +460,9 @@ export function enforceCustomerEvidence(input: {
     caption = `${block}\n\n${caption}`.trim();
   }
 
-  return { titles, caption: arrangeDiningStory(caption), coverTitle, coverSubtitle };
+  const customerEvidence = [input.note, ...(input.recommendTo ?? []), ...(input.enjoyMost ?? [])]
+    .map((item) => item?.trim() ?? "")
+    .filter(Boolean)
+    .join("\n");
+  return { titles, caption: arrangeDiningStory(caption, "", customerEvidence), coverTitle, coverSubtitle };
 }

@@ -10,7 +10,8 @@ import {
   formatXiaohongshuPasteText,
   type RednotePublishPackage,
 } from "@/lib/rednote-publish";
-import { DIANPING_SHOP_WEB_URL } from "@/lib/publish/dianping-shop";
+import { useCampaignFlow } from "@/components/providers/campaign-flow-provider";
+import { dianpingShopForCampaign } from "@/lib/publish/dianping-shop";
 
 function PublishCopyModal({
   title,
@@ -22,6 +23,7 @@ function PublishCopyModal({
   publishPendingLabel,
   busy,
   showFallback,
+  fallbackHref,
   onClose,
   onCopied,
   onPublish,
@@ -35,6 +37,7 @@ function PublishCopyModal({
   publishPendingLabel: string;
   busy?: boolean;
   showFallback?: boolean;
+  fallbackHref?: string;
   onClose: () => void;
   onCopied?: () => void;
   onPublish: () => void;
@@ -94,9 +97,9 @@ function PublishCopyModal({
           </Button>
         </div>
 
-        {showFallback ? (
+        {showFallback && fallbackHref ? (
           <a
-            href={DIANPING_SHOP_WEB_URL}
+            href={fallbackHref}
             target="_blank"
             rel="noreferrer"
             className="mt-3 block text-center text-sm font-semibold text-primary underline-offset-2 hover:underline"
@@ -125,8 +128,10 @@ export function DianpingCopyModal({
   onPublish: () => void;
 }) {
   const t = useT();
+  const { campaignId } = useCampaignFlow();
   const g = t.publish.dianpingGuide;
   const pasteText = useMemo(() => formatDianpingPasteText(pkg), [pkg]);
+  const shopUrl = dianpingShopForCampaign(campaignId).webUrl;
 
   return (
     <PublishCopyModal
@@ -139,6 +144,7 @@ export function DianpingCopyModal({
       publishPendingLabel={g.copyNeedFirst}
       busy={busy}
       showFallback={showFallback}
+      fallbackHref={shopUrl}
       onClose={onClose}
       onCopied={onCopied}
       onPublish={onPublish}

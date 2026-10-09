@@ -1,4 +1,4 @@
-import { arrangeDiningStory } from "@/lib/caption-story";
+import type { HumanStyleSelection } from "@/lib/human-style/select";
 import { stripGeneratedLocationTime } from "@/lib/locations";
 
 const EMOJI_RE = /\p{Extended_Pictographic}/gu;
@@ -60,6 +60,7 @@ function chunkHasLemon(text: string) {
 }
 
 function fixFruitEmojisInChunk(chunk: string) {
+  if (/鲈鱼/.test(chunk)) return chunk.replace(/🥭|🍋/g, "🐟");
   const mango = chunkHasMango(chunk);
   const lemon = chunkHasLemon(chunk);
   if (mango && !lemon) return chunk.replaceAll("🍋", "🥭");
@@ -77,24 +78,47 @@ export function fixFruitEmojis(text: string) {
 }
 
 export function fixFruitEmojisInTitles(titles: [string, string, string]): [string, string, string] {
-  return titles.map((title) => bindEmojis(fixFruitEmojis(title))) as [string, string, string];
+  return titles.map((title) => settleTitleEmoji(fixFruitEmojis(title))) as [string, string, string];
+}
+
+/** Keep a title emoji the model already wrote. Move one that sits between Chinese words to the start or the end. */
+function settleTitleEmoji(title: string) {
+  const trimmed = title.replace(/\s{2,}/g, " ").trim();
+  const flag = trimmed.startsWith("🇹🇭") ? "🇹🇭" : "";
+  const body = trimmed.replace(/🇹🇭/g, "");
+  const emojis = body.match(/\p{Extended_Pictographic}\uFE0F?/gu) ?? [];
+  if (emojis.length === 0) return `${flag}${body.replace(/\s{2,}/g, " ").trim()}`.trim();
+  const decorative = emojis[0] ?? "";
+  const plain = body.replace(/\p{Extended_Pictographic}\uFE0F?/gu, "").replace(/\s{2,}/g, " ").trim();
+  const compact = body.replace(/\s/g, "");
+  const atStart = compact.startsWith(decorative);
+  const atEnd = compact.endsWith(decorative);
+  if (emojis.length === 1 && (atStart || atEnd) && !(atStart && atEnd && plain.length > 0)) {
+    return trimmed;
+  }
+  let hash = 0;
+  for (const char of plain) hash = (hash * 33 + char.charCodeAt(0)) >>> 0;
+  const atFront = hash % 2 === 0;
+  return atFront ? `${flag}${decorative}${plain}` : `${flag}${plain}${decorative}`;
+}
+
+export function customerBannedEmoji(note = "") {
+  return /不要(?:加)?(?:表情|emoji)|无表情/i.test(note);
 }
 
 export function formatCaptionEmojiRules() {
-  return `EMOJI — use one only when this sentence has a matching food or feeling. Titles may use the same list. Cover overlay never uses emoji. Location 📍/⏰ do not count, and do not add an emoji just to reach a number.
+  return `EMOJI — follow THIS ROUND HUMAN STYLE. Do not pick a count first and then fill it in. Titles use the same approved list, but title placement is a separate rule.
 
 Approved list only: ${STORY_EMOJI_POOL.join(" ")}
-Food sits on that food: 蟹→🦀, 虾→🍤, 芒果→🥭, 柠檬→🍋, 青柠蒸鲈鱼/鲈鱼→🐟, 饭→🍚, 冬阴功→🍜, 咖喱→🍛. 逛街/购物→🛍️.
-Feeling, only when the sentence has no food emoji: 好吃/好喝→😋, 香/还想吃→🤤, 帅→😍, 舒服/放松→😌.
-🍋 is 柠檬 only. 🥭 is 芒果 only. 🐟 is fish only. Never put 🥭 or 🍋 on 鲈鱼.
-The emoji comes immediately after its object. 芒果糯米饭🥭很好吃. 青柠蒸鲈鱼🐟很开胃. Never 鲈鱼很开胃🥭. In one sentence, each food gets its own emoji. No suitable emoji → write none. Do not reuse the previous food's emoji.
-Never put Chinese punctuation directly after an emoji. BAD: 很好吃😋。 / 环境很好😌， / 好好吃😋！ GOOD: 好好吃😋 / 芒果糯米饭🥭甜度刚刚好。 The period in the good example is not next to the emoji.
-Do not put an emoji on every sentence. Do not stack two emojis together. Do not use 🍽️ 📍 🕐 or any emoji outside this list.`;
-}
-
-function splitStoryUnits(story: string) {
-  const parts = story.split(/(?<=[。！？!?\n])/u);
-  return parts.length > 0 ? parts : [story];
+Match the meaning of THIS sentence: 蟹→🦀, 虾/河虾冬阴功汤→🍤, 芒果→🥭, 柠檬→🍋, 青柠蒸鲈鱼/鲈鱼→🐟, 炒饭/糯米饭→🍚, 冬阴功→🍤, 咖喱→🍛. 逛街/购物→🛍️. Feeling, only in a sentence that is not already a food line: 好吃/好喝→😋, 香/还想吃→🤤, 帅→😍, 舒服/放松→😌.
+🍋 is 柠檬 only. 🥭 is 芒果 only. 🐟 is fish only. Never put 🥭 or 🍋 on 鲈鱼, and never put 🐟 on a later sentence about 安心 just because fish was mentioned earlier.
+Body: Foodie stays with texture or taste, not one emoji per dish. Chatty sits in an aside or an exclamation, unevenly. Casual uses one, with a feeling or at a sentence end. Story marks a turn, not every beat. Short uses one only at the real point. Playful can place one, and occasionally a pair, with the loose tone. Travel stays with a real place or scene. Local is sparse: one natural spot, not a guide sticker. Emotional follows how strong the customer's own feeling already is.
+These are habits, not a fixed position for that persona. Do not put one on every sentence or every dish. Do not glue one to every dish name. Do not add an unrelated emoji to look human. If the caption already has a natural emoji, do not add another pass of them. Local and Short may use very few, but do not leave the whole caption without one just because it is short or quiet, unless the customer said 不要表情 / 不要 emoji / 无表情.
+There is no body emoji quota and no body emoji cap. That is not permission to stack them.
+Place them differently: sentence start, sentence end, after the reaction, or inside the sentence when that reads naturally.
+Titles, separately: at least one of the 3 titles has an emoji. Usually one or two titles have one each. Start or end, not glued to the dish name, and not a copy of the caption placement. Do not leave all 3 titles bare just because the caption is sparse. A customer ban overrides this title minimum. Do not repeat one placement on every title.
+Never put Chinese punctuation directly after an emoji. BAD: 很好吃😋。 GOOD: 好好吃😋
+Do not use 🍽️ 📍 🕐 or any emoji outside this list. Cover overlay still has no emoji.`;
 }
 
 const EMOJI_CLUSTER = "\\p{Extended_Pictographic}\\uFE0F?(?:\\u200D\\p{Extended_Pictographic}\\uFE0F?)*";
@@ -108,26 +132,36 @@ export function withSentenceEnd(text: string) {
   return `${trimmed}。`;
 }
 
-function tidyEmojiPunctuation(text: string) {
+function tidyEmojiPunctuation(text: string, keepClusters = false) {
   let next = text.replace(new RegExp(`(${EMOJI_CLUSTER})\\s*[。．.，,！!？?；;]+`, "gu"), "$1 ");
-  next = next.replace(new RegExp(`[。．.，,！!？?]\\s*(${EMOJI_CLUSTER})(?=\\s*$)`, "gu"), "$1");
-  next = next.replace(new RegExp(`(${EMOJI_CLUSTER})(?:\\s*${EMOJI_CLUSTER})+`, "gu"), "$1");
+  if (!keepClusters) {
+    next = next.replace(new RegExp(`(${EMOJI_CLUSTER})(?:\\s*${EMOJI_CLUSTER})+`, "gu"), "$1");
+  }
   return next.replace(/[ \t]{2,}/g, " ").replace(/[ \t]+$/g, "");
 }
 
-function stripAiConnectives(text: string) {
-  return text
-    .replace(/值得一提的是[，,]?/g, "")
-    .replace(/不得不说[，,]?/g, "")
-    .replace(/总体来说[，,]?/g, "")
-    .replace(/总的来说[，,]?/g, "")
-    .replace(/整体来说[，,]?/g, "")
-    .replace(/作为一家/g, "")
-    .replace(/如果你正在寻找/g, "")
-    .replace(/给我的感觉是[，,]?/g, "")
-    .replace(/对于喜欢[^。！？]{0,12}的人来说[，,]?/g, "")
-    .replace(/非常值得推荐[。！？]?/g, "")
-    .replace(/这次来到/g, "这次去了");
+/** An emoji with no words is not a sentence. Attach it to the previous sentence and keep that sentence's punctuation. */
+function attachOrphanEmoji(text: string) {
+  const paragraphs = text.split(/\n\n/).reduce<string[]>((blocks, paragraph) => {
+    const next = paragraph
+      .split(/(?<=[。！？!?])/)
+      .reduce((sentence, part) => {
+        const words = part.replace(/[\s。！？!?\p{Extended_Pictographic}]/gu, "");
+        if (words.length > 0) return sentence + part;
+        const emoji = part.replace(/[。！？!?\s]/g, "");
+        if (!emoji || !sentence) return sentence;
+        return `${sentence.replace(/\s+$/u, "")}${emoji}`;
+      }, "");
+    if (!next.trim()) return blocks;
+    if (/^[\s\p{Extended_Pictographic}。！？!?]+$/u.test(next) && blocks.length > 0) {
+      const emoji = next.replace(/[。！？!?\s]/g, "");
+      blocks[blocks.length - 1] = `${blocks[blocks.length - 1].replace(/\s+$/u, "")}${emoji}`;
+      return blocks;
+    }
+    blocks.push(next);
+    return blocks;
+  }, []);
+  return paragraphs.join("\n\n");
 }
 
 const OBJECT_EMOJIS: Array<{ re: RegExp; emoji: string }> = [
@@ -204,113 +238,143 @@ export function bindEmojis(sentence: string) {
   return tidyEmojiPunctuation(`${result}${ending}`);
 }
 
-function joinCaptionSentences(sentences: string[]) {
-  return sentences.map((sentence) => withSentenceEnd(tidyEmojiPunctuation(sentence))).reduce((text, sentence) => {
-    if (!text) return sentence;
-    if (new RegExp(`${EMOJI_CLUSTER}$`, "u").test(text)) return `${text} ${sentence}`;
-    return `${text}${sentence}`;
-  }, "");
-}
+const DISH_GLUE =
+  /(青柠蒸鲈鱼|河虾冬阴功汤|酸甜酱炒河虾|芒果糯米饭|菠萝炒饭|滑蛋饭|冬阴功|鲈鱼|咖喱|炒饭|蟹|虾)(\p{Extended_Pictographic}\uFE0F?)/u;
 
-function injectFittingStoryEmojis(story: string) {
-  if (!story.trim()) return story;
-  return splitStoryUnits(story)
-    .map((unit) => (unit.trim() ? bindEmojis(unit) : unit))
-    .reduce((text, unit) => {
-      if (!text) return unit;
-      if (/\p{Extended_Pictographic}$/u.test(text) && /\p{Script=Han}/u.test(unit.trim())) return `${text} ${unit.trim()}`;
-      return text + unit;
-    }, "");
-}
-
-const FOOD_SUBJECT =
-  /芒果糯米饭|蒜炒虾仁|咖喱蟹肉|青咖喱牛肉|菠萝炒饭|滑蛋饭|河虾冬阴功汤|冬阴功|青柠蒸鲈鱼|炒空心菜|酸甜酱炒河虾|粉红奶/;
-
-function foodSubject(sentence: string) {
-  return sentence.match(FOOD_SUBJECT)?.[0] ?? "";
-}
-
-function captionBucket(sentence: string) {
-  const text = sentence.replace(/\p{Extended_Pictographic}/gu, "");
-  const food = FOOD_SUBJECT.test(text) || /好吃|好喝|味道|粉红奶|芒果|糯米|虾|蟹|咖喱|冬阴功|柠檬|这道|点的|甜度|粘度|口感|配料|锅气/.test(text);
-  const service = /服务|老板|店员|服务员/.test(text);
-  const scene = /环境|氛围|舒服|放松|空间|翻新|坐着|坐下来|centralwOrld|商场|逛街|Baan\s*Ying|方便|楼/i.test(text);
-  if (food && /粉红奶|芒果|糯米|虾|蟹|咖喱|冬阴功|柠檬|这道|点的|甜度|粘度|口感|好吃|好喝/.test(text)) return "food";
-  if (service && !food) return "service";
-  if (scene) return "scene";
-  if (food) return "food";
-  if (service) return "service";
-  return "other";
-}
-
-/** Long captions break between topic groups, at most about 3 sentences each. */
-export function groupCaptionParagraphs(story: string) {
-  if (/\n\n/.test(story)) {
-    return story
-      .split(/\n\n+/)
-      .map((paragraph) => joinCaptionSentences(paragraph.split(/(?<=[。！？!?])/u).map((part) => part.trim()).filter(Boolean)))
-      .filter(Boolean)
-      .join("\n\n");
+/** Move an emoji that sits inside a sentence, or directly on a dish name, to the start or the end of that same sentence. */
+function unglueSentenceEmoji(sentence: string, atStart: boolean) {
+  const pattern = new RegExp(EMOJI_CLUSTER, "gu");
+  const glued: Array<{ index: number; emoji: string }> = [];
+  for (const match of sentence.matchAll(pattern)) {
+    const emoji = match[0];
+    const index = match.index ?? 0;
+    const before = sentence[index - 1] ?? "";
+    const after = sentence[index + emoji.length] ?? "";
+    const betweenHan = /\p{Script=Han}/u.test(before) && /\p{Script=Han}/u.test(after);
+    const onDish = DISH_GLUE.test(sentence.slice(Math.max(0, index - 16), index + emoji.length));
+    if (betweenHan || onDish) glued.push({ index, emoji });
   }
-  const sentences = story
-    .split(/\n+/)
-    .flatMap((block) => block.split(/(?<=[。！？!?])/u))
+  if (glued.length === 0) return sentence;
+  let text = sentence;
+  const moved: string[] = [];
+  for (let index = glued.length - 1; index >= 0; index -= 1) {
+    const item = glued[index];
+    if (!item) continue;
+    text = text.slice(0, item.index) + text.slice(item.index + item.emoji.length);
+    moved.push(item.emoji);
+  }
+  const unique = [...new Set(moved.reverse())];
+  const ending = text.match(/[。！？!?]+$/u)?.[0] ?? "";
+  const body = text.replace(/[。！？!?]+$/u, "").replace(/[ \t]{2,}/g, " ").trim();
+  return atStart ? `${unique.join("")}${body}${ending}` : `${body}${ending}${unique.join("")}`;
+}
+
+function loosenCaptionEmojiPlacement(story: string, seed: number) {
+  let seen = 0;
+  return story
+    .split(/\n\n/)
+    .map((paragraph) =>
+      paragraph
+        .split(/(?<=[。！？!?])|\n/u)
+        .map((sentence) => {
+          seen += 1;
+          return unglueSentenceEmoji(sentence, (seed + seen) % 2 === 0);
+        })
+        .filter((sentence) => sentence.trim())
+        .join(""),
+    )
+    .filter((paragraph) => paragraph.trim())
+    .join("\n\n");
+}
+
+function sentenceParts(block: string) {
+  return block
+    .split(/(?<=[。！？!?])|(?<=\p{Extended_Pictographic}\uFE0F?)\s+(?=\p{Script=Han})/u)
     .map((part) => part.trim())
     .filter(Boolean);
-  const plainLength = (value: string) => value.replace(/\p{Extended_Pictographic}/gu, "").replace(/[。！？!?\s，,]/g, "").length;
-  const groups: string[][] = [];
-  for (const sentence of sentences) {
-    const current = groups.at(-1);
-    const previous = current?.at(-1);
-    const previousSubject = previous ? foodSubject(previous) : "";
-    const subject = foodSubject(sentence);
-    const dishChanged = Boolean(previousSubject && subject && previousSubject !== subject);
-    const drinkFollowsFood = Boolean(previousSubject && subject === "粉红奶" && !/冬阴功|炒饭|蟹|虾仁|咖喱|糯米/.test(sentence));
-    const detailed = plainLength(previous ?? "") >= 18 || plainLength(sentence) >= 18;
-    if (
-      current &&
-      previous &&
-      captionBucket(previous) === captionBucket(sentence) &&
-      current.length < 3 &&
-      (!dishChanged || !detailed || drinkFollowsFood)
-    ) {
-      current.push(sentence);
-    } else groups.push([sentence]);
-  }
-  const severalDishes = new Set(sentences.map(foodSubject).filter(Boolean)).size > 1;
-  const mixedTopics = new Set(sentences.map(captionBucket)).size > 1;
-  if (groups.length > 1 && groups.every((group) => group.length === 1) && !mixedTopics && !severalDishes) {
-    if (sentences.length <= 3) return joinCaptionSentences(sentences);
-    const packed: string[][] = [];
-    let index = 0;
-    while (index < sentences.length) {
-      const rest = sentences.length - index;
-      const size = rest > 3 ? (rest % 3 === 1 ? 2 : 3) : rest;
-      packed.push(sentences.slice(index, index + size));
-      index += size;
-    }
-    return packed.map((group) => joinCaptionSentences(group)).join("\n\n");
-  }
-  const paragraphs = groups.flatMap((group) => {
-    if (group.length <= 3) return [group];
-    const chunks: string[][] = [];
-    let index = 0;
-    while (index < group.length) {
-      const rest = group.length - index;
-      const size = rest === 4 ? 2 : Math.min(3, rest);
-      chunks.push(group.slice(index, index + size));
-      index += size;
-    }
-    return chunks;
-  });
-  return paragraphs.map((group) => joinCaptionSentences(group)).join("\n\n");
 }
 
-/** Fix fruit mix-ups and emoji punctuation. Add a fitting emoji only where the sentence already has that meaning. */
-export function ensureCaptionEmojis(caption: string) {
-  const fixed = stripAiConnectives(fixFruitEmojis(caption));
-  const { story, location } = splitCaptionStoryAndLocation(fixed);
-  const next = groupCaptionParagraphs(injectFittingStoryEmojis(arrangeDiningStory(story)));
+function emojiForSentence(sentence: string) {
+  const plain = sentence.replace(/\p{Extended_Pictographic}/gu, "");
+  if (/鲈鱼|青柠蒸鲈鱼/.test(plain)) return "🐟";
+  if (/蟹/.test(plain)) return "🦀";
+  if (/虾/.test(plain)) return "🍤";
+  if (/芒果/.test(plain)) return "🥭";
+  if (/柠檬|青柠/.test(plain)) return "🍋";
+  if (/咖喱/.test(plain)) return "🍛";
+  if (/冬阴功/.test(plain)) return "🍤";
+  if (/炒饭|糯米饭|滑蛋饭/.test(plain)) return "🍚";
+  if (/舒服|放松/.test(plain)) return "😌";
+  if (/好喝|好吃/.test(plain)) return "😋";
+  if (/逛街|逛完|购物/.test(plain)) return "🛍️";
+  return "";
+}
+
+function decorativeEmojiCount(text: string) {
+  return text.replace(/🇹🇭/g, "").match(/\p{Extended_Pictographic}/gu)?.length ?? 0;
+}
+
+/** One related emoji when the whole caption has none. Does not add a second pass, and does not invent a match. */
+function addOneRelatedEmoji(story: string, style: HumanStyleSelection | undefined, seed: number) {
+  if (decorativeEmojiCount(story) > 0) return story;
+  const paragraphs = story.split(/\n\n/);
+  const candidates: Array<{ paragraph: number; sentence: number; emoji: string; text: string }> = [];
+  paragraphs.forEach((paragraph, paragraphIndex) => {
+    sentenceParts(paragraph).forEach((sentence, sentenceIndex) => {
+      const emoji = emojiForSentence(sentence);
+      if (emoji) candidates.push({ paragraph: paragraphIndex, sentence: sentenceIndex, emoji, text: sentence });
+    });
+  });
+  if (candidates.length === 0) return story;
+  const persona = style?.primaryStyle;
+  const preferred =
+    persona === "emotional" || persona === "chatty"
+      ? candidates.find((item) => /喜欢|高兴|开心|然后|其实|真的|太/.test(item.text))
+      : persona === "travel"
+        ? candidates.find((item) => /逛|商场|过来|约上/.test(item.text))
+        : persona === "story"
+          ? candidates.find((item) => /之后|然后|总算|终于/.test(item.text))
+          : persona === "foodie"
+            ? candidates.find((item) => /新鲜|开胃|粘度|甜|口感|配料|香/.test(item.text))
+            : persona === "short" || persona === "local" || persona === "casual"
+              ? candidates[candidates.length - 1]
+              : candidates[Math.abs(seed) % candidates.length];
+  const candidate = preferred ?? candidates[Math.abs(seed) % candidates.length];
+  if (!candidate) return story;
+  const atStart =
+    persona === "local" || persona === "short"
+      ? seed % 4 === 0
+      : persona === "casual"
+        ? seed % 2 === 1
+        : seed % 2 === 0;
+  return paragraphs
+    .map((paragraph, paragraphIndex) => {
+      if (paragraphIndex !== candidate.paragraph) return paragraph;
+      return sentenceParts(paragraph)
+        .map((sentence, sentenceIndex) => {
+          if (sentenceIndex !== candidate.sentence) return sentence;
+          const body = sentence.replace(/[。！？!?]+$/u, "");
+          const ending = sentence.match(/[。！？!?]+$/u)?.[0] ?? "";
+          return atStart ? `${candidate.emoji}${body}${ending}` : `${body}${ending}${candidate.emoji}`;
+        })
+        .reduce((text, sentence) => {
+          if (!text) return sentence;
+          if (/\p{Extended_Pictographic}$/u.test(text)) return `${text} ${sentence}`;
+          return `${text}${sentence}`;
+        }, "");
+    })
+    .join("\n\n");
+}
+
+export function ensureCaptionEmojis(caption: string, style?: HumanStyleSelection, note = "") {
+  const keepClusters =
+    style?.primaryStyle === "playful" ||
+    style?.primaryStyle === "emotional" ||
+    style?.secondaryStyle === "playful";
+  const { story, location } = splitCaptionStoryAndLocation(fixFruitEmojis(caption));
+  const seeded = Math.round((style?.variation ?? 0) * 100) + Math.round((style?.intensity ?? 0) * 10);
+  const withOne = customerBannedEmoji(note) ? story : addOneRelatedEmoji(story, style, seeded);
+  const next = attachOrphanEmoji(tidyEmojiPunctuation(loosenCaptionEmojiPlacement(withOne, seeded), keepClusters));
   if (!location) return next;
   return `${next}\n\n${location}`;
 }

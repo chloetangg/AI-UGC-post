@@ -110,8 +110,8 @@ const case5 = ensureGroundedHeadlineCopy({
   context: case5Context,
 });
 assert(
-  copyMentionsExactCentralworld([...case5.titles, case5.coverTitle, case5.coverSubtitle]),
-  `case5 missing exact centralwOrld: ${case5.titles.join(" / ")} | ${case5.coverTitle} ${case5.coverSubtitle}`,
+  !copyMentionsExactCentralworld([...case5.titles, case5.coverTitle, case5.coverSubtitle]),
+  `case5 added centralwOrld without a customer mall name: ${case5.titles.join(" / ")} | ${case5.coverTitle} ${case5.coverSubtitle}`,
 );
 assert(
   !/CentralWorld|centralworld|Central World|尚泰世界/.test(
@@ -146,13 +146,9 @@ const case6 = ensureGroundedHeadlineCopy({
   context: case5Context,
 });
 assert(
-  copyMentionsExactCentralworld([...case6.titles, case6.coverTitle, case6.coverSubtitle]),
-  `case6 missing exact centralwOrld after grounded titles: ${case6.titles.join(" / ")}`,
+  !copyMentionsExactCentralworld([...case6.titles, case6.coverTitle, case6.coverSubtitle]),
+  `case6 added centralwOrld without a customer mall name: ${case6.titles.join(" / ")}`,
 );
-const case6Hits = [...case6.titles, case6.coverTitle, case6.coverSubtitle].filter((line) =>
-  line.includes(CANONICAL_CENTRALWORLD),
-).length;
-assert(case6Hits >= 1 && case6Hits <= 2, `case6 stuffed centralwOrld (${case6Hits}): ${case6.titles.join(" / ")}`);
 console.log(`case6 titles: ${case6.titles.join(" / ")}`);
 
 const multiContext = {

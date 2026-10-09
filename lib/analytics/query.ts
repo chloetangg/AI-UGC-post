@@ -1,4 +1,6 @@
-import { getDb } from "@/lib/mongodb";
+import { getDeploymentConfig } from "@/lib/deployment/config";
+import { dashboardBranchById } from "@/lib/deployment/databases";
+import { getNamedDb } from "@/lib/mongodb";
 import { resolveAnalyticsWindow } from "@/lib/analytics/dates";
 import { ensureAnalyticsIndexes } from "@/lib/analytics/events";
 import {
@@ -24,7 +26,10 @@ export async function queryAnalyticsReport(input: {
   startDate?: string;
   endDate?: string;
   qrCodeId?: string;
+  branchId?: string;
 }): Promise<AnalyticsReport> {
+  const branch = dashboardBranchById(input.branchId?.trim() || getDeploymentConfig().branchId);
+  if (!branch) throw new Error("Unknown branch");
   const window = resolveAnalyticsWindow(input);
   const qrCodeId = input.qrCodeId?.trim() || "";
   const match: Record<string, unknown> = {};
@@ -36,8 +41,8 @@ export async function queryAnalyticsReport(input: {
   }
   if (qrCodeId) match.qrCodeId = qrCodeId;
 
-  await ensureAnalyticsIndexes();
-  const db = await getDb();
+  const db = await getNamedDb(branch.dbName);
+  await ensureAnalyticsIndexes(db);
   const [facet] = await db
     .collection(ANALYTICS_COLLECTION)
     .aggregate<{
@@ -138,6 +143,8 @@ export async function queryAnalyticsReport(input: {
     startDate: window.startDate,
     endDate: window.endDate,
     timezone: ANALYTICS_TIMEZONE,
+    branchId: branch.id,
+    branchName: branch.name,
     summary,
     conversion: {
       qrToForm: percent(summary.formSubmissions, summary.qrScans),

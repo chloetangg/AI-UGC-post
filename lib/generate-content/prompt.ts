@@ -3,6 +3,7 @@ import {
   type GenerateContentRequest,
 } from "@/lib/generate-content/types";
 import { formatCaptionEmojiRules } from "@/lib/caption-emoji";
+import { formatPlatformNicknameRule } from "@/lib/brand-spelling";
 import { formatCaptionConsumerVoiceRules, formatCaptionShapeRules, formatCustomerHookPriorityRules, formatCustomerOriginalVoiceRules, formatSpokenNaturalnessRules } from "@/lib/caption-voice";
 import { CAPTION_NO_HASHTAG_RULES } from "@/lib/hashtags";
 import { complianceGenerationRules } from "@/lib/compliance/prompt";
@@ -11,7 +12,6 @@ import {
   formatLocationTimeStaticRules,
   locationFactsForPrompt,
   officialLocationLine,
-  STRICT_MALL_CHINESE_NAME_RULES,
   LOCATION_TIME_FORMAT_POOL,
   type LocationTimePlan,
   verifiedHoursForBranch,
@@ -49,17 +49,18 @@ export const generateContentJsonSchema = {
   },
 } as const;
 
-export function buildGenerateContentSystemPrompt() {
-  const locationFacts = locationFactsForPrompt();
+export function buildGenerateContentSystemPrompt(branch = "") {
+  const locationFacts = locationFactsForPrompt(branch);
 
-  return `You are an AI copywriter specialized in generating authentic Xiaohongshu (小红书) UGC content for brand campaigns.
+  return `You are an AI copywriter specialized in generating authentic Xiaohongshu UGC content for brand campaigns.
+${formatPlatformNicknameRule()}
 
 Your job is to transform the user's selected experience, preferences, and campaign information into a natural Xiaohongshu post.
 
 LANGUAGE:
 - Always generate Simplified Chinese (${GENERATE_CONTENT_LANGUAGE}).
 - Never generate English content, even when the website UI is in English.
-- Titles and body must be Simplified Chinese, except English mall names that have no approved Chinese name (Terminal 21, One Bangkok).
+- Titles and body must be Simplified Chinese, except this branch's official English mall name when it has no approved Chinese name.
 
 CONTENT PRINCIPLES:
 - Write from the perspective of a real consumer.
@@ -82,13 +83,13 @@ These mall names, Chinese names, capitalization, and floors are FIXED FACTS. The
 ${locationFacts.chineseNameRules}
 
 ${locationFacts.branchRules}
-If the customer wrote CentralWorld / centralworld / "2F" / wrong floor, still treat the official facts as true.
+If the customer wrote a different spelling or floor, the official facts above still win. Do not mention another branch's mall, floor, or hours.
 Generic "Baan Ying" has no mall/floor — do not invent one.
 
 VERIFIED OPENING HOURS (locked official facts):
 ${locationFacts.hours}
 
-${formatLocationTimeStaticRules()}
+${formatLocationTimeStaticRules(branch)}
 
 LOCATION TEMPLATES (standalone mode only):
 ${LOCATION_TIME_FORMAT_POOL}
@@ -163,9 +164,7 @@ Official location line (locked):
 ${officialLocationLine(diningBranch) || "Not provided"}
 Verified opening hours (locked):
 ${verifiedHoursForBranch(diningBranch) || "Not provided"}
-${locationPlan ? formatLocationTimePlanRules(locationPlan, diningBranch) : formatLocationTimeStaticRules()}
-
-${STRICT_MALL_CHINESE_NAME_RULES}
+${locationPlan ? formatLocationTimePlanRules(locationPlan, diningBranch) : formatLocationTimeStaticRules(diningBranch)}
 
 ${LOCATION_TIME_FORMAT_POOL}
 Do not add hashtags.

@@ -1,4 +1,4 @@
-import type { CoverTitleContext } from "./cover-rules";
+import { selectedCoverLocation, type CoverTitleContext } from "./cover-rules";
 
 function sanitizeCoverLine(raw: string) {
   return raw
@@ -109,7 +109,7 @@ export function isSpokenCompleteCoverHeadline(title: string) {
   if (!cleaned || isIncompleteCoverAction(cleaned)) return false;
   return (
     /^第一次来(尝试|吃|试试|体验).{2,}$/.test(cleaned) ||
-    /^第一次来centralwOrld吃/.test(cleaned) ||
+    /^第一次来(centralwOrld|Siam Center|Terminal 21|One Bangkok)吃/.test(cleaned) ||
     /^(在)?曼谷(吃到|发现|逛街发现)(一家|这家)/.test(cleaned) ||
     /^来曼谷(可以)?试试这家/.test(cleaned)
   );
@@ -119,7 +119,10 @@ export function repairIncompleteCoverAction(title: string, context: CoverTitleCo
   const cleaned = sanitizeCoverLine(title);
   if (!isIncompleteCoverAction(cleaned)) return cleaned;
   const firstVisit = context.visitFrequency === "1st time" || /第一次/.test(cleaned);
-  if (/centralwOrld|central\s*world/i.test(cleaned) && firstVisit) return "第一次来centralwOrld吃泰餐";
+  const mall = selectedCoverLocation(context.branch) || "centralwOrld";
+  if (/central\s*world|siam\s*center|terminal\s*21|one\s*bangkok/i.test(cleaned) && firstVisit) {
+    return `第一次来${mall}吃泰餐`;
+  }
   if (/发现/.test(cleaned)) return "在曼谷发现这家泰餐";
   if (/值得/.test(cleaned)) return "来曼谷试试这家泰餐";
   if (/到曼谷第一次/.test(cleaned)) return "来曼谷试试这家泰餐";

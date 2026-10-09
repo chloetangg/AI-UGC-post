@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import type { Db } from "mongodb";
 import { getDb } from "@/lib/mongodb";
 import { persistAnalyticsEvent } from "@/lib/analytics/persist";
 import {
@@ -14,7 +15,7 @@ const ONCE_PER_SESSION: AnalyticsEventType[] = [
   "dianping_copy_content",
 ];
 
-let indexesReady: Promise<void> | null = null;
+const indexesReady = new Map<string, Promise<void>>();
 
 function isDuplicateKey(error: unknown) {
   return Boolean(error && typeof error === "object" && "code" in error && error.code === 11000);
@@ -40,11 +41,13 @@ export function analyticsEventId(
   return `${eventType}:${sessionId}:${Date.now()}:${randomUUID()}`;
 }
 
-export async function ensureAnalyticsIndexes() {
-  if (!indexesReady) {
-    indexesReady = (async () => {
-      const db = await getDb();
-      const collection = db.collection(ANALYTICS_COLLECTION);
+export async function ensureAnalyticsIndexes(db?: Db) {
+  const database = db ?? (await getDb());
+  const key = database.databaseName;
+  let pending = indexesReady.get(key);
+  if (!pending) {
+    pending = (async () => {
+      const collection = database.collection(ANALYTICS_COLLECTION);
       await Promise.all([
         collection.createIndex({ eventId: 1 }, { unique: true, name: "eventId_unique" }),
         collection.createIndex({ eventType: 1, timestamp: 1 }, { name: "eventType_timestamp" }),
@@ -53,11 +56,12 @@ export async function ensureAnalyticsIndexes() {
         collection.createIndex({ timestamp: 1 }, { name: "timestamp" }),
       ]);
     })().catch((error) => {
-      indexesReady = null;
+      indexesReady.delete(key);
       throw error;
     });
+    indexesReady.set(key, pending);
   }
-  await indexesReady;
+  await pending;
 }
 
 export async function recordAnalyticsEvent(input: RecordAnalyticsInput) {

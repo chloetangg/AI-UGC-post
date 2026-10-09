@@ -13,6 +13,7 @@ import type { GeneratedContent } from "@/types/content";
 type RawGenerated = {
   titles?: unknown;
   caption?: unknown;
+  captionParagraphs?: unknown;
   hashtags?: unknown;
   coverTitle?: unknown;
   coverSubtitle?: unknown;
@@ -36,6 +37,13 @@ type RawGenerated = {
 function asStringArray(value: unknown) {
   if (!Array.isArray(value)) return [];
   return value.map((item) => String(item ?? "").trim()).filter(Boolean);
+}
+
+export function titleSlotCounts(value: unknown) {
+  if (!Array.isArray(value)) return { raw: 0, blank: 0, kept: 0 };
+  const raw = value.length;
+  const blank = value.filter((item) => !String(item ?? "").trim()).length;
+  return { raw, blank, kept: raw - blank };
 }
 
 function cleanCoverTitle(value: string) {
@@ -80,18 +88,22 @@ export function parseGeneratedContent(
 ): GeneratedContent {
   const cleaned = raw.replace(/```json|```/g, "").trim();
   const parsed = JSON.parse(cleaned) as RawGenerated;
+  const titleSlots = titleSlotCounts(parsed.titles);
   const titles = asStringArray(parsed.titles)
     .map(stripHashtagsFromTitle)
     .map(rewriteFirstVisitWording)
     .map(sanitizeOfficialMallNames);
+  const paragraphCaption = asStringArray(parsed.captionParagraphs).join("\n\n");
   const caption = sanitizeOfficialMallNames(
     rewriteFirstVisitWording(
-      stripAllHashtagsFromCaption(String(parsed.caption ?? "").trim()),
+      stripAllHashtagsFromCaption((paragraphCaption || String(parsed.caption ?? "")).trim()),
     ),
   );
 
   if (titles.length < 3 || !caption) {
-    throw new Error("Incomplete model output");
+    throw new Error(
+      `Incomplete model output: titles=${titles.length} caption=${caption ? "present" : "empty"} raw=${titleSlots.raw} blank=${titleSlots.blank} stage=empty-title-filter`,
+    );
   }
 
   const postTitles: [string, string, string] = [titles[0], titles[1], titles[2]];

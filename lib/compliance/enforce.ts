@@ -18,6 +18,11 @@ export type ComplianceResult = ComplianceContent & {
   usage: OpenAICallUsage[];
 };
 
+export type ComplianceJsonComplete = (
+  system: string,
+  user: string,
+) => Promise<{ text: string; usage: OpenAICallUsage }>;
+
 function collectHits(content: ComplianceContent) {
   return [
     ...content.titles.flatMap((title) => scanCompliance(title, { field: "title" })),
@@ -73,34 +78,22 @@ const rewriteSchema = {
 } as const;
 
 async function modelRewrite(
-  openai: OpenAI,
-  model: string,
+  complete: ComplianceJsonComplete,
   content: ComplianceContent,
   coverContext: CoverTitleContext = {},
 ): Promise<{ content: ComplianceContent; usage: OpenAICallUsage[] }> {
-  const completion = await openai.chat.completions.create({
-    model,
-    temperature: 0.4,
-    response_format: { type: "json_schema", json_schema: rewriteSchema },
-    messages: [
-      {
-        role: "system",
-        content: `Rewrite only the risky sentences in this Xiaohongshu post into neutral, factual, personal experience. Keep dishes, facts, emoji count, and a natural spoken tone. Do not delete the thought — rewrite it. Keep required hashtag #BaanYing曼谷 exactly. The other 4 hashtags must stay in the approved pool. COVER mainTitle must keep at least one keyword from 曼谷/centralwOrld/泰餐/美食/必吃 and must not become a keyword dump. COVER subTitle must stay extracted from the customer's evidence, not a generic 招牌泰式料理 template. 必吃 is allowed on the cover only, never as a post-title/caption claim. Cover mainTitle and subTitle must not use 最/最爱/第一/冠军/全曼谷/No.1 ranking language; rewrite to 超爱 / 很喜欢 / 很想再吃. Leave 绝绝子 / 封神 / 天花板 when they are a casual reaction to strong praise. Still rewrite 这家店直接封神 / 天花板级别 / 全曼谷天花板. Subtitle stays 6–15 units and is not padded. Never copy customer negatives such as 贵/难吃/踩雷/抽奖送东西 onto titles or cover; keep meaning as neutral wording, never as false praise. Do not truncate titles. Return JSON only. No analysis.
+  const completed = await complete(
+    `Rewrite only the risky sentences in this Xiaohongshu post into neutral, factual, personal experience. Keep dishes, facts, emoji count, and a natural spoken tone. Do not delete the thought — rewrite it. Keep required hashtag #BaanYing曼谷 exactly. The other 4 hashtags must stay in the approved pool. COVER mainTitle must keep at least one keyword from 曼谷/centralwOrld/泰餐/美食/必吃 and must not become a keyword dump. COVER subTitle must stay extracted from the customer's evidence, not a generic 招牌泰式料理 template. 必吃 is allowed on the cover only, never as a post-title/caption claim. Cover mainTitle and subTitle must not use 最/最爱/第一/冠军/全曼谷/No.1 ranking language; rewrite to 超爱 / 很喜欢 / 很想再吃. Leave 绝绝子 / 封神 / 天花板 when they are a casual reaction to strong praise. Still rewrite 这家店直接封神 / 天花板级别 / 全曼谷天花板. Subtitle stays 6–15 units and is not padded. Never copy customer negatives such as 贵/难吃/踩雷/抽奖送东西 onto titles or cover; keep meaning as neutral wording, never as false praise. Do not truncate titles. Return JSON only. No analysis.
 ${complianceGenerationRules()}`,
-      },
-      {
-        role: "user",
-        content: JSON.stringify({
-          titles: content.titles,
-          caption: content.caption,
-          hashtags: content.hashtags,
-          mainTitle: content.coverTitle,
-          subTitle: content.coverSubtitle,
-        }),
-      },
-    ],
-  });
-  const parsed = JSON.parse(completion.choices[0]?.message?.content ?? "{}") as Partial<ComplianceContent> & {
+    JSON.stringify({
+      titles: content.titles,
+      caption: content.caption,
+      hashtags: content.hashtags,
+      mainTitle: content.coverTitle,
+      subTitle: content.coverSubtitle,
+    }),
+  );
+  const parsed = JSON.parse(completed.text || "{}") as Partial<ComplianceContent> & {
     mainTitle?: string;
     subTitle?: string;
   };
@@ -114,7 +107,7 @@ ${complianceGenerationRules()}`,
   };
   return {
     content: localRewrite(next, coverContext),
-    usage: [usageFromCompletion(completion, model, "compliance-rewrite")],
+    usage: [completed.usage],
   };
 }
 
@@ -126,6 +119,7 @@ export async function enforceXiaohongshuCompliance(options: {
   content: ComplianceContent;
   openai?: OpenAI;
   model?: string;
+  complete?: ComplianceJsonComplete;
   coverContext?: CoverTitleContext;
 }): Promise<ComplianceResult> {
   const usage: OpenAICallUsage[] = [];
@@ -134,9 +128,29 @@ export async function enforceXiaohongshuCompliance(options: {
     return { ...next, usage };
   }
 
-  if (options.openai && options.model) {
+  const complete =
+    options.complete ??
+    (options.openai && options.model
+      ? async (system: string, user: string) => {
+          const completion = await options.openai!.chat.completions.create({
+            model: options.model!,
+            temperature: 0.4,
+            response_format: { type: "json_schema", json_schema: rewriteSchema },
+            messages: [
+              { role: "system", content: system },
+              { role: "user", content: user },
+            ],
+          });
+          return {
+            text: completion.choices[0]?.message?.content ?? "",
+            usage: usageFromCompletion(completion, options.model!, "compliance-rewrite"),
+          };
+        }
+      : undefined);
+
+  if (complete) {
     try {
-      const rewritten = await modelRewrite(options.openai, options.model, next, options.coverContext);
+      const rewritten = await modelRewrite(complete, next, options.coverContext);
       usage.push(...rewritten.usage);
       next = rewritten.content;
     } catch {

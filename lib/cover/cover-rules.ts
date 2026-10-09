@@ -8,6 +8,7 @@ import {
 } from "./dish-names";
 import { sanitizeCoverLine, toCoverGraphemes } from "./cover-title-text";
 import { distillCustomerHook } from "@/lib/title-insight";
+import { parseReviewIntoEvaluationUnits, selectOneValidSubtitle } from "@/lib/cover/subtitle-units";
 
 export const COVER_LOCATION_KEYWORDS = [
   "centralwOrld",
@@ -133,6 +134,10 @@ export function findCoverKeywords(text: string) {
       continue;
     }
     if (hay.includes(keyword)) found.push(keyword);
+  }
+  for (const keyword of COVER_LOCATION_KEYWORDS) {
+    if (keyword === "centralwOrld") continue;
+    if (hay.toLowerCase().includes(keyword.toLowerCase())) found.push(keyword);
   }
   return found;
 }
@@ -362,7 +367,9 @@ function noteClauseWithinSubtitle(note: string) {
   for (const clause of clauses) {
     if (/第一次/.test(clause)) continue;
     if (/^(招牌泰式料理|曼谷热门美食|正宗泰国料理)$/.test(clause)) continue;
+    if (parseReviewIntoEvaluationUnits(clause).length > 1) continue;
     const distilled = distillCustomerHook(clause);
+    if (parseReviewIntoEvaluationUnits(distilled).length > 1) continue;
     if (fitsSubtitleUnits(distilled)) return distilled;
     if (fitsSubtitleUnits(clause) && distilled === clause) return clause;
   }
@@ -371,6 +378,9 @@ function noteClauseWithinSubtitle(note: string) {
 
 export function subtitleFromCoverContext(context: CoverTitleContext = {}) {
   const note = context.diningNote?.trim() ?? "";
+  if (parseReviewIntoEvaluationUnits(note).length > 1) {
+    return selectOneValidSubtitle({ note });
+  }
   const dish = firstCoverDishName(context);
   const short = dish ? coverDishShortName(dish) : "";
 
@@ -457,10 +467,10 @@ export function coverFallbackPairs(context: CoverTitleContext = {}) {
     { title: "曼谷吃饭很舒服", subtitle },
     { title: "必吃泰式料理", subtitle },
   ];
-  if (location === "centralwOrld" && /逛|商场|方便/.test(context.diningNote ?? "")) {
+  if (location && /逛|商场|方便/.test(context.diningNote ?? "")) {
     pairs.unshift(
-      { title: "centralwOrld泰餐", subtitle },
-      { title: "centralwOrld必吃美食", subtitle },
+      { title: `${location}泰餐`, subtitle },
+      { title: `${location}必吃美食`, subtitle },
     );
   }
   return pairs;
@@ -471,9 +481,9 @@ export function formatCoverTitleStaticRules() {
 
 Natural spoken Chinese from THIS visit beats a keyword. Do not glue 曼谷 onto a broken stub (曼谷超爱次来吃 / 曼谷美食发现).
 
-mainTitle: 4–10 units MAX, not a target. Han=1, centralwOrld=1, Terminal 21 / Siam Center / One Bangkok=2, Baan Ying=2, other Latin=0.5 rounded up. At least 1 and at most 2 of 曼谷 / centralwOrld / 泰餐 / 美食 / 必吃, woven into the hook. GOOD: 曼谷泰餐遇到帅老板 / 老板很帅的曼谷泰餐. A mall name only when location is the hook.
+mainTitle: 4–10 units MAX, not a target. Han=1, centralwOrld=1, Terminal 21 / Siam Center / One Bangkok=2, Baan Ying=2, other Latin=0.5 rounded up. Its job is to make a reader stop, not to summarize the post. Use the single most specific point from TITLE MATERIAL. A real convenience can lead when that is the useful fact; a dish can lead when the dish is stronger. A little curiosity is allowed only when the caption still delivers that point. One natural sentence a diner would post. Do not splice 泰餐 / 曼谷 / 服务 / 好吃 into 泰餐这家服务好舒服. Do not stop at a bare review: 这家店服务不错 / 这道菜很好吃 / 这家泰餐的服务真的不错 / 这口冬阴功很香. 泰餐这家 / 这家真的 / 这口 / 狠狠爱了 / 天花板 sound like a template unless that is already how they wrote. Do not require a question, an exclamation, a contrast, or a stock internet word. Do not start every cover with 真的 / 超 / 巨. Lead with the customer's own reason or reaction when the note has one. A pool keyword (曼谷 / this branch's mall / 泰餐 / 美食 / 必吃) is optional support, at most 2, and only inside that hook. Do not stuff a city, mall, cuisine, or brand in for search. Do not default to 商场里吃泰餐 / 曼谷吃饭很舒服 / 在商场吃到的芒果糯米饭 / 曼谷必吃泰餐. A mall name only when the customer or this round's angle is actually about the place. Do not write an ad slogan or a hard sell. Do not invent a detail to make the line catchier.
 
-subTitle: 6–15 units, not padded. One extracted hook, not the customer's sentence and not two facts glued. Prefer what they wrote, then a selected dish or like. 粉红奶真的很好喝 may stay short. No 招牌泰式料理. If first visit is the ONLY evidence: 第一次来尝试Baan Ying. Never 第一次吃泰餐, and do not put 第一次 and a dish in the same subtitle.
+subTitle: one different supported fact, 6–15 units. It adds a new point or a new reason to care. It must not restate the mainTitle with a synonym. If mainTitle is a practical convenience such as paying, a dish they named can be the subtitle. If mainTitle is a dish, service or another real point can be the subtitle. Those are options, not a fixed pair. If there is no second point, do not invent one and do not pad with 必点 / 封神 / 狠狠爱了 / 这口. BAD: mainTitle 商场里吃泰餐 / subTitle 商场里吃泰餐很方便. BAD: mainTitle 这家店服务不错 / subTitle 店员服务真的很贴心. A review with no punctuation can still hold several evaluations. Split 食物很好吃粉红奶很好喝 into 食物很好吃 and 粉红奶很好喝, then keep one. Never glue them, and never cut characters off either end to make the line fit. 粉红奶真的很好喝 may stay short. No 招牌泰式料理. If first visit is the ONLY evidence: 第一次来尝试Baan Ying. Never 第一次吃泰餐, and do not put 第一次 and a dish in the same subtitle.
 
 ${formatCoverDishNameStaticRules()}
 
@@ -492,8 +502,8 @@ export function formatCoverTitleInstance(context: CoverTitleContext = {}) {
   const enjoy = (context.enjoyMost ?? []).filter(Boolean).join(", ") || "none";
   const dishes = (context.dishes ?? []).filter(Boolean).join(", ") || "none";
   const locationHint = location
-    ? `Dining location (system-provided): ${location}. Cover may use this generation's mall spelling when the mall is the hook. Across Title 1–3 + Cover Title + Cover Subtitle, that spelling must appear once — not necessarily on the cover. Never invent Terminal 21 / Siam Center / One Bangkok.`
-    : "No dining mall keyword is available. Do NOT invent a mall, Terminal 21, Siam Center, or One Bangkok.";
+    ? `Dining location (system-provided): ${location}. Use this mall on the cover only when the place is the hook. Do not require it across the titles and the cover. Do not name any other mall.`
+    : "No dining mall keyword is available. Do NOT invent a mall.";
   return `THIS VISIT COVER EVIDENCE — apply COVER OVERLAY rules from the system prompt. Do not invent.
 
 Previous coverTitle (do not copy): ${previousMain}

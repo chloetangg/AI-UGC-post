@@ -2,10 +2,11 @@ import {
   extractExperienceFacts,
   type ExperienceFact,
 } from "@/lib/content-evidence";
-import type { CoverTitleContext } from "@/lib/cover/cover-rules";
+import { selectedCoverLocation, type CoverTitleContext } from "@/lib/cover/cover-rules";
 import { chineseFullDishName } from "@/lib/cover/dish-names";
 import { stripGeneratedLocationTime } from "@/lib/locations";
 import { withSentenceEnd } from "@/lib/caption-emoji";
+import { collapseRepeatedSkeletons } from "@/lib/caption-story";
 import { neutralizeInventedPartyCopy } from "@/lib/party-size";
 import { buildEvidenceMap } from "@/lib/content-lock";
 import type { RecommendedDish } from "@/types/content";
@@ -84,6 +85,8 @@ export type GenerationMemory = {
   informationDensity: string;
   structureType: string;
   lengthLevel: CaptionLengthBand;
+  humanStyle?: string;
+  emojiMode?: string;
 };
 
 export const LENGTH_BAND_RANGE: Record<CaptionLengthBand, { min: number; max: number }> = {
@@ -130,7 +133,7 @@ const FOCUS_COPY: Record<ContentFocusId, string> = {
   CONVENIENCE: "tourist convenience: pay / Chinese menu / mall dining",
   EXPERIENCE: "restaurant experience: owner / space / service / feel",
   FIRST_VISIT: "first visit at Baan Ying",
-  SHOPPING: "mall-stop / centralwOrld shopping then eat",
+  SHOPPING: "a mall stop only when they wrote 逛街 or the mall. Otherwise keep their own reason",
   SIGNATURE_DISH: "one signature dish in depth",
 };
 
@@ -259,9 +262,7 @@ function dishFactsFromContext(context: CoverTitleContext): ExperienceFact[] {
       coverMains: [name],
       coverSubs: [`这口${name}很香`],
       titleHooks: [`曼谷泰餐${name}很满足`],
-      captionLine: detail
-        ? `${name}${detail}，吃起来很有记忆点。`.replace(/，+/g, "，")
-        : `${name}很好吃，吃完还想再点。`,
+      captionLine: detail ? `${name}${detail}。`.replace(/。+$/g, "。") : "",
     };
   });
 }
@@ -668,10 +669,11 @@ ${memories
   return `${memoryBlock}Apply THIS ROUND INDEPENDENT DRAFT from the system prompt.
 
 THIS ROUND CONTENT FOCUS: ${plan.contentFocus} — ${FOCUS_COPY[plan.contentFocus]}
+Content focus chooses what else to include. It does not replace the customer's reason for coming.
 ${STRUCTURE_COPY[plan.contentFocus]}
 THIS ROUND NARRATIVE PATH: ${plan.openingPattern}. Change the path from the last 3. Do not force odd syntax.
 THIS ROUND OPENING: ${plan.openingStyle}. First sentence must not reuse 这次最想推荐的是 / 这次来Baan Ying / 第一次来到 centralwOrld if those appeared recently.
-THIS ROUND DISH ENTRY: ${plan.dishEntryPattern}. Describe the dish; do not announce 推荐 unless that is the only unused pattern.
+THIS ROUND DISH ENTRY: ${plan.dishEntryPattern} may shape ONE dish. Other dishes, if real, share one different sentence. Never repeat 是我这次还会想再点的一道, 很好吃, or 吃起来 once per dish.
 THIS ROUND ENDING: ${plan.endingPattern}. Do not add a summary just to finish.
 THIS ROUND RHYTHM / DENSITY: ${plan.sentenceRhythm} / ${plan.informationDensity}
 THIS ROUND INFORMATION PRIORITY (describe these 2–5 only; skip the rest): ${plan.informationPriority.join(" → ") || "none"}
@@ -698,6 +700,16 @@ function factDescribed(text: string, fact: ExperienceFact) {
   );
 }
 
+function traitForDish(facts: ExperienceFact[], dish: string) {
+  if (!dish) return "";
+  const fact = facts.find((item) => item.markers.some((marker) => marker === dish));
+  if (!fact?.captionLine.includes(dish)) return "";
+  return fact.captionLine
+    .replace(dish, "")
+    .replace(/，吃起来很有记忆点。?|很好吃，吃完还想再点。?|[。！？!?]/g, "")
+    .trim();
+}
+
 function dishLineFor(
   name: string,
   detail: string,
@@ -711,8 +723,12 @@ function dishLineFor(
       return `如果只选一道，我会选${name}。`;
     case "memory-point":
       return trait ? `${name}这次真的有记住我，${trait}。` : `${name}这次真的有记住我。`;
-    case "would-reorder":
-      return `${name}是我这次还会想再点的一道。`;
+    case "would-reorder": {
+      const clean = trait.replace(/[。！？!?]+$/g, "").trim();
+      if (!clean) return `${name}这次还会想再点。`;
+      if (/还会想再点|还会点/.test(clean)) return `${name}${clean}。`;
+      return `${name}${clean}，这次还会想再点。`;
+    }
     case "specific-trait":
       return trait ? `${name}的${trait}比较明显。` : `${name}吃起来比较有记忆点。`;
     default:
@@ -732,6 +748,7 @@ function descriptionFor(
     const detail = fact.captionLine.includes(name)
       ? fact.captionLine.replace(name, "").replace(/，吃起来很有记忆点。?|很好吃，吃完还想再点。?|。$/g, "").trim()
       : "";
+    if (!detail) return "";
     return dishLineFor(name, detail, plan?.dishEntryPattern ?? "direct-describe");
   }
   if (fact.id === "alipay" && context.customerType === "Tourist") {
@@ -814,7 +831,7 @@ function polishSentence(sentence: string, context: CoverTitleContext, facts: Exp
     const fact = facts.find((item) => item.markers.some((marker) => marker && next.includes(marker)));
     if (fact) return descriptionFor(fact, context, seed);
   }
-  return next.replace(/\s{2,}/g, "").trim();
+  return next.replace(/[^\S\n]{2,}/g, "").trim();
 }
 
 function preserveSentiment(caption: string, context: CoverTitleContext) {
@@ -856,6 +873,10 @@ function pickUnusedLine(options: string[], seed: number, used: string[] = []) {
   return pool[Math.abs(seed) % pool.length] ?? options[0] ?? "";
 }
 
+function currentMall(context: CoverTitleContext) {
+  return selectedCoverLocation(context.branch) || "centralwOrld";
+}
+
 function openingFor(
   plan: GenerationVariationPlan,
   context: CoverTitleContext,
@@ -867,6 +888,7 @@ function openingFor(
   const hasOwner = facts.some((fact) => fact.id === "handsome-owner" || fact.id === "friendly-owner");
   const tourist = context.customerType === "Tourist";
   const used = [plan.firstSentencePattern];
+  const mall = currentMall(context);
   switch (plan.openingPattern) {
     case "favorite-dish":
     case "concrete-detail":
@@ -875,9 +897,10 @@ function openingFor(
       return dish
         ? pickUnusedLine(
             [
-              dishLineFor(dish, "", plan.dishEntryPattern),
-              `${dish}这次还蛮有记忆点。`,
-              `点的几道里面，我比较喜欢${dish}。`,
+              dishLineFor(dish, traitForDish(facts, dish), plan.dishEntryPattern),
+              traitForDish(facts, dish)
+                ? `${dish}${traitForDish(facts, dish)}。`
+                : `${dish}这次还蛮有记忆点。`,
             ],
             seed,
             used,
@@ -887,13 +910,13 @@ function openingFor(
       return facts.some((fact) => fact.id === "mall-stop")
         ? pickUnusedLine(
             [
-              "在centralwOrld逛了一圈，想找一家泰餐吃饭，最后选了Baan Ying。",
-              "刚好在centralwOrld，想吃泰餐的时候就来了Baan Ying。",
+              `在${mall}逛了一圈，想找一家泰餐吃饭，最后选了Baan Ying。`,
+              `刚好在${mall}，想吃泰餐的时候就来了Baan Ying。`,
             ],
             seed,
             used,
           )
-        : "刚好在centralwOrld的Baan Ying，想找一家泰餐吃饭。";
+        : `刚好在${mall}的Baan Ying，想找一家泰餐吃饭。`;
     case "dining-feel":
     case "atmosphere-to-food":
       return pickUnusedLine(
@@ -905,17 +928,17 @@ function openingFor(
       );
     case "convenience-to-food":
       if (facts.some((fact) => fact.id === "mall-stop" || fact.id === "mall-chain")) {
-        return "刚好在centralwOrld的Baan Ying，想吃泰餐的时候也比较方便。";
+        return `刚好在${mall}的Baan Ying，想吃泰餐的时候也比较方便。`;
       }
       return tourist ? "来曼谷吃饭，方便程度对我来说还蛮重要的。" : "这顿比较让我省心的，是吃饭本身很方便。";
     case "customer-note":
       if (hasOwner) return "还有一个很容易让人记住的小细节，就是老板很帅。";
-      if (dish) return dishLineFor(dish, "", plan.dishEntryPattern);
+      if (dish) return dishLineFor(dish, traitForDish(facts, dish), plan.dishEntryPattern);
       if (firstVisit) return "第一次来尝试Baan Ying，没有想太多。";
       return "这顿有几个点印象比较深。";
     case "fact-end-no-summary":
     default:
-      if (dish) return dishLineFor(dish, "", plan.dishEntryPattern);
+      if (dish) return dishLineFor(dish, traitForDish(facts, dish), plan.dishEntryPattern);
       if (plan.openingStyle === "first-visit-first" && firstVisit) {
         return "第一次来尝试Baan Ying，没有想太多。";
       }
@@ -954,16 +977,17 @@ function rebuildCaption(
       dishAlreadyTold;
     if (alreadyOpened) continue;
     const line = descriptionFor(fact, context, seed + index, plan);
-    if (!sentences.some((sentence) => sentence.includes(line.slice(0, 6)))) sentences.push(line);
+    if (line && !sentences.some((sentence) => sentence.includes(line.slice(0, 6)))) sentences.push(line);
   }
   const lastDish = plan.dishOrder[0] || "";
   if (plan.endingPattern === "scene" && facts.some((fact) => fact.id === "mall-chain" || fact.id === "mall-stop")) {
-    if (!sentences.some((sentence) => /central\s*world|商场|baan\s*ying/i.test(sentence))) {
-      sentences.push("刚好在centralwOrld的Baan Ying，想吃泰餐的时候也比较方便。");
+    const mall = currentMall(context);
+    if (!sentences.some((sentence) => new RegExp(`${mall.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}|商场|baan\\s*ying`, "i").test(sentence))) {
+      sentences.push(`刚好在${mall}的Baan Ying，想吃泰餐的时候也比较方便。`);
     }
   } else if (plan.endingPattern === "personal-judgment" && lastDish) {
-    if (!/还会点|还会想再点/.test(sentences.at(-1) ?? "")) {
-      sentences.push(`${lastDish}是我这次还会想再点的一道。`);
+    if (!sentences.some((sentence) => sentence.includes(lastDish))) {
+      sentences.push(`${lastDish}这次还记得住。`);
     }
   } else if (plan.endingPattern === "feeling" && facts.some((fact) => fact.id === "comfortable")) {
     if (!/放松|舒服/.test(sentences.at(-1) ?? "")) {
@@ -971,6 +995,11 @@ function rebuildCaption(
     }
   }
   return joinSentences(sentences);
+}
+
+function dishesAlreadyTold(caption: string, context: CoverTitleContext) {
+  const names = selectedDishNames(context);
+  return names.length > 0 && names.every((name) => caption.includes(name));
 }
 
 function expandMentionOnly(
@@ -983,6 +1012,7 @@ function expandMentionOnly(
   const sentences = splitSentences(caption).map((sentence, index) =>
     polishSentence(sentence, context, facts, seed + index),
   );
+  if (dishesAlreadyTold(caption, context)) return joinSentences(sentences);
   const used = new Set(
     facts.filter((fact) => sentences.some((sentence) => factDescribed(sentence, fact))).map((fact) => fact.id),
   );
@@ -1012,6 +1042,7 @@ function expandToBand(
   plan: GenerationVariationPlan,
   seed: number,
 ) {
+  if (dishesAlreadyTold(caption, context)) return caption;
   let next = caption;
   if (storyHanCount(next) >= plan.lengthMin) return next;
   for (const [index, fact] of structureFactOrder(facts, plan).entries()) {
@@ -1061,15 +1092,33 @@ function titleCore(title: string) {
     .replace(/[，。！？、：:｜|\s]/g, "");
 }
 
-export function titlesLackVariation(titles: string[], facts: ExperienceFact[] = []) {
+function meaningCore(title: string) {
+  return titleCore(title).replace(/店员|服务员|这家|真的|挺|很|超|特别|比较/g, "");
+}
+
+/** Same core, or the same words with only a short synonym trimmed. A shared topic is not a duplicate. */
+function titlesAreNearDuplicates(titles: string[]) {
+  const cores = titles.map(meaningCore);
+  if (cores.some((core) => core.length < 2)) return false;
+  const shortest = [...cores].sort((a, b) => a.length - b.length)[0] ?? "";
+  if (shortest.length < 2) return false;
+  return cores.every((core) => core === shortest || core.includes(shortest));
+}
+
+export function titlesLackVariation(titles: string[]) {
   if (titles.length < 3) return true;
   const cores = titles.map(titleCore);
-  if (cores[0] && cores[0] === cores[1] && cores[1] === cores[2]) return true;
-  const factHits = titles.map((title) => facts.filter((fact) => fact.markers.some((marker) => marker && title.includes(marker))).map((fact) => fact.id));
-  const shared = factHits[0]?.filter((id) => factHits.every((list) => list.includes(id))) ?? [];
-  if (shared.length > 0 && factHits.every((list) => list.length <= 1) && facts.length >= 3) return true;
-  const colonCount = titles.filter((title) => /[:：]/.test(title)).length;
-  return colonCount === 3;
+  if (cores[0] && cores.every((core) => core === cores[0])) return true;
+  return titlesAreNearDuplicates(titles);
+}
+
+function faithfulDishTitle(fact: ExperienceFact) {
+  if (!fact.id.startsWith("dish:") && fact.id !== "featured-dish") return "";
+  const name = fact.markers[0] ?? "";
+  const line = fact.captionLine.replace(/，吃起来很有记忆点。?|很好吃，吃完还想再点。?|[。！？]/g, "").trim();
+  if (!name || !line.includes(name)) return "";
+  if (/很满足|很香|甜丝丝|甜而不腻/.test(line)) return "";
+  return line;
 }
 
 export function coverTooSimilar(currentTitle: string, currentSub: string, previousCover = "") {
@@ -1081,19 +1130,16 @@ export function coverTooSimilar(currentTitle: string, currentSub: string, previo
   return false;
 }
 
-function rotateTitles(
-  titles: [string, string, string],
-  facts: ExperienceFact[],
-  plan: GenerationVariationPlan,
-) {
-  if (!titlesLackVariation(titles, facts) || facts.length === 0) return titles;
+function rotateTitles(titles: [string, string, string], facts: ExperienceFact[]) {
+  if (!titlesLackVariation(titles) || facts.length === 0) return titles;
+  const options = facts.map(faithfulDishTitle).filter(Boolean);
+  if (options.length === 0) return titles;
   const next: [string, string, string] = [titles[0], titles[1], titles[2]];
-  const used = new Set<string>();
-  const hooks = facts.flatMap((fact) => fact.titleHooks);
-  for (let index = 0; index < next.length; index += 1) {
-    const hook = hooks.find((item) => item && !used.has(item) && !next.includes(item));
+  const used = new Set<string>([titleCore(next[0])]);
+  for (let index = 1; index < next.length; index += 1) {
+    const hook = options.find((item) => item && !used.has(titleCore(item)) && !next.includes(item));
     if (!hook) continue;
-    used.add(hook);
+    used.add(titleCore(hook));
     const keepFlag = next[index].trimStart().startsWith("🇹🇭");
     next[index] = `${keepFlag ? "🇹🇭" : ""}${hook}`;
   }
@@ -1134,7 +1180,7 @@ export function evaluateGenerationVariation(input: {
   if (input.previousCaption && isCaptionTooSimilar(caption, input.previousCaption, facts)) {
     reasons.push("caption-similar");
   }
-  if (titlesLackVariation(input.titles, facts)) reasons.push("title-similar");
+  if (titlesLackVariation(input.titles)) reasons.push("title-similar");
   if (coverTooSimilar(input.coverTitle, input.coverSubtitle, input.previousCoverTitle)) {
     reasons.push("cover-similar");
   }
@@ -1191,7 +1237,7 @@ export function ensureGenerationVariation(input: {
   const facts = workingFacts(context);
   const seed = input.variantIndex ?? 0;
   let activePlan = input.plan;
-  let titles = rotateTitles(input.titles, facts, input.plan);
+  let titles = rotateTitles(input.titles, facts);
   let cover = rotateCover(input.coverTitle, input.coverSubtitle, input.previousCoverTitle ?? "", facts);
   let caption = stripGeneratedLocationTime(input.caption);
   const previousCaption = input.previousCaption ?? "";
@@ -1262,7 +1308,7 @@ export function ensureGenerationVariation(input: {
     caption = preserveSentiment(caption, context);
     caption = expandToBand(caption, context, facts, retryPlan, seed + 99);
     caption = joinSentences(splitSentences(trimToBand(caption, retryPlan)));
-    titles = rotateTitles(titles, facts, retryPlan);
+    titles = rotateTitles(titles, facts);
     cover = rotateCover(cover.coverTitle, cover.coverSubtitle, input.previousCoverTitle ?? "", facts);
     verdict = evaluateGenerationVariation({
       ...input,
@@ -1280,7 +1326,7 @@ export function ensureGenerationVariation(input: {
       neutralizeInventedPartyCopy(titles[1], context),
       neutralizeInventedPartyCopy(titles[2], context),
     ] as [string, string, string],
-    caption: neutralizeInventedPartyCopy(caption, context),
+    caption: neutralizeInventedPartyCopy(collapseRepeatedSkeletons(caption), context),
     coverTitle: neutralizeInventedPartyCopy(cover.coverTitle, context),
     coverSubtitle: neutralizeInventedPartyCopy(cover.coverSubtitle, context),
     needsRetry: false,
