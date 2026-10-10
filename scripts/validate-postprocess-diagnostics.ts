@@ -9,6 +9,7 @@ import { layoutCoverOverlay } from "../lib/cover/cover-title";
 import { selectOneValidSubtitle } from "../lib/cover/subtitle-units";
 import { formatCoverTitleStaticRules } from "../lib/cover/cover-rules";
 import { buildSystemPrompt } from "../lib/generate-prompt";
+import { repairFragmentedDegreeTitle } from "../lib/cover/cover-natural";
 import { enforceCustomerEvidence } from "../lib/customer-evidence";
 import { headlinesSharePoint, separateOverlappingHeadlines } from "../lib/headline-overlap";
 import { ensureGenerationVariation, planGenerationVariation } from "../lib/generation-variation";
@@ -977,6 +978,159 @@ const postTwice = separateOverlappingHeadlines({
   recommendTo: ["咖喱蟹肉很下饭", "芒果糯米饭芒果很新鲜"],
 });
 assert(JSON.stringify(postOnce) === JSON.stringify(postTwice), `post-title dedupe changed on the second pass: ${JSON.stringify(postTwice)}`);
+
+function returnedStory(caption: string, extra: { note?: string; recommendTo?: string[]; enjoyMost?: string[] }) {
+  const allocated = enforceCustomerEvidence({
+    titles: ["到店的过程很顺", "这顿吃完就走了", "朋友介绍来吃的"],
+    caption,
+    coverTitle: "商场里的泰餐",
+    coverSubtitle: "店里坐着很舒服",
+    note: extra.note,
+    recommendTo: extra.recommendTo ?? ["菠萝炒饭配料很足"],
+    enjoyMost: extra.enjoyMost,
+    branch,
+  });
+  return finalizeOfficialLocationTime({
+    caption: allocated.caption,
+    branch,
+    placement: "inline",
+  }).caption;
+}
+
+const likedVisit = returnedStory("这个口味我比较喜欢。这次去的是centralworld的baan ying，吃完就可以接着逛。", {
+  note: "这个口味我比较喜欢",
+  recommendTo: ["菠萝炒饭配料很足"],
+});
+assert(!/喜欢这次/.test(likedVisit), `a finished preference was glued to the visit: ${likedVisit}`);
+assert(/喜欢。/.test(likedVisit), `the preference lost its sentence end: ${likedVisit}`);
+assert(/这次去的是/.test(likedVisit) && /吃完就可以接着逛/.test(likedVisit), `the visit sentence was deleted: ${likedVisit}`);
+
+const likedVisitGlued = returnedStory("这个口味我比较喜欢这次去的是centralworld的baan ying，吃完就可以接着逛。", {
+  note: "这个口味我比较喜欢",
+  recommendTo: ["菠萝炒饭配料很足"],
+});
+assert(!/喜欢这次/.test(likedVisitGlued), `glued preference stayed a fragment: ${likedVisitGlued}`);
+assert(/吃完就可以接着逛/.test(likedVisitGlued), `glued visit was deleted: ${likedVisitGlued}`);
+
+const twoDishes = returnedStory(
+  "点的几道里面，我比较喜欢菠萝炒饭，配料很足。蒜炒虾仁蒜香味很足，这个口味我比较喜欢。味道很正宗，吃起来就是很熟悉的泰式风味。",
+  { recommendTo: ["菠萝炒饭配料很足", "蒜炒虾仁蒜香味很足"] },
+);
+assert(!/喜欢味道/.test(twoDishes), `a second taste was glued onto 比较喜欢: ${twoDishes}`);
+assert(/菠萝炒饭/.test(twoDishes) && /配料很足/.test(twoDishes), `pineapple evaluation was lost: ${twoDishes}`);
+assert(/蒜炒虾仁/.test(twoDishes) && /蒜香/.test(twoDishes), `shrimp evaluation was lost: ${twoDishes}`);
+assert(!/正宗|熟悉的泰式风味/.test(twoDishes), `unsupported taste was added: ${twoDishes}`);
+
+const repeatedPineapple = returnedStory(
+  "菠萝炒饭配料很足。菠萝炒饭，这个口味我比较喜欢。蒜炒虾仁蒜香味很足。",
+  { recommendTo: ["菠萝炒饭配料很足", "蒜炒虾仁蒜香味很足"] },
+);
+assert(/蒜炒虾仁/.test(repeatedPineapple) && /蒜香/.test(repeatedPineapple), `compressing one dish dropped the other: ${repeatedPineapple}`);
+assert(/菠萝炒饭/.test(repeatedPineapple) && /配料很足/.test(repeatedPineapple), `the clearer pineapple point was dropped: ${repeatedPineapple}`);
+assert((repeatedPineapple.match(/我比较喜欢/g) ?? []).length <= 1, `the same pineapple preference was repeated: ${repeatedPineapple}`);
+
+const noAuthentic = returnedStory("菠萝炒饭配料很足。味道很正宗，吃起来就是很熟悉的泰式风味。", {
+  recommendTo: ["菠萝炒饭配料很足"],
+  enjoyMost: ["店员服务热情周到"],
+});
+assert(/配料很足/.test(noAuthentic), `a real dish point was removed with the stock line: ${noAuthentic}`);
+assert(!/正宗|熟悉的泰式风味/.test(noAuthentic), `stock taste was kept without evidence: ${noAuthentic}`);
+
+const spokenVisit = "上次来曼谷的时候就在这家店吃过，咖喱蟹肉很下饭，服务员态度都很好，抬头还撞见老板，是真的帅。";
+const spokenKept = returnedStory(spokenVisit, {
+  note: spokenVisit,
+  recommendTo: ["咖喱蟹肉很下饭"],
+});
+assert(spokenKept.includes("上次来曼谷的时候就在这家店吃过"), `a natural visit was split apart: ${spokenKept}`);
+assert(spokenKept.includes("咖喱蟹肉很下饭"), `a natural dish point was dropped: ${spokenKept}`);
+assert(spokenKept.includes("服务员态度都很好") && spokenKept.includes("是真的帅"), `a natural service line was dropped: ${spokenKept}`);
+assert(!/帅在/.test(spokenKept), `a natural sentence was glued to the place: ${spokenKept}`);
+
+const degreeTitle = enforceCustomerEvidence({
+  titles: ["吃饭的氛围分舒服", "青咖喱牛肉分量很足", "这顿十分舒服"],
+  caption: "菠萝炒饭配料很足。",
+  coverTitle: "商场里的泰餐",
+  coverSubtitle: "店里氛围很舒服",
+  note: "店里氛围很舒服",
+  recommendTo: ["菠萝炒饭配料很足", "青咖喱牛肉分量很足"],
+  enjoyMost: ["店里氛围很舒服"],
+  branch,
+});
+assert(degreeTitle.titles[0] === "店里氛围很舒服", `broken degree title was not replaced from evidence: ${degreeTitle.titles[0]}`);
+assert(degreeTitle.titles[1] === "青咖喱牛肉分量很足", `a real 分量 title was rewritten: ${degreeTitle.titles[1]}`);
+assert(degreeTitle.titles[2] === "这顿十分舒服", `十分舒服 was treated as a broken degree: ${degreeTitle.titles[2]}`);
+assert(!/分舒服/.test(systemPrompt), "the prompt hardcodes the broken sample");
+assert(/十分/.test(systemPrompt) && /舒服/.test(systemPrompt), "the prompt lost the degree-word check");
+
+const warmFact = enforceCustomerEvidence({
+  titles: ["吃饭的氛围分舒服", "到店的过程很顺", "这顿吃完就走了"],
+  caption: "家庭式温馨氛围。",
+  coverTitle: "商场里的泰餐",
+  coverSubtitle: "家庭式温馨氛围",
+  note: "家庭式温馨氛围",
+  recommendTo: ["家庭式温馨氛围"],
+  branch,
+});
+assert(warmFact.titles[0] === "家庭式温馨氛围", `an atmosphere fact was rewritten: ${warmFact.titles[0]}`);
+assert(!/很舒服|分舒服/.test(warmFact.titles[0]), `温馨 was upgraded to 舒服: ${warmFact.titles[0]}`);
+
+const noAtmosphere = enforceCustomerEvidence({
+  titles: ["吃饭的氛围分舒服", "青咖喱牛肉分量很足", "到店的过程很顺"],
+  caption: "青咖喱牛肉分量很足。",
+  coverTitle: "商场里的泰餐",
+  coverSubtitle: "青咖喱牛肉分量很足",
+  recommendTo: ["青咖喱牛肉分量很足"],
+  branch,
+});
+assert(noAtmosphere.titles[0] === "青咖喱牛肉分量很足", `missing atmosphere invented a title: ${noAtmosphere.titles[0]}`);
+assert(!/氛围很舒服|分舒服/.test(noAtmosphere.titles.join(" ")), `missing atmosphere kept or invented 舒服: ${noAtmosphere.titles.join(" | ")}`);
+assert(noAtmosphere.titles[1] === "青咖喱牛肉分量很足", `分量 was rewritten while replacing a broken title: ${noAtmosphere.titles[1]}`);
+
+const untouchedDegree = repairFragmentedDegreeTitle("青咖喱牛肉分量很足", ["青咖喱牛肉分量很足"]);
+const untouchedVery = repairFragmentedDegreeTitle("这顿十分舒服", ["这顿十分舒服"]);
+assert(untouchedDegree.action === "unchanged" && untouchedDegree.title === "青咖喱牛肉分量很足", `分量 was repaired: ${untouchedDegree.title}`);
+assert(untouchedVery.action === "unchanged" && untouchedVery.title === "这顿十分舒服", `十分舒服 was repaired: ${untouchedVery.title}`);
+
+const degreeFailed = repairFragmentedDegreeTitle("吃饭的氛围分舒服", ["菠萝炒饭配料很足"], ["到店的过程很顺", "这顿吃完就走了"]);
+assert(degreeFailed.action === "safe-failure", `a broken title without a replacement was not recorded: ${degreeFailed.action} ${degreeFailed.reason}`);
+assert(degreeFailed.reason.length > 0, "safe-failure did not record a reason");
+assert(!/分舒服|氛围很舒服|很舒服/.test(degreeFailed.title), `safe-failure kept or invented the evaluation: ${degreeFailed.title}`);
+const degreeFailedPost = enforceCustomerEvidence({
+  titles: ["吃饭的氛围分舒服", "到店的过程很顺", "这顿吃完就走了"],
+  caption: "菠萝炒饭配料很足。",
+  coverTitle: "商场里的泰餐",
+  coverSubtitle: "菠萝炒饭配料很足",
+  recommendTo: ["菠萝炒饭配料很足"],
+  branch,
+});
+assert(degreeFailedPost.titles[0] === degreeFailed.title, `the post kept a broken title: ${degreeFailedPost.titles[0]}`);
+assert(!/分舒服/.test(degreeFailedPost.titles.join(" ")), `the post silently kept 分舒服: ${degreeFailedPost.titles.join(" | ")}`);
+
+const shopLiked = returnedStory("这家店我比较喜欢，价格也合理。", {
+  note: "这家店我比较喜欢，价格也合理",
+  recommendTo: ["菠萝炒饭配料很足"],
+});
+assert(/这家店我比较喜欢，价格也合理/.test(shopLiked), `比较喜欢 lost the sentence: ${shopLiked}`);
+
+const likedEspecially = returnedStory("我比较喜欢。尤其是菠萝炒饭，配料真的很足。", {
+  note: "我比较喜欢。尤其是菠萝炒饭，配料真的很足",
+  recommendTo: ["菠萝炒饭配料很足"],
+});
+assert(/喜欢。/.test(likedEspecially) && /尤其是菠萝炒饭/.test(likedEspecially), `the preference boundary was removed: ${likedEspecially}`);
+assert(/配料/.test(likedEspecially) && !/喜欢尤其是|喜欢菠萝/.test(likedEspecially), `the dish sentence was glued back: ${likedEspecially}`);
+
+const twoDishLines = returnedStory("菠萝炒饭配料很足。蒜炒虾仁蒜香味很足。", {
+  recommendTo: ["菠萝炒饭配料很足", "蒜炒虾仁蒜香味很足"],
+});
+assert(/菠萝炒饭配料很足/.test(twoDishLines) && /蒜炒虾仁蒜香味很足/.test(twoDishLines), `one dish evaluation was dropped: ${twoDishLines}`);
+
+const placeOnce = returnedStory("这个口味我比较喜欢。这次去的是centralworld的baan ying，吃完就可以接着逛。", {
+  note: "这个口味我比较喜欢。这次去的是centralworld的baan ying，吃完就可以接着逛。",
+  recommendTo: ["菠萝炒饭配料很足"],
+});
+assert(!/喜欢这次/.test(placeOnce), `the visit was glued onto 喜欢: ${placeOnce}`);
+assert((placeOnce.match(/baan ying/gi) ?? []).length === 1, `the boundary fix repeated the restaurant: ${placeOnce}`);
+assert((placeOnce.match(/centralworld/gi) ?? []).length === 1, `the boundary fix repeated the mall: ${placeOnce}`);
 
 assert(headlinesSharePoint("青咖喱牛肉椰香很足", "青咖喱牛肉椰香真的很足🍛"), "coconut wording with 真的 was missed");
 assert(headlinesSharePoint("青咖喱牛肉椰香很足", "青咖喱牛肉椰香味很足"), "coconut wording with 味 was missed");

@@ -751,6 +751,13 @@ function descriptionFor(
     if (!detail) return "";
     return dishLineFor(name, detail, plan?.dishEntryPattern ?? "direct-describe");
   }
+  if (fact.id === "authentic-taste") {
+    const evidence = [context.diningNote ?? "", ...(context.enjoyMost ?? []), ...(context.recommendTo ?? [])].join("\n");
+    const parts: string[] = [];
+    if (/正宗/.test(evidence)) parts.push("味道很正宗");
+    if (/熟悉的泰式风味/.test(evidence)) parts.push("吃起来就是很熟悉的泰式风味");
+    return parts.length > 0 ? `${parts.join("，")}。` : "";
+  }
   if (fact.id === "alipay" && context.customerType === "Tourist") {
     return variants[1] ?? variants[0] ?? fact.captionLine;
   }

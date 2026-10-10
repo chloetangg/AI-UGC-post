@@ -344,7 +344,7 @@ export function extractExperienceFacts(context: CoverTitleContext = {}): Experie
       coverMains: ["味道很正宗", "泰餐很正宗"],
       coverSubs: ["味道吃着很正宗", "这顿味道很正"],
       titleHooks: ["这家泰餐味道很正宗", "这顿泰餐味道很合口味"],
-      captionLine: "食物整体味道很正宗，吃起来就是很熟悉的泰式风味。",
+      captionLine: /熟悉的泰式风味/.test(spoken) ? "味道很正宗，吃起来就是很熟悉的泰式风味。" : "味道很正宗。",
     });
   }
 

@@ -2,6 +2,7 @@ import { arrangeDiningStory } from "@/lib/caption-story";
 import { headlineNeedsEvidenceReplacement } from "@/lib/content-evidence";
 import { chineseFullDishName } from "@/lib/cover/dish-names";
 import { isAcceptableCoverOverlay } from "@/lib/cover/cover-title";
+import { repairFragmentedDegreeTitle } from "@/lib/cover/cover-natural";
 import { selectedCoverLocation, type CoverTitleContext } from "@/lib/cover/cover-rules";
 import { keywordInTitle } from "@/lib/title-keywords";
 import { isCopiedCustomerLine } from "@/lib/title-insight";
@@ -376,17 +377,32 @@ export function enforceCustomerEvidence(input: {
   recommendTo?: string[];
   branch?: string;
 }) {
+  const evidenceLines = [input.note ?? "", ...(input.recommendTo ?? []), ...(input.enjoyMost ?? [])]
+    .flatMap((item) => item.split(/[。！？!?\n，,]/))
+    .map((item) => item.trim())
+    .filter(Boolean);
+  const repairTitle = (title: string, siblings: string[] = [], allowSafeFailure = true) => {
+    const result = repairFragmentedDegreeTitle(title, evidenceLines, siblings);
+    if (!allowSafeFailure && result.action === "safe-failure") return title;
+    return result.title;
+  };
+  const repairBatch = (list: readonly string[], allowSafeFailure = true) =>
+    list.map((title, index) => repairTitle(title, list.filter((_, item) => item !== index), allowSafeFailure)) as [
+      string,
+      string,
+      string,
+    ];
   const { customer, other } = collectCustomerEvidence(input);
   if (customer.length === 0) {
     return {
-      titles: input.titles,
+      titles: repairBatch(input.titles),
       caption: input.caption,
-      coverTitle: input.coverTitle,
-      coverSubtitle: input.coverSubtitle,
+      coverTitle: repairTitle(input.coverTitle, input.titles),
+      coverSubtitle: repairTitle(input.coverSubtitle, input.titles),
     };
   }
 
-  const titles: [string, string, string] = [...input.titles];
+  const titles: [string, string, string] = repairBatch(input.titles, false);
   const primary = customer[0];
   if (!primary) {
     return {
@@ -464,5 +480,11 @@ export function enforceCustomerEvidence(input: {
     .map((item) => item?.trim() ?? "")
     .filter(Boolean)
     .join("\n");
-  return { titles, caption: arrangeDiningStory(caption, "", customerEvidence), coverTitle, coverSubtitle };
+  const returnedTitles = repairBatch(titles);
+  return {
+    titles: returnedTitles,
+    caption: arrangeDiningStory(caption, "", customerEvidence),
+    coverTitle: repairTitle(coverTitle, returnedTitles),
+    coverSubtitle: repairTitle(coverSubtitle, returnedTitles),
+  };
 }

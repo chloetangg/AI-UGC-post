@@ -146,6 +146,73 @@ export function isUnnaturalHeadline(title: string) {
   return !isNaturalCoverChinese(title);
 }
 
+const BROKEN_DEGREE = /(?<!十)分(舒服|好吃|放松|温馨)/;
+const REAL_DEGREE = /很|挺|比较|特别|十分|超|真的|蛮/;
+const ATMOSPHERE_FACT = /氛围|环境|温馨|舒服|放松/;
+
+export type DegreeRepairAction = "unchanged" | "evidence" | "fact" | "alternate" | "safe-failure";
+
+export type DegreeRepair = {
+  title: string;
+  action: DegreeRepairAction;
+  /** Why a broken degree title was kept, replaced, or sent to the existing safe title. */
+  reason: string;
+};
+
+/** A degree fragment such as 分舒服 is not a title we can safely rewrite by swapping one character. */
+export function fragmentedDegreeTitle(title: string) {
+  return BROKEN_DEGREE.test(title.replace(/\p{Extended_Pictographic}/gu, ""));
+}
+
+function plainTitle(text: string) {
+  return text.replace(/\p{Extended_Pictographic}/gu, "").replace(/^🇹🇭/u, "").trim();
+}
+
+function evidenceClauses(evidence: string[]) {
+  return evidence
+    .flatMap((item) => item.split(/[。！？!?\n，,]/))
+    .map((item) => item.trim())
+    .filter((item) => item.length >= 2);
+}
+
+function withTitleFlag(previous: string, next: string) {
+  const flag = previous.trimStart().startsWith("🇹🇭") ? "🇹🇭" : "";
+  return `${flag}${plainTitle(next)}`;
+}
+
+/**
+ * Broken degree titles are not left in the result.
+ * A matching evidence sentence wins. A related fact is copied as written.
+ * Otherwise an evidenced sibling title is used. The last resort is the existing
+ * short cover fallback, which does not invent the missing evaluation.
+ */
+export function repairFragmentedDegreeTitle(title: string, evidence: string[], alternates: string[] = []): DegreeRepair {
+  if (!fragmentedDegreeTitle(title)) return { title, action: "unchanged", reason: "" };
+  const stem = title.match(BROKEN_DEGREE)?.[1] ?? "";
+  const lines = evidenceClauses(evidence);
+  const matched = lines.find((line) => stem && line.includes(stem) && !fragmentedDegreeTitle(line) && REAL_DEGREE.test(line));
+  if (matched) return { title: withTitleFlag(title, matched), action: "evidence", reason: "used the evidence sentence with a complete degree" };
+  const topic = stem === "好吃" ? /好吃|味道|口味/ : ATMOSPHERE_FACT;
+  const fact = lines.find((line) => topic.test(line) && !fragmentedDegreeTitle(line));
+  if (fact) {
+    return {
+      title: withTitleFlag(title, fact),
+      action: "fact",
+      reason: "used the evidenced atmosphere fact without adding the broken evaluation",
+    };
+  }
+  const alternate = alternates.find((item) => {
+    const plain = plainTitle(item);
+    return plain && plain !== plainTitle(title) && !fragmentedDegreeTitle(item) && lines.some((line) => line.includes(plain) || plain.includes(line));
+  });
+  if (alternate) return { title: withTitleFlag(title, alternate), action: "alternate", reason: "used another title already supported by evidence" };
+  return {
+    title: withTitleFlag(title, naturalCoverFallback()),
+    action: "safe-failure",
+    reason: "no evidenced replacement for a broken degree title",
+  };
+}
+
 export function formatCoverNaturalRules() {
   return `COVER TITLE NATURAL CHINESE CHECK — run before output. Additive.
 

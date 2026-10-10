@@ -28,13 +28,52 @@ function splitGluedTopics(text: string) {
   );
 }
 
-/** "我比较喜欢。" only exists because a dish was cut off. Put that dish back in the same sentence. */
+function leadOf(part: string) {
+  return part
+    .replace(/^[，、\s。！？!?]+/u, "")
+    .replace(/^\p{Extended_Pictographic}\uFE0F?/u, "")
+    .replace(/^这口/u, "");
+}
+
+function dishAtStart(body: string) {
+  const match = body.match(DISH);
+  return match?.index === 0 ? match[0] : "";
+}
+
+/** A cut-off preference is waiting for a dish name alone, not a sentence that merely mentions one. */
+function isDishOnlyFragment(part: string) {
+  const body = leadOf(part).replace(/[。！？!?的]+$/u, "").trim();
+  if (!body || /[，,、]/.test(body)) return false;
+  const dish = dishAtStart(body);
+  return Boolean(dish) && body.slice(dish.length).trim() === "";
+}
+
+/**
+ * Insert a boundary only when the text after 喜欢 is its own clause.
+ * A dish name, a short object, or an existing comma stays attached.
+ */
+function isIndependentContinuation(rest: string) {
+  const body = rest.replace(/^\p{Extended_Pictographic}\uFE0F?/u, "").trim();
+  if (!body || /^[，,、]/.test(body)) return false;
+  if (isDishOnlyFragment(body) || dishAtStart(leadOf(body))) return false;
+  return /[，,、]/.test(body) || /是/.test(body) || /很|挺|特别|十分|可以/.test(body);
+}
+
+function separatePreferenceRunOn(text: string) {
+  return text.replace(
+    /((?:这个口味)?我?(?:比较|最)喜欢)([^。！？!?\n]*)/g,
+    (full, like: string, rest: string) => (isIndependentContinuation(rest) ? `${like}。${rest}` : full),
+  );
+}
+
+/** Rejoin only a bare dish that was cut off. A complete next sentence keeps its 。！？. */
 function rejoinDangling(parts: string[]) {
   const out: string[] = [];
   for (const part of parts) {
     const previous = out.at(-1);
     const stem = previous?.replace(/[。！？!?]+$/u, "").trim() ?? "";
-    if (previous && /(?:比较喜欢|最喜欢|很喜欢|我喜欢|喜欢|的是|几道里面|这几道里)$/.test(stem)) {
+    const cutOff = /(?:比较喜欢|最喜欢|很喜欢|我喜欢|喜欢|的是|几道里面|这几道里)$/.test(stem);
+    if (previous && cutOff && isDishOnlyFragment(part)) {
       out[out.length - 1] = `${stem}${part.replace(/^[，、\s]+/u, "")}`;
     } else out.push(part);
   }
@@ -42,7 +81,7 @@ function rejoinDangling(parts: string[]) {
 }
 
 function sentencesOf(caption: string) {
-  const parts = splitGluedTopics(caption)
+  const parts = splitGluedTopics(separatePreferenceRunOn(caption))
     .split(/\n+/)
     .flatMap((block) => block.split(/(?<=[。！？!?])|(?<=\p{Extended_Pictographic}\uFE0F?)\s+(?=\p{Script=Han})/u))
     .map((part) => part.trim())
@@ -196,6 +235,8 @@ function stripUnsupportedSpans(part: string, evidence: string, dishes: string[])
   if (!tasteSupportedFor(evidence, /满足/, dishes)) {
     next = next.replace(/(?:这顿)?吃(?:起来|着|下来)很满足|这顿吃下来很满足/g, "");
   }
+  if (/熟悉的泰式风味/.test(next) && !/熟悉的泰式风味/.test(evidence)) next = next.replace(/吃起来就是很熟悉的泰式风味|很熟悉的泰式风味|熟悉的泰式风味/g, "");
+  if (/正宗/.test(next) && !/正宗/.test(evidence)) next = next.replace(/(?:味道|食物)?很?正宗/g, "");
   if (!/多吃|半碗|不知不觉/.test(evidence)) next = next.replace(/不知不觉就?多吃了半碗/g, "");
   return next.replace(/^[，、\s]+|[，、\s]+$/g, "").replace(/[，、]{2,}/g, "，").trim();
 }
@@ -387,6 +428,7 @@ function dedupeRepeatedFacts(caption: string) {
           if (!part || earlier.includes(part)) return false;
           if (/^(?:真的)?很?(?:好吃|好喝|推荐|不错|新鲜|正宗|满足)$/.test(part)) return false;
           if (/印象最深|吃下来印象/.test(part) && /新鲜|好吃|好喝/.test(earlier)) return false;
+          if (/^(?:这个口味)?我?(?:比较|最)?喜欢$/.test(part) && /配料|新鲜|下饭|蒜香|椰香|Q弹|很足|好吃/.test(earlier)) return false;
           if (/新鲜|好吃|好喝/.test(part) && /新鲜|好吃|好喝/.test(earlier)) {
             const core = part
               .replace(/新鲜|好吃|好喝|吃着|真的|很|这道|汤/g, "")

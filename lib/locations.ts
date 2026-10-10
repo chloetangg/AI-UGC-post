@@ -574,7 +574,7 @@ function replaceFirst(text: string, pattern: RegExp, value: string) {
 
 const LOCATION_DISH =
   /芒果糯米饭|蒜炒虾仁|咖喱蟹肉|青咖喱牛肉|菠萝炒饭|滑蛋饭|河虾冬阴功汤|冬阴功|青柠蒸鲈鱼|炒空心菜|酸甜酱炒河虾|粉红奶|泰奶/;
-const LOCATION_EXPERIENCE = /老板|服务|店员|氛围|环境|温馨|家庭|好吃|好喝|满意|舒服|放松|合口味/;
+const LOCATION_EXPERIENCE = /老板|服务|店员|氛围|环境|温馨|家庭|好吃|好喝|满意|舒服|放松|合口味|喜欢/;
 
 function mallPattern(location: ReturnType<typeof officialLocationForBranch>) {
   if (!location || location.id === "centralworld") {
@@ -743,6 +743,7 @@ function stripLaterLocationSentence(sentence: string, mallRe: RegExp) {
       return hasLocationSubstance(next) ? [next] : [];
     }
     if (isPureLocationClause(clause, mallRe)) return [];
+    if (/喜欢/.test(clause)) return hasLocationSubstance(clause) ? [clause] : [];
     const next =
       mallRe.test(clause) ||
       mentionsRestaurantName(clause) ||
