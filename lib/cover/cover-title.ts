@@ -17,9 +17,11 @@ import {
   normalizeCoverLocations,
   packsMultipleCoverEvidence,
   inventsUnsupportedCoverClaim,
+  selectedCoverLocation,
   usesUnselectedCoverLocation,
   type CoverTitleContext,
 } from "./cover-rules";
+import { mallText } from "@/lib/branches/mall-text";
 import { sanitizeCoverAbsoluteLanguage } from "./cover-absolute";
 import { selectOneValidSubtitle, validateSubtitleCandidate } from "./subtitle-units";
 import {
@@ -206,16 +208,22 @@ export function isAcceptableCoverOverlay(
   return true;
 }
 
+function branchFallbackPairs(context: CoverTitleContext) {
+  const mall = selectedCoverLocation(context.branch) || mallText().name;
+  return FALLBACK_COVER_PAIRS.map((item) => ({ ...item, title: item.title.replace("centralwOrld", mall) }));
+}
+
 function pickFallbackPair(postTitles: string[], context: CoverTitleContext = {}) {
   const blocked = new Set(postTitles.map((title) => comparableHan(title)).filter(Boolean));
   const previousPair = coverKeywordPairKey(context.previousCoverTitle ?? "");
   const previousMain = comparableHan((context.previousCoverTitle ?? "").split("/")[0] ?? "");
+  const fallbackPairs = branchFallbackPairs(context);
   const pool = [
     ...evidenceLedCoverPairs(context),
     ...coverFallbackPairs({ ...context, postTitles }),
-    ...FALLBACK_COVER_PAIRS,
+    ...fallbackPairs,
   ].filter((item) => !blocked.has(comparableHan(item.title)) && !isWeakSeoCover(item.title));
-  const choices = pool.length > 0 ? pool : [...FALLBACK_COVER_PAIRS];
+  const choices = pool.length > 0 ? pool : fallbackPairs;
   const valid = choices.filter((item) =>
     isAcceptableCoverOverlay(item.title, item.subtitle, postTitles, context),
   );
@@ -226,7 +234,7 @@ function pickFallbackPair(postTitles: string[], context: CoverTitleContext = {})
   });
   const use = diverse.length > 0 ? diverse : valid.length > 0 ? valid : choices;
   const seed = (context.variantIndex ?? 0) + postTitles.reduce((sum, title) => sum + title.length, 0);
-  const picked = use[seed % use.length] ?? FALLBACK_COVER_PAIRS[seed % FALLBACK_COVER_PAIRS.length];
+  const picked = use[seed % use.length] ?? fallbackPairs[seed % fallbackPairs.length];
   if (isNaturalCoverChinese(picked.title) && isAcceptableMainTitle(picked.title, postTitles, context)) {
     return picked;
   }

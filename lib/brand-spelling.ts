@@ -39,13 +39,17 @@ export function applyBrandSpelling(text: string, spelling: BrandSpelling) {
   if (!text) return text;
   const tight = tightRestaurant(spelling.restaurant);
   const pattern = new RegExp(spelling.mallPattern.source, "gi");
-  const withMall = text.replace(pattern, spelling.mall);
-  const withRestaurant = withMall.replace(/baan\s*ying/gi, (match, offset: number, full: string) => {
+  const inTag = (offset: number, full: string) => {
     const before = full.slice(0, offset);
     const hash = before.lastIndexOf("#");
-    const inTag = hash >= 0 && !/[\s#]/.test(before.slice(hash + 1));
-    return inTag ? tight : spelling.restaurant;
-  });
+    return hash >= 0 && !/[\s#]/.test(before.slice(hash + 1));
+  };
+  const withMall = text.replace(pattern, (match, offset: number, full: string) =>
+    inTag(offset, full) ? spelling.mall.replace(/\s+/g, "") : spelling.mall,
+  );
+  const withRestaurant = withMall.replace(/baan\s*ying/gi, (match, offset: number, full: string) =>
+    inTag(offset, full) ? tight : spelling.restaurant,
+  );
   return withRestaurant.replaceAll("小红书", "小红薯");
 }
 

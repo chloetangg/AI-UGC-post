@@ -9,6 +9,7 @@ import { withSentenceEnd } from "@/lib/caption-emoji";
 import { collapseRepeatedSkeletons } from "@/lib/caption-story";
 import { neutralizeInventedPartyCopy } from "@/lib/party-size";
 import { buildEvidenceMap } from "@/lib/content-lock";
+import { mallText } from "@/lib/branches/mall-text";
 import type { RecommendedDish } from "@/types/content";
 
 export const CAPTION_STRUCTURES = ["A", "B", "C", "D", "E", "F"] as const;
@@ -331,7 +332,7 @@ function allowedLengthBands(richness: number): CaptionLengthBand[] {
 export function detectContentFocus(text: string, facts: ExperienceFact[] = []): ContentFocusId {
   const opening = storyCaptionText(text).replace(/[\p{Extended_Pictographic}]/gu, "").slice(0, 22);
   if (/^第一次来|^第一次来到|原本只是想试试看/.test(opening)) return "FIRST_VISIT";
-  if (/^在centralwOrld|^逛|逛街|商场里/.test(opening)) return "SHOPPING";
+  if (new RegExp(`^在${mallText().name}|^逛|逛街|商场里`).test(opening)) return "SHOPPING";
   if (/支付宝|中文菜单|对游客来说|吃饭方便|方便程度/.test(opening)) return "CONVENIENCE";
   if (/老板|环境|轻松的用餐|最喜欢的是那种|用餐时的感觉|很容易让人记住的小细节/.test(opening)) return "EXPERIENCE";
   if (/最想推荐的是|这道真的可以单独|还是/.test(opening) && /虾|咖喱|饭|菜/.test(opening)) return "SIGNATURE_DISH";
@@ -344,7 +345,7 @@ export function detectContentFocus(text: string, facts: ExperienceFact[] = []): 
 export function openingFamily(caption: string) {
   const opening = storyCaptionText(caption).replace(/[\p{Extended_Pictographic}]/gu, "").slice(0, 22);
   if (/第一次来|第一次来到|原本只是想/.test(opening)) return "first-visit-first";
-  if (/逛|centralwOrld逛|商场/.test(opening)) return "shopping-first";
+  if (new RegExp(`逛|${mallText().name}逛|商场`).test(opening)) return "shopping-first";
   if (/支付宝|中文菜单|方便程度|对游客|吃饭方便/.test(opening)) return "convenience-first";
   if (/老板|环境|轻松|用餐感觉|用餐时的感觉|很容易让人记住的小细节/.test(opening)) return "experience-first";
   if (/最想推荐|蒜炒|咖喱|虾仁|这道|比较想说的还是吃|点的几道|如果只选一道|记住我/.test(opening)) return "dish-first";
@@ -356,7 +357,7 @@ export function firstSentencePattern(caption: string) {
   if (/这次最想推荐的是|这次比较想推荐的是/.test(first)) return "announce-recommend";
   if (/这次来Baan Ying/.test(first)) return "baan-ying-frame";
   if (/第一次来/.test(first)) return "first-visit";
-  if (/在centralwOrld|逛/.test(first)) return "mall-scene";
+  if (new RegExp(`在${mallText().name}|逛`).test(first)) return "mall-scene";
   if (/支付宝|中文菜单|方便/.test(first)) return "convenience";
   if (/老板/.test(first)) return "owner-detail";
   if (/如果只选一道|点的几道里面/.test(first)) return "dish-choice";
@@ -379,7 +380,7 @@ export function detectEndingPattern(caption: string): EndingPatternId | "summary
   const last = splitSentences(caption).at(-1) ?? "";
   if (/吃下来整体|整体来说|整体体验|值得推荐|可以来试试|大家可以去/.test(last)) return "summary";
   if (/还会点|还会想再点/.test(last)) return "personal-judgment";
-  if (/centralwOrld|商场|逛街/.test(last)) return "scene";
+  if (new RegExp(`${mallText().name}|商场|逛街`).test(last)) return "scene";
   if (/舒服|放松|轻松/.test(last)) return "feeling";
   if (/虾|咖喱|饭|菜/.test(last)) return "dish";
   return "no-summary";
@@ -672,7 +673,7 @@ THIS ROUND CONTENT FOCUS: ${plan.contentFocus} — ${FOCUS_COPY[plan.contentFocu
 Content focus chooses what else to include. It does not replace the customer's reason for coming.
 ${STRUCTURE_COPY[plan.contentFocus]}
 THIS ROUND NARRATIVE PATH: ${plan.openingPattern}. Change the path from the last 3. Do not force odd syntax.
-THIS ROUND OPENING: ${plan.openingStyle}. First sentence must not reuse 这次最想推荐的是 / 这次来Baan Ying / 第一次来到 centralwOrld if those appeared recently.
+THIS ROUND OPENING: ${plan.openingStyle}. First sentence must not reuse 这次最想推荐的是 / 这次来Baan Ying / 第一次来到 ${mallText().name} if those appeared recently.
 THIS ROUND DISH ENTRY: ${plan.dishEntryPattern} may shape ONE dish. Other dishes, if real, share one different sentence. Never repeat 是我这次还会想再点的一道, 很好吃, or 吃起来 once per dish.
 THIS ROUND ENDING: ${plan.endingPattern}. Do not add a summary just to finish.
 THIS ROUND RHYTHM / DENSITY: ${plan.sentenceRhythm} / ${plan.informationDensity}
@@ -881,7 +882,7 @@ function pickUnusedLine(options: string[], seed: number, used: string[] = []) {
 }
 
 function currentMall(context: CoverTitleContext) {
-  return selectedCoverLocation(context.branch) || "centralwOrld";
+  return selectedCoverLocation(context.branch) || mallText().name;
 }
 
 function openingFor(
@@ -1094,7 +1095,7 @@ export function isCaptionTooSimilar(current: string, previous: string, facts: Ex
 function titleCore(title: string) {
   return title
     .replace(/[\p{Extended_Pictographic}]/gu, "")
-    .replace(/centralwOrld/g, "")
+    .replace(new RegExp(mallText().name, "g"), "")
     .replace(/曼谷(美食推荐|美食攻略|吃什么|探店|泰餐|泰菜|餐厅|吃饭|美食)/g, "")
     .replace(/[，。！？、：:｜|\s]/g, "");
 }

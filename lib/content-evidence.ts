@@ -11,6 +11,7 @@ import { chineseFullDishName, coverDishShortName } from "@/lib/cover/dish-names"
 import type { RecommendedDish } from "@/types/content";
 import { detectedPartyKinds, customerPartySource, neutralizeInventedPartyCopy } from "@/lib/party-size";
 import { distillCustomerHook } from "@/lib/title-insight";
+import { mallText } from "@/lib/branches/mall-text";
 
 export type CoverHookType =
   | "personal-experience"
@@ -519,7 +520,7 @@ export function previousPrimaryExperienceId(context: CoverTitleContext = {}, pre
 }
 
 export function formatEvidencePriorityStaticRules(branch = "") {
-  const mall = selectedCoverLocation(branch) || CANONICAL_CENTRALWORLD;
+  const mall = selectedCoverLocation(branch) || mallText().name;
   return `EVIDENCE PRIORITY — do this internally before writing JSON. Do not print this block.
 
 CUSTOMER INPUT → EXTRACT REAL FACTS → PICK THE MOST ATTRACTIVE TRUE FACTS → WRITE TITLE / COVER TITLE / COVER SUBTITLE.
@@ -560,7 +561,7 @@ export function formatEvidencePriorityInstance(context: CoverTitleContext = {}, 
   const food = facts.find((fact) => fact.kind === "food");
   const allowedMaterial = facts.length
     ? facts.map((fact) => `${fact.id}: ${fact.markers.join("/")}`).join("; ")
-    : `confirmed dining location ${selectedCoverLocation(context.branch) || CANONICAL_CENTRALWORLD} + selected dishes/reasons only`;
+    : `confirmed dining location ${selectedCoverLocation(context.branch) || mallText().name} + selected dishes/reasons only`;
   return `ALLOWED TITLE MATERIAL THIS VISIT: ${allowedMaterial}
 
 THIS VISIT INTERNAL BRIEF:
@@ -650,12 +651,20 @@ export function normalizeExactCentralworld(text: string) {
   return text.replace(/central\s*world/gi, CANONICAL_CENTRALWORLD);
 }
 
+/** Any casing or spacing of this branch's mall becomes its exact brand spelling. */
+function normalizeExactMall(text: string, context: CoverTitleContext) {
+  const mall = mallText(context.branch);
+  return text.replace(new RegExp(mall.spaced, "gi"), mall.name);
+}
+
 function mallToken(context: CoverTitleContext) {
-  return selectedCoverLocation(context.branch) || CANONICAL_CENTRALWORLD;
+  return selectedCoverLocation(context.branch) || mallText().name;
 }
 
 function mentionsMallToken(text: string, token: string) {
   if (/central/i.test(token)) return /central\s*world/i.test(text);
+  const mall = mallText(token);
+  if (mall.name === token) return new RegExp(mall.spaced, "i").test(text);
   return text.toLowerCase().includes(token.toLowerCase());
 }
 
@@ -674,6 +683,8 @@ function customerNamedMall(context: CoverTitleContext) {
   const blob = [context.diningNote ?? "", ...(context.enjoyMost ?? []), ...(context.recommendTo ?? [])].join("\n");
   const token = mallToken(context);
   if (!token || /central/i.test(token)) return /central\s*world|尚泰世界/i.test(blob);
+  const mall = mallText(token);
+  if (mall.name === token) return new RegExp(`${mall.spaced}|${mall.chineseStem}`, "i").test(blob);
   return blob.toLowerCase().includes(token.toLowerCase());
 }
 
@@ -738,7 +749,7 @@ function rewriteUngroundedTitles(
 
 function weaveCentralworld(title: string, context: CoverTitleContext) {
   const mallName = mallToken(context);
-  const text = normalizeExactCentralworld(title);
+  const text = normalizeExactMall(title, context);
   if (mentionsMallToken(text, mallName)) return text;
   if (!customerNamedMall(context)) return text;
   const mall = hasMallEvidence(context);
@@ -752,7 +763,7 @@ function weaveCentralworld(title: string, context: CoverTitleContext) {
 }
 
 function naturalCentralworldTitle(title: string, context: CoverTitleContext) {
-  const current = normalizeExactCentralworld(title);
+  const current = normalizeExactMall(title, context);
   if (mentionsMallToken(current, mallToken(context))) return current;
   if (!customerNamedMall(context) || !/逛|商场/.test(current)) return current;
   return weaveCentralworld(current, context);
@@ -773,12 +784,12 @@ export function ensureGroundedHeadlineCopy(input: {
   const context = input.context ?? {};
   const facts = extractExperienceFacts(context);
   let titles: [string, string, string] = [
-    normalizeExactCentralworld(input.titles[0]),
-    normalizeExactCentralworld(input.titles[1]),
-    normalizeExactCentralworld(input.titles[2]),
+    normalizeExactMall(input.titles[0], context),
+    normalizeExactMall(input.titles[1], context),
+    normalizeExactMall(input.titles[2], context),
   ];
-  let coverTitle = normalizeExactCentralworld(input.coverTitle);
-  let coverSubtitle = normalizeExactCentralworld(input.coverSubtitle);
+  let coverTitle = normalizeExactMall(input.coverTitle, context);
+  let coverSubtitle = normalizeExactMall(input.coverSubtitle, context);
 
   titles = rewriteUngroundedTitles(titles, facts, context);
 

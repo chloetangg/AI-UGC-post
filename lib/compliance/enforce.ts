@@ -1,6 +1,7 @@
 import type OpenAI from "openai";
 import { layoutCoverOverlay, type CoverTitleContext } from "@/lib/cover/cover-title";
 import { normalizeHashtags } from "@/lib/hashtags";
+import { mallText } from "@/lib/branches/mall-text";
 import { usageFromCompletion, type OpenAICallUsage } from "@/lib/openai-usage";
 import { complianceGenerationRules } from "./prompt";
 import { rewriteCompliantText, rewriteHashtag } from "./rewrite";
@@ -83,7 +84,7 @@ async function modelRewrite(
   coverContext: CoverTitleContext = {},
 ): Promise<{ content: ComplianceContent; usage: OpenAICallUsage[] }> {
   const completed = await complete(
-    `Rewrite only the risky sentences in this Xiaohongshu post into neutral, factual, personal experience. Keep dishes, facts, emoji count, and a natural spoken tone. Do not delete the thought — rewrite it. Keep required hashtag #BaanYing曼谷 exactly. The other 4 hashtags must stay in the approved pool. COVER mainTitle must keep at least one keyword from 曼谷/centralwOrld/泰餐/美食/必吃 and must not become a keyword dump. COVER subTitle must stay extracted from the customer's evidence, not a generic 招牌泰式料理 template. 必吃 is allowed on the cover only, never as a post-title/caption claim. Cover mainTitle and subTitle must not use 最/最爱/第一/冠军/全曼谷/No.1 ranking language; rewrite to 超爱 / 很喜欢 / 很想再吃. Leave 绝绝子 / 封神 / 天花板 when they are a casual reaction to strong praise. Still rewrite 这家店直接封神 / 天花板级别 / 全曼谷天花板. Subtitle stays 6–15 units and is not padded. Never copy customer negatives such as 贵/难吃/踩雷/抽奖送东西 onto titles or cover; keep meaning as neutral wording, never as false praise. Do not truncate titles. Return JSON only. No analysis.
+    `Rewrite only the risky sentences in this Xiaohongshu post into neutral, factual, personal experience. Keep dishes, facts, emoji count, and a natural spoken tone. Do not delete the thought — rewrite it. Keep required hashtag #BaanYing曼谷 exactly. The other 4 hashtags must stay in the approved pool. COVER mainTitle must keep at least one keyword from 曼谷/${mallText().name}/泰餐/美食/必吃 and must not become a keyword dump. COVER subTitle must stay extracted from the customer's evidence, not a generic 招牌泰式料理 template. 必吃 is allowed on the cover only, never as a post-title/caption claim. Cover mainTitle and subTitle must not use 最/最爱/第一/冠军/全曼谷/No.1 ranking language; rewrite to 超爱 / 很喜欢 / 很想再吃. Leave 绝绝子 / 封神 / 天花板 when they are a casual reaction to strong praise. Still rewrite 这家店直接封神 / 天花板级别 / 全曼谷天花板. Subtitle stays 6–15 units and is not padded. Never copy customer negatives such as 贵/难吃/踩雷/抽奖送东西 onto titles or cover; keep meaning as neutral wording, never as false praise. Do not truncate titles. Return JSON only. No analysis.
 ${complianceGenerationRules()}`,
     JSON.stringify({
       titles: content.titles,

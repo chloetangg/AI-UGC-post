@@ -449,6 +449,7 @@ export function locationTimePassesSelfCheck(
 
   const key = branchKey(branch);
   if (key === "centralworld" && !section.includes("centralwOrld")) return false;
+  if (key === "siam" && !section.includes("Siam Center")) return false;
   if (key === "terminal21" && !section.includes("Terminal 21")) return false;
   if (key === "onebangkok" && !section.includes("One Bangkok")) return false;
   if (key === "onebangkok" && formatShowsHours(detected, hoursDisplay) && !section.includes(ONE_BANGKOK_HOURS)) {
@@ -580,7 +581,7 @@ function mallPattern(location: ReturnType<typeof officialLocationForBranch>) {
   if (!location || location.id === "centralworld") {
     return /central\s*world|尚泰世界购物中心/i;
   }
-  const parts = [location.englishName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")];
+  const parts = [location.englishName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/ /g, "\\s*")];
   if (location.chineseName) parts.push(location.chineseName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
   return new RegExp(parts.join("|"), "i");
 }

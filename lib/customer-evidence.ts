@@ -13,6 +13,7 @@ import { selectedCoverLocation, type CoverTitleContext } from "@/lib/cover/cover
 import { keywordInTitle } from "@/lib/title-keywords";
 import { isCopiedCustomerLine } from "@/lib/title-insight";
 import { parseReviewIntoEvaluationUnits } from "@/lib/cover/subtitle-units";
+import { mallText } from "@/lib/branches/mall-text";
 
 export type CustomerEvidenceCategory =
   | "CUSTOMER_FOOD"
@@ -75,11 +76,13 @@ function pushUnique(list: EvidencePoint[], point: EvidencePoint | null) {
 }
 
 function placeName(branch?: string) {
-  return selectedCoverLocation(branch) || "centralwOrld";
+  return selectedCoverLocation(branch) || mallText().name;
 }
 
 function mentionsPlace(clause: string, mall: string) {
   if (/central/i.test(mall)) return /central\s*world|尚泰世界/.test(clause);
+  const names = mallText(mall);
+  if (names.name === mall) return new RegExp(`${names.spaced}|${names.chineseStem}`).test(clause);
   return new RegExp(mall.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i").test(clause);
 }
 
@@ -98,7 +101,7 @@ function faithfulDishLine(dish: string, clause: string) {
   return `${text}。`;
 }
 
-function fromClause(clause: string, mall = "centralwOrld"): EvidencePoint | null {
+function fromClause(clause: string, mall = mallText().name): EvidencePoint | null {
   if (!clause || bareVisit(clause)) return null;
   const drink = drinkEntity(clause);
   if (drink && /好|喜欢|推荐|惊喜|不错/.test(clause)) {
@@ -359,7 +362,10 @@ function leadWithFreshAngle(titles: [string, string, string], cover: string[], e
 /** Evidence the caption already states in other words does not need a template line. */
 function captionCoversPoint(caption: string, point: EvidencePoint) {
   if (point.entity && caption.toLowerCase().includes(point.entity.toLowerCase())) return true;
-  if (point.category === "CUSTOMER_SCENE") return /逛|商场|central\s*world|尚泰/i.test(caption);
+  if (point.category === "CUSTOMER_SCENE") {
+    const mall = mallText();
+    return new RegExp(`逛|商场|${mall.spaced}|${mall.chineseShort}`, "i").test(caption);
+  }
   if (point.category === "CUSTOMER_ATMOSPHERE") return /环境|氛围|温馨|舒服|放松/.test(caption);
   if (point.category === "CUSTOMER_SERVICE") return /服务|店员|服务员/.test(caption);
   return false;

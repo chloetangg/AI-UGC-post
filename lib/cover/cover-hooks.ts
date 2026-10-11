@@ -1,5 +1,6 @@
 import { formatCoverTitleStaticRules, selectedCoverLocation, shouldUseCoverLocation, type CoverTitleContext } from "./cover-rules";
 import type { CoverHookType } from "@/lib/content-evidence";
+import { mallText } from "@/lib/branches/mall-text";
 
 export const COVER_HOOK_FAMILIES = [
   "HOOK-01",
@@ -90,7 +91,7 @@ export function suggestCoverHookFamily(input: {
 }
 
 export function formatCoverHookRules(context: CoverTitleContext = {}) {
-  const mall = selectedCoverLocation(context.branch) || "centralwOrld";
+  const mall = selectedCoverLocation(context.branch) || mallText().name;
   return `${formatCoverTitleStaticRules()}
 
 HOOK FAMILIES — pick from evidence after the coverTitle keyword + one-evidence subtitle rules are satisfied. Do not copy these exact sentences:
