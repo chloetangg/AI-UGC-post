@@ -267,7 +267,7 @@ export async function createModelArkResponse(options: {
 }) {
   const apiKey = process.env.MODELARK_API_KEY?.trim() ?? "";
   if (!apiKey) {
-    throw new ModelArkError(500, "Missing MODELARK_API_KEY", "http");
+    throw new ModelArkError(500, "ModelArk is not configured: MODELARK_API_KEY is missing on the server.", "http");
   }
   const model = process.env.MODELARK_MODEL?.trim() || MODELARK_MODEL;
   const usages: OpenAICallUsage[] = [];

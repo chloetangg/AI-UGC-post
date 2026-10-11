@@ -49,6 +49,7 @@ import { createGenerationDiagnostics, generationDiagnosticsEnabled } from "@/lib
 export const maxDuration = 60;
 
 const MAX_IMAGES = 5;
+const MODELARK_NOT_CONFIGURED = "ModelArk is not configured: MODELARK_API_KEY is missing on the server.";
 
 function errorDetail(error: unknown) {
   const parts: string[] = [];
@@ -116,7 +117,7 @@ export async function POST(request: Request) {
     model: "",
     enabled: false,
   });
-  let providerName = "OpenAI";
+  let providerName = "ModelArk";
   try {
     const form = await request.formData();
     const rawPayload = form.get("payload");
@@ -178,6 +179,9 @@ export async function POST(request: Request) {
 
     const provider = resolveAiProvider();
     providerName = provider === "modelark" ? "ModelArk" : "OpenAI";
+    if (provider === "modelark" && !process.env.MODELARK_API_KEY?.trim()) {
+      return Response.json({ error: MODELARK_NOT_CONFIGURED }, { status: 500 });
+    }
     const openai = provider === "openai" ? getClient() : null;
     const model =
       provider === "modelark"
@@ -810,6 +814,11 @@ export async function POST(request: Request) {
       }
       const safe = /sk-|api[_-]?key|bearer /i.test(error.message) ? "Generation failed" : error.message;
       return Response.json({ error: safe }, { status: error.status >= 400 ? error.status : 502 });
+    }
+    if (error instanceof OpenAI.APIError) {
+      const status = typeof error.status === "number" && error.status >= 400 ? error.status : 502;
+      const reason = /sk-|api[_-]?key|bearer /i.test(error.message) ? `${status} request rejected` : error.message;
+      return Response.json({ error: `OpenAI error (AI_PROVIDER=openai): ${reason}` }, { status });
     }
     const raw = error instanceof Error ? error.message : "Generation failed";
     const detail = errorDetail(error);
