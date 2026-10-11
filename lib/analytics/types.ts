@@ -21,6 +21,41 @@ export const ANALYTICS_EVENT_TYPES = [
 ] as const;
 
 export type AnalyticsEventType = (typeof ANALYTICS_EVENT_TYPES)[number];
+
+const METADATA_VALUE_MAX_LENGTH = 180;
+export const RATING_FEEDBACK_MAX_LENGTH = 1000;
+
+export function parseStarRating(value: unknown): number | null {
+  const text = typeof value === "number" ? String(value) : typeof value === "string" ? value.trim() : "";
+  return /^[1-5]$/.test(text) ? Number(text) : null;
+}
+
+/** Null when the rating is not a whole star from 1 to 5. Feedback is kept only for 1–2 stars. */
+export function ratingEventMetadata(metadata: Record<string, string>): Record<string, string> | null {
+  const rating = parseStarRating(metadata.rating);
+  if (rating == null) return null;
+  const low = rating <= 2;
+  const { feedback, ...rest } = metadata;
+  const note = low ? feedback?.trim() ?? "" : "";
+  return {
+    ...rest,
+    rating: String(rating),
+    band: low ? "rating_low" : "rating_positive",
+    ...(note ? { feedback: note } : {}),
+  };
+}
+
+export function sanitizeEventMetadata(value: unknown): Record<string, string> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .filter(([, item]) => typeof item === "string")
+      .map(([key, item]) => [
+        key,
+        String(item).slice(0, key === "feedback" ? RATING_FEEDBACK_MAX_LENGTH : METADATA_VALUE_MAX_LENGTH),
+      ]),
+  );
+}
 export type AnalyticsDeviceType = "mobile" | "tablet" | "desktop";
 
 export const ANALYTICS_RANGES = [

@@ -8,6 +8,7 @@ import {
   sanitizeQrCodeId,
 } from "@/lib/analytics/cookie";
 import { ANALYTICS_SESSION_HEADER } from "@/lib/analytics/types";
+import { NEW_RATING_PARAM } from "@/lib/entry-rating";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,7 +28,7 @@ export async function GET(
 
   const destination = request.nextUrl.clone();
   destination.pathname = `/c/${campaignId}/rating`;
-  destination.search = "";
+  destination.search = `?${NEW_RATING_PARAM}=1`;
   destination.hash = "";
   const response = NextResponse.redirect(destination, 302);
   if (!request.cookies.get(ANALYTICS_SESSION_COOKIE)?.value?.trim()) {

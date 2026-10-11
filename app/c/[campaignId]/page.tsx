@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { newRatingPath } from "@/lib/entry-rating";
 
 export default async function CampaignLandingPage({
   params,
@@ -6,5 +7,5 @@ export default async function CampaignLandingPage({
   params: Promise<{ campaignId: string }>;
 }) {
   const { campaignId } = await params;
-  redirect(`/c/${campaignId}/rating`);
+  redirect(newRatingPath(campaignId));
 }

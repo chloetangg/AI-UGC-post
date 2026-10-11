@@ -8,7 +8,13 @@ import {
   newAnalyticsSessionId,
   sanitizeQrCodeId,
 } from "@/lib/analytics/cookie";
-import { ANALYTICS_CAMPAIGN, ANALYTICS_EVENT_TYPES, type AnalyticsEventType } from "@/lib/analytics/types";
+import {
+  ANALYTICS_CAMPAIGN,
+  ANALYTICS_EVENT_TYPES,
+  ratingEventMetadata,
+  sanitizeEventMetadata,
+  type AnalyticsEventType,
+} from "@/lib/analytics/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,6 +33,17 @@ export async function POST(request: Request) {
     if (!eventType) {
       return NextResponse.json({ ok: true, skipped: true });
     }
+    let metadata = sanitizeEventMetadata(body.metadata);
+    if (eventType === "rating_submitted") {
+      const checked = ratingEventMetadata(metadata);
+      if (!checked) {
+        return NextResponse.json(
+          { ok: false, error: "Rating must be a whole number from 1 to 5." },
+          { status: 400 },
+        );
+      }
+      metadata = checked;
+    }
     const session = await readAnalyticsSession();
     const fromBody =
       typeof body.sessionId === "string"
@@ -38,14 +55,6 @@ export async function POST(request: Request) {
         ? body.qrCodeId
         : session.qrCodeId,
     );
-    const metadata =
-      body.metadata && typeof body.metadata === "object" && !Array.isArray(body.metadata)
-        ? Object.fromEntries(
-            Object.entries(body.metadata as Record<string, unknown>)
-              .filter(([, value]) => typeof value === "string")
-              .map(([key, value]) => [key, String(value).slice(0, 180)]),
-          )
-        : {};
     await recordAnalyticsEvent({
       eventType,
       eventId: typeof body.eventId === "string" ? body.eventId : undefined,

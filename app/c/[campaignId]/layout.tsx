@@ -4,6 +4,7 @@ import { CampaignFlowProvider } from "@/components/providers/campaign-flow-provi
 import { LanguageProvider } from "@/components/providers/language-provider";
 import { CampaignShell } from "@/components/campaign/CampaignShell";
 import { getDeploymentConfig, isCurrentDeploymentRef } from "@/lib/deployment/config";
+import { newRatingPath } from "@/lib/entry-rating";
 
 export default async function CampaignLayout({
   children,
@@ -15,7 +16,7 @@ export default async function CampaignLayout({
   const { campaignId } = await params;
   const deployment = getDeploymentConfig();
   if (!isCurrentDeploymentRef(campaignId)) {
-    redirect(`/c/${deployment.campaignId}/rating`);
+    redirect(newRatingPath(deployment.campaignId));
   }
 
   return (

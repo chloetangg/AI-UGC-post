@@ -4,12 +4,12 @@ import { useLanguage } from "@/components/providers/language-provider";
 import { UI_LANGUAGES } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
-export function LanguageSwitch() {
+export function LanguageSwitch({ className }: { className?: string }) {
   const { language, setLanguage, t } = useLanguage();
 
   return (
     <div
-      className="flex shrink-0 items-center gap-0.5 text-[11px] font-semibold tracking-[0.06em]"
+      className={cn("flex shrink-0 items-center gap-0.5 text-[11px] font-semibold tracking-[0.06em]", className)}
       role="group"
       aria-label="Language"
     >
