@@ -2,7 +2,13 @@ import { arrangeDiningStory } from "@/lib/caption-story";
 import { headlineNeedsEvidenceReplacement } from "@/lib/content-evidence";
 import { chineseFullDishName } from "@/lib/cover/dish-names";
 import { isAcceptableCoverOverlay } from "@/lib/cover/cover-title";
-import { repairFragmentedDegreeTitle } from "@/lib/cover/cover-natural";
+import {
+  fragmentedDegreeTitle,
+  isNaturalCoverChinese,
+  naturalCoverFallback,
+  repairFragmentedDegreeTitle,
+} from "@/lib/cover/cover-natural";
+import { headlinesSharePoint, sameTitleAngle } from "@/lib/headline-overlap";
 import { selectedCoverLocation, type CoverTitleContext } from "@/lib/cover/cover-rules";
 import { keywordInTitle } from "@/lib/title-keywords";
 import { isCopiedCustomerLine } from "@/lib/title-insight";
@@ -149,7 +155,7 @@ function fromClause(clause: string, mall = "centralwOrld"): EvidencePoint | null
     };
   }
   if (/环境|氛围/.test(clause) && /舒服|放松|温馨/.test(clause)) {
-    const line = /放松/.test(clause) ? "坐着比较放松" : "环境很舒服";
+    const line = /放松/.test(clause) ? "坐着比较放松" : /舒服/.test(clause) ? "环境很舒服" : clause;
     return {
       source: "customer",
       category: "CUSTOMER_ATMOSPHERE",
@@ -311,6 +317,63 @@ function preserveFlag(previous: string, next: string) {
   return next;
 }
 
+const UNSUPPORTED_SAFE_TITLE = /必吃|必点|好吃|正宗|回购/;
+
+/**
+ * Three titles must be three angles. A later title that repeats an earlier angle
+ * takes an unused evidence line as written, or the existing short safe title.
+ */
+function separateRepeatedTitles(titles: [string, string, string], evidence: string[]) {
+  const out: [string, string, string] = [...titles];
+  const evidenceText = evidence.join("");
+  const candidates = [
+    ...evidence.filter((line) => line.length >= 4 && line.length <= 16 && isNaturalCoverChinese(line)),
+    ...[0, 1, 2, 3]
+      .map((index) => naturalCoverFallback({}, index))
+      .filter((line) => !UNSUPPORTED_SAFE_TITLE.test(line) || UNSUPPORTED_SAFE_TITLE.test(evidenceText)),
+  ].filter((line) => !fragmentedDegreeTitle(line));
+  for (let index = 1; index < out.length; index += 1) {
+    if (!out.slice(0, index).some((earlier) => sameTitleAngle(earlier, out[index]))) continue;
+    const taken = out.filter((_, other) => other !== index);
+    const next = candidates.find((line) => !taken.some((title) => headlinesSharePoint(title, line)));
+    if (next) out[index] = preserveFlag(out[index], next);
+  }
+  return out;
+}
+
+/**
+ * The default post title should not restate the cover. When another title in the batch
+ * is backed by evidence and says something else, it moves to the front. Nothing new is written.
+ */
+function leadWithFreshAngle(titles: [string, string, string], cover: string[], evidence: string[]) {
+  const repeatsCover = (title: string) => cover.some((line) => line && headlinesSharePoint(title, line));
+  if (!repeatsCover(titles[0])) return titles;
+  const backed = (title: string) => evidence.some((line) => headlinesSharePoint(title, line));
+  const swap = [1, 2].find((index) => backed(titles[index]) && !repeatsCover(titles[index]));
+  if (swap === undefined) return titles;
+  const out: [string, string, string] = [...titles];
+  [out[0], out[swap]] = [out[swap], out[0]];
+  return out;
+}
+
+/** Evidence the caption already states in other words does not need a template line. */
+function captionCoversPoint(caption: string, point: EvidencePoint) {
+  if (point.entity && caption.toLowerCase().includes(point.entity.toLowerCase())) return true;
+  if (point.category === "CUSTOMER_SCENE") return /逛|商场|central\s*world|尚泰/i.test(caption);
+  if (point.category === "CUSTOMER_ATMOSPHERE") return /环境|氛围|温馨|舒服|放松/.test(caption);
+  if (point.category === "CUSTOMER_SERVICE") return /服务|店员|服务员/.test(caption);
+  return false;
+}
+
+/** Named dishes, drinks, and people keep their faithful line. Other points restore the customer's own clause. */
+function restoredLine(point: EvidencePoint) {
+  if (point.category === "CUSTOMER_FOOD" || point.category === "CUSTOMER_DRINK" || point.category === "CUSTOMER_PERSON") {
+    return point.captionLine;
+  }
+  const own = point.text.replace(/[。！？!?\s]+$/u, "").trim();
+  return own ? `${own}。` : "";
+}
+
 function scrubCaption(caption: string, point: EvidencePoint) {
   let next = caption;
   if (point.category === "CUSTOMER_DRINK" && point.entity !== "饮品" && point.entity !== "饮料") {
@@ -394,11 +457,13 @@ export function enforceCustomerEvidence(input: {
     ];
   const { customer, other } = collectCustomerEvidence(input);
   if (customer.length === 0) {
+    const coverTitle = repairTitle(input.coverTitle, input.titles);
+    const coverSubtitle = repairTitle(input.coverSubtitle, input.titles);
     return {
-      titles: repairBatch(input.titles),
+      titles: leadWithFreshAngle(separateRepeatedTitles(repairBatch(input.titles), evidenceLines), [coverTitle, coverSubtitle], evidenceLines),
       caption: input.caption,
-      coverTitle: repairTitle(input.coverTitle, input.titles),
-      coverSubtitle: repairTitle(input.coverSubtitle, input.titles),
+      coverTitle,
+      coverSubtitle,
     };
   }
 
@@ -467,24 +532,26 @@ export function enforceCustomerEvidence(input: {
 
   let caption = input.caption;
   for (const point of customer) caption = scrubCaption(caption, point);
-  const required = customer.slice(0, 4).filter((point) => point.captionLine && !caption.includes(point.entity));
+  const required = customer
+    .slice(0, 4)
+    .filter((point) => point.captionLine && !captionCoversPoint(caption, point))
+    .map(restoredLine)
+    .filter(Boolean);
   if (required.length > 0) {
-    const block = required
-      .slice(0, 3)
-      .map((point) => point.captionLine)
-      .join("");
-    caption = `${block}\n\n${caption}`.trim();
+    caption = `${required.slice(0, 3).join("")}\n\n${caption}`.trim();
   }
 
   const customerEvidence = [input.note, ...(input.recommendTo ?? []), ...(input.enjoyMost ?? [])]
     .map((item) => item?.trim() ?? "")
     .filter(Boolean)
     .join("\n");
-  const returnedTitles = repairBatch(titles);
+  const returnedTitles = separateRepeatedTitles(repairBatch(titles), evidenceLines);
+  const returnedCover = repairTitle(coverTitle, returnedTitles);
+  const returnedSubtitle = repairTitle(coverSubtitle, returnedTitles);
   return {
-    titles: returnedTitles,
+    titles: leadWithFreshAngle(returnedTitles, [returnedCover, returnedSubtitle], evidenceLines),
     caption: arrangeDiningStory(caption, "", customerEvidence),
-    coverTitle: repairTitle(coverTitle, returnedTitles),
-    coverSubtitle: repairTitle(coverSubtitle, returnedTitles),
+    coverTitle: returnedCover,
+    coverSubtitle: returnedSubtitle,
   };
 }

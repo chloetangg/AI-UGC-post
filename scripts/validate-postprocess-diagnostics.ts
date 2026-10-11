@@ -11,7 +11,7 @@ import { formatCoverTitleStaticRules } from "../lib/cover/cover-rules";
 import { buildSystemPrompt } from "../lib/generate-prompt";
 import { repairFragmentedDegreeTitle } from "../lib/cover/cover-natural";
 import { enforceCustomerEvidence } from "../lib/customer-evidence";
-import { headlinesSharePoint, separateOverlappingHeadlines } from "../lib/headline-overlap";
+import { headlinesSharePoint, sameTitleAngle, separateOverlappingHeadlines } from "../lib/headline-overlap";
 import { ensureGenerationVariation, planGenerationVariation } from "../lib/generation-variation";
 import { ensureTitleFormats } from "../lib/title-formats";
 import { finalizeOfficialLocationTime, scrubForeignBranchFacts } from "../lib/locations";
@@ -1056,8 +1056,13 @@ const degreeTitle = enforceCustomerEvidence({
   enjoyMost: ["店里氛围很舒服"],
   branch,
 });
-assert(degreeTitle.titles[0] === "店里氛围很舒服", `broken degree title was not replaced from evidence: ${degreeTitle.titles[0]}`);
-assert(degreeTitle.titles[1] === "青咖喱牛肉分量很足", `a real 分量 title was rewritten: ${degreeTitle.titles[1]}`);
+assert(degreeTitle.titles.includes("店里氛围很舒服"), `broken degree title was not replaced from evidence: ${degreeTitle.titles.join(" | ")}`);
+assert(!/(?<!十)分舒服/.test(degreeTitle.titles.join("")), `broken degree title survived: ${degreeTitle.titles.join(" | ")}`);
+assert(
+  degreeTitle.titles[0] !== degreeTitle.coverSubtitle,
+  `the default title restates the cover subtitle while another evidenced title exists: ${degreeTitle.titles.join(" | ")}`,
+);
+assert(degreeTitle.titles.includes("青咖喱牛肉分量很足"), `a real 分量 title was rewritten: ${degreeTitle.titles.join(" | ")}`);
 assert(degreeTitle.titles[2] === "这顿十分舒服", `十分舒服 was treated as a broken degree: ${degreeTitle.titles[2]}`);
 assert(!/分舒服/.test(systemPrompt), "the prompt hardcodes the broken sample");
 assert(/十分/.test(systemPrompt) && /舒服/.test(systemPrompt), "the prompt lost the degree-word check");
@@ -1084,7 +1089,10 @@ const noAtmosphere = enforceCustomerEvidence({
 });
 assert(noAtmosphere.titles[0] === "青咖喱牛肉分量很足", `missing atmosphere invented a title: ${noAtmosphere.titles[0]}`);
 assert(!/氛围很舒服|分舒服/.test(noAtmosphere.titles.join(" ")), `missing atmosphere kept or invented 舒服: ${noAtmosphere.titles.join(" | ")}`);
-assert(noAtmosphere.titles[1] === "青咖喱牛肉分量很足", `分量 was rewritten while replacing a broken title: ${noAtmosphere.titles[1]}`);
+assert(
+  noAtmosphere.titles.filter((title) => sameTitleAngle(title, "青咖喱牛肉分量很足")).length === 1,
+  `the only evidenced angle was repeated to fill the titles: ${noAtmosphere.titles.join(" | ")}`,
+);
 
 const untouchedDegree = repairFragmentedDegreeTitle("青咖喱牛肉分量很足", ["青咖喱牛肉分量很足"]);
 const untouchedVery = repairFragmentedDegreeTitle("这顿十分舒服", ["这顿十分舒服"]);
@@ -1190,7 +1198,227 @@ assert(warmthReuse.coverSubtitle === "芒果糯米饭很新鲜", `warmth reuse c
 assert(warmthReuse.titles[0] === "店里是满满的家庭温馨感", `warmth was rewritten onto the beef: ${warmthReuse.titles[0]}`);
 assert(!warmthReuse.titles[0].includes("🍛"), `curry emoji moved onto the room line: ${warmthReuse.titles[0]}`);
 
+type HeadlineInput = Parameters<typeof enforceCustomerEvidence>[0];
+function returnedHeadlines(input: HeadlineInput) {
+  const allocated = enforceCustomerEvidence(input);
+  const polished = fixFruitEmojisInTitles(ensureTitleFormats(allocated.titles, [], { caption: allocated.caption, note: input.note }));
+  return {
+    allocated,
+    ...separateOverlappingHeadlines({
+      titles: polished,
+      coverTitle: allocated.coverTitle,
+      coverSubtitle: allocated.coverSubtitle,
+      note: input.note,
+      recommendTo: input.recommendTo,
+      enjoyMost: input.enjoyMost,
+    }),
+  };
+}
+function repeatedAngles(titles: string[]) {
+  return titles.some((title, index) => titles.slice(0, index).some((earlier) => sameTitleAngle(earlier, title)));
+}
+
+assert(sameTitleAngle("青咖喱牛肉分量很足", "🇹🇭青咖喱牛肉分量很足🍛"), "emoji and flag made a new angle");
+assert(sameTitleAngle("青咖喱牛肉分量很足", "青咖喱牛肉的分量真的很足！"), "degree words and punctuation made a new angle");
+assert(!sameTitleAngle("青咖喱牛肉分量很足", "青咖喱牛肉很下饭"), "two claims on one dish were merged");
+assert(!sameTitleAngle("青咖喱牛肉分量很足", "菠萝炒饭分量很足"), "one claim on two dishes was merged");
+
+const singleAngle = returnedHeadlines({
+  titles: ["青咖喱牛肉分量很足", "🇹🇭青咖喱牛肉分量真的很足🍛", "到店的过程很顺"],
+  caption: "青咖喱牛肉分量很足。",
+  coverTitle: "商场里的泰餐",
+  coverSubtitle: "青咖喱牛肉分量很足",
+  recommendTo: ["青咖喱牛肉分量很足"],
+  branch,
+});
+assert(!repeatedAngles(singleAngle.titles), `one evidenced angle filled two titles: ${singleAngle.titles.join(" | ")}`);
+assert(sameTitleAngle(singleAngle.titles[0], "青咖喱牛肉分量很足"), `the evidenced title was lost: ${singleAngle.titles[0]}`);
+assert(!/很好吃|必点|必吃|回购|正宗/.test(singleAngle.titles.join("")), `a missing angle was invented: ${singleAngle.titles.join(" | ")}`);
+
+const manyAngles = returnedHeadlines({
+  titles: ["青咖喱牛肉分量很足", "🇹🇭青咖喱牛肉分量真的很足🍛", "这顿吃完就走了"],
+  caption: "青咖喱牛肉分量很足。店员服务热情周到。店里氛围很舒服。",
+  coverTitle: "商场里的泰餐",
+  coverSubtitle: "店里氛围很舒服",
+  recommendTo: ["青咖喱牛肉分量很足"],
+  enjoyMost: ["店员服务热情周到", "店里氛围很舒服"],
+  branch,
+});
+assert(!repeatedAngles(manyAngles.titles), `distinct angles were not used: ${manyAngles.titles.join(" | ")}`);
+assert(manyAngles.titles.some((title) => /分量/.test(title)), `the dish angle was dropped: ${manyAngles.titles.join(" | ")}`);
+assert(manyAngles.titles.some((title) => /服务/.test(title)), `the service angle was not used: ${manyAngles.titles.join(" | ")}`);
+assert(!sameTitleAngle(manyAngles.coverSubtitle, manyAngles.titles[0]), `cover subtitle and post title repeat: ${manyAngles.coverSubtitle} | ${manyAngles.titles[0]}`);
+
+const brokenContext = {
+  diningNote: "",
+  dishes: ["Green Curry Beef"],
+  enjoyMost: ["家庭式温馨氛围"],
+  recommendTo: ["青咖喱牛肉分量很足"],
+  branch,
+};
+const brokenVaried = ensureGenerationVariation({
+  titles: ["吃饭的氛围分舒服", "青咖喱牛肉分量很足", "到店的过程很顺"],
+  caption: "青咖喱牛肉分量很足。",
+  coverTitle: "商场里的泰餐",
+  coverSubtitle: "家庭式温馨氛围",
+  plan: planGenerationVariation({ context: brokenContext, variantIndex: 0 }),
+  context: brokenContext,
+  variantIndex: 0,
+});
+const brokenLocked = ensureContentLock({
+  titles: brokenVaried.titles,
+  caption: brokenVaried.caption,
+  coverTitle: brokenVaried.coverTitle,
+  coverSubtitle: brokenVaried.coverSubtitle,
+  context: brokenContext,
+});
+const brokenReturned = returnedHeadlines({
+  titles: brokenLocked.titles,
+  caption: brokenLocked.caption,
+  coverTitle: brokenLocked.coverTitle,
+  coverSubtitle: brokenLocked.coverSubtitle,
+  dishes: brokenContext.dishes,
+  enjoyMost: brokenContext.enjoyMost,
+  recommendTo: brokenContext.recommendTo,
+  branch,
+});
+const brokenAll = [...brokenReturned.titles, brokenReturned.coverTitle, brokenReturned.coverSubtitle].join(" | ");
+assert(!/分舒服/.test(brokenAll), `the broken degree survived the route order: ${brokenAll}`);
+assert(!/很舒服|很好吃|必点|必吃|回购|正宗/.test(brokenAll), `a repaired title gained an unevidenced claim: ${brokenAll}`);
+assert(brokenReturned.titles.some((title) => title.includes("家庭式温馨氛围")), `the evidenced fact repair was replaced: ${brokenAll}`);
+assert(!repeatedAngles(brokenReturned.titles), `the repaired titles repeat one angle: ${brokenAll}`);
+assert(
+  !headlinesSharePoint(brokenReturned.titles[0], brokenReturned.coverSubtitle),
+  `the default post title restates the cover subtitle while another evidenced title exists: ${brokenAll}`,
+);
+
+const missedDish = enforceCustomerEvidence({
+  titles: ["朋友介绍来的泰餐", "到店的过程很顺", "这顿吃完就走了"],
+  caption: "朋友介绍来的。店员服务很热情。",
+  coverTitle: "朋友推荐的泰餐",
+  coverSubtitle: "店员服务很热情",
+  note: "朋友介绍来的",
+  recommendTo: ["芒果糯米饭芒果很新鲜"],
+  branch,
+});
+assert(/芒果糯米饭/.test(missedDish.caption) && /新鲜/.test(missedDish.caption), `a missed recommended dish was not restored: ${missedDish.caption}`);
+assert(!/真的很好吃|必点|正宗/.test(missedDish.caption), `the restored dish gained praise: ${missedDish.caption}`);
+
+const completeVisit = "朋友介绍来的，在centralworld逛完来吃饭很方便。菠萝炒饭配料很足。店里氛围很舒服，服务员也很热情。";
+const completeInput = {
+  titles: ["朋友介绍来的泰餐", "菠萝炒饭配料很足", "店里氛围很舒服"] as [string, string, string],
+  caption: completeVisit,
+  coverTitle: "朋友推荐的泰餐",
+  coverSubtitle: "菠萝炒饭配料很足",
+  note: "朋友介绍来的，逛完centralworld来吃饭很方便，店里环境很舒服，服务很好",
+  dishes: ["Pineapple Fried Rice", "Mango Sticky Rice", "Crab Meat Curry"],
+  enjoyMost: ["食物味道正宗美味"],
+  recommendTo: ["菠萝炒饭配料很足"],
+  branch,
+};
+const completeKept = enforceCustomerEvidence(completeInput);
+assert(!/芒果糯米饭|咖喱蟹肉/.test(completeKept.caption), `unreviewed dishes were added for coverage: ${completeKept.caption}`);
+assert(!/环境很舒服|服务真的很好/.test(completeKept.caption), `a covered point was added again: ${completeKept.caption}`);
+assert((completeKept.caption.match(/来吃饭很方便/g) ?? []).length === 1, `the convenience point was added again: ${completeKept.caption}`);
+assert((completeKept.caption.match(/central\s*world/gi) ?? []).length === 1, `the mall was added again: ${completeKept.caption}`);
+assert(completeKept.caption.includes("朋友介绍来的") && completeKept.caption.includes("店里氛围很舒服"), `the customer's own lines were replaced: ${completeKept.caption}`);
+
+const warmOnly = enforceCustomerEvidence({
+  titles: ["朋友介绍来的泰餐", "菠萝炒饭配料很足", "到店的过程很顺"],
+  caption: "朋友介绍来的。菠萝炒饭配料很足。",
+  coverTitle: "朋友推荐的泰餐",
+  coverSubtitle: "菠萝炒饭配料很足",
+  note: "朋友介绍来的，家庭式温馨氛围",
+  recommendTo: ["菠萝炒饭配料很足"],
+  branch,
+});
+assert(warmOnly.caption.includes("家庭式温馨氛围") && !/很舒服/.test(warmOnly.caption), `温馨 was restored as 舒服: ${warmOnly.caption}`);
+
+const noDishReview = enforceCustomerEvidence({
+  titles: ["朋友介绍来的泰餐", "到店的过程很顺", "这顿吃完就走了"],
+  caption: "朋友介绍来的，在centralworld逛完顺便吃饭。",
+  coverTitle: "朋友推荐的泰餐",
+  coverSubtitle: "到店的过程很顺",
+  note: "朋友介绍来的",
+  dishes: ["Scrambled Egg Rice", "Pineapple Fried Rice"],
+  branch,
+});
+assert(!/很好吃|必点|必吃|很正宗|正宗/.test(`${noDishReview.caption}${noDishReview.titles.join("")}`), `praise was invented without a dish review: ${noDishReview.caption} | ${noDishReview.titles.join(" | ")}`);
+assert(!/滑蛋饭|菠萝炒饭/.test(noDishReview.caption), `selected dishes were added without a review: ${noDishReview.caption}`);
+
+const footerEmoji = ensureCaptionEmojis(completeKept.caption, style, completeInput.note);
+const footerStandalone = finalizeOfficialLocationTime({ caption: footerEmoji, branch, placement: "standalone", format: "A" }).caption;
+assert(footerStandalone.includes("📍 尚泰世界购物中心（centralwOrld）3楼"), `the official place line changed: ${footerStandalone}`);
+assert(footerStandalone.includes("⏰ 10:00–22:00"), `the official hours line changed: ${footerStandalone}`);
+assert((footerStandalone.match(/📍/g) ?? []).length === 1 && (footerStandalone.match(/⏰/g) ?? []).length === 1, `the official block repeated: ${footerStandalone}`);
+const bodyEmoji = [...footerEmoji.matchAll(/\p{Extended_Pictographic}/gu)].map((match) => match[0]);
+assert(bodyEmoji.every((emoji) => footerStandalone.includes(emoji)), `location finishing dropped a caption emoji: ${footerStandalone}`);
+const footerInline = finalizeOfficialLocationTime({ caption: footerEmoji, branch, placement: "inline" }).caption;
+assert((footerInline.match(/central\s*world/gi) ?? []).length === 1, `inline place repeated after evidence fill: ${footerInline}`);
+
+function standaloneOf(caption: string) {
+  return finalizeOfficialLocationTime({ caption, branch, placement: "standalone", format: "A" }).caption;
+}
+function inlineOf(caption: string) {
+  return finalizeOfficialLocationTime({ caption, branch, placement: "inline" }).caption;
+}
+function footerOnce(text: string) {
+  return (
+    (text.match(/📍 尚泰世界购物中心（centralwOrld）3楼/g) ?? []).length === 1 &&
+    (text.match(/⏰ 10:00–22:00/g) ?? []).length === 1
+  );
+}
+function bodyOf(text: string) {
+  return text.split(/\n\n📍/)[0] ?? text;
+}
+
+const convenience = "朋友介绍来的，在centralworld逛完来吃饭很方便。";
+const convenienceStandalone = standaloneOf(convenience);
+assert(/逛完来吃饭很方便/.test(bodyOf(convenienceStandalone)), `standalone dropped the convenience line: ${convenienceStandalone}`);
+assert(bodyOf(convenienceStandalone).includes("朋友介绍来的"), `standalone dropped the arrival: ${convenienceStandalone}`);
+assert(footerOnce(convenienceStandalone), `standalone footer is not exactly once: ${convenienceStandalone}`);
+assert(inlineOf(convenience) === convenience, `inline rewrote a complete convenience line: ${inlineOf(convenience)}`);
+
+const relaxed = "在centralworld的Baan Ying吃下来整个人都很放松。";
+const relaxedStandalone = standaloneOf(relaxed);
+const relaxedInline = inlineOf(relaxed);
+assert(/吃下来整个人都很放松/.test(bodyOf(relaxedStandalone)), `standalone dropped the relaxed meal: ${relaxedStandalone}`);
+assert(!/baan\s*ying/i.test(bodyOf(relaxedStandalone)), `standalone added the restaurant into the body: ${relaxedStandalone}`);
+assert(footerOnce(relaxedStandalone), `relaxed footer is not exactly once: ${relaxedStandalone}`);
+assert(/吃下来整个人都很放松/.test(relaxedInline), `inline dropped the relaxed meal: ${relaxedInline}`);
+assert((relaxedInline.match(/baan\s*ying/gi) ?? []).length === 1, `inline repeated the restaurant: ${relaxedInline}`);
+
+const serviceShop = "店员服务很热情，在centralworld吃完还能继续逛。";
+const serviceShopStandalone = standaloneOf(serviceShop);
+const serviceShopInline = inlineOf(serviceShop);
+assert(/店员服务很热情/.test(bodyOf(serviceShopStandalone)) && /吃完还能继续逛/.test(bodyOf(serviceShopStandalone)), `standalone dropped service or shopping: ${serviceShopStandalone}`);
+assert(footerOnce(serviceShopStandalone), `service footer is not exactly once: ${serviceShopStandalone}`);
+assert(/店员服务很热情/.test(serviceShopInline) && /吃完还能继续逛/.test(serviceShopInline), `inline dropped service or shopping: ${serviceShopInline}`);
+
+const officialRepeat = "菠萝炒饭配料很足。Baan Ying就在尚泰世界购物中心（centralwOrld）3楼，营业时间是10:00–22:00。";
+const officialStandalone = standaloneOf(officialRepeat);
+assert(bodyOf(officialStandalone) === "菠萝炒饭配料很足。", `pure address or hours stayed in the body: ${officialStandalone}`);
+assert(footerOnce(officialStandalone), `official footer changed: ${officialStandalone}`);
+assert(!/营业时间/.test(bodyOf(officialStandalone)), `hours were repeated in the body: ${officialStandalone}`);
+
+const mallNamed = "逛完centralworld来Baan Ying吃饭，菠萝炒饭配料很足。";
+for (const text of [standaloneOf(mallNamed), inlineOf(mallNamed)]) {
+  assert((bodyOf(text).match(/central\s*world/gi) ?? []).length <= 1, `the mall was appended again: ${text}`);
+  assert((bodyOf(text).match(/baan\s*ying/gi) ?? []).length <= 1, `the restaurant was appended again: ${text}`);
+  assert(/逛完/.test(bodyOf(text)) && /菠萝炒饭配料很足/.test(text), `the shopping visit or dish was dropped: ${text}`);
+}
+
+const noPlace = "菠萝炒饭配料很足。店员服务很热情。朋友说下次还要来。";
+assert(bodyOf(standaloneOf(noPlace)) === noPlace, `standalone changed a caption without a place: ${standaloneOf(noPlace)}`);
+assert(inlineOf(noPlace) === noPlace, `inline changed a caption without a place: ${inlineOf(noPlace)}`);
+
 const route = readFileSync(new URL("../app/api/generate/route.ts", import.meta.url), "utf8");
+assert(route.includes("normalizeHashtags(compliant.hashtags"), "hashtags no longer come from the model output");
+assert(
+  route.indexOf("ensureGenerationVariation({") < route.indexOf("enforceCustomerEvidence({") &&
+    route.indexOf("ensureContentLock({") < route.indexOf("enforceCustomerEvidence({"),
+  "variation or content lock now runs after the degree title repair",
+);
 const shared = route.slice(route.indexOf("const formatted = fixFruitEmojisInTitles"));
 assert(shared.includes("ensureCaptionEmojis") && shared.includes("ensureContentLock"), "shared post-process is missing");
 assert(!/if \(provider === "openai"\)/.test(shared) && !/if \(provider === "modelark"\)/.test(shared), "post-process branched by provider");

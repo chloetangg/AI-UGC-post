@@ -71,6 +71,22 @@ function pointOf(text: string): HeadlinePoint {
   return { dish, claims: claimsOf(plain, dish) };
 }
 
+const ANGLE_FILLER = /是真的|真的|确实|非常|特别|十分|超级|很|挺|超|蛮|比较|这道|这口|这家|的/g;
+
+/** Emoji, flags, punctuation, spacing, and degree fillers do not make a new angle. */
+export function titleAngleKey(text: string) {
+  return text
+    .replace(/[\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}\uFE0F\u200D]/gu, "")
+    .replace(/[\p{P}\p{S}\s]/gu, "")
+    .replace(ANGLE_FILLER, "")
+    .toLowerCase();
+}
+
+export function sameTitleAngle(left: string, right: string) {
+  const key = titleAngleKey(left);
+  return key.length >= 2 && key === titleAngleKey(right);
+}
+
 function isThemeLine(text: string) {
   const point = pointOf(text);
   return !point.dish && point.claims.length === 0 && /商场|逛街|泰餐|这家店/.test(plainLine(text));
@@ -81,6 +97,7 @@ function isThemeLine(text: string) {
  * or the same word on two different dishes is not a repeat.
  */
 export function headlinesSharePoint(left: string, right: string) {
+  if (sameTitleAngle(left, right)) return true;
   const a = pointOf(left);
   const b = pointOf(right);
   const dishesDiffer = Boolean(a.dish && b.dish && !sameDish(a.dish, b.dish));

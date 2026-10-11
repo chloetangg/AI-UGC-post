@@ -736,19 +736,38 @@ function splitCaptionParagraphs(caption: string) {
     .filter((group) => group.length > 0);
 }
 
+/**
+ * What a clause still says once the place and generic arrival words are gone.
+ * An address, floor, hours, or "came here to eat" leaves nothing. Convenience, shopping, or a feeling remains.
+ */
+function experienceBeyondPlace(clause: string, mallRe: RegExp) {
+  return stripLocationWords(clause, mallRe)
+    .replace(/\d{1,2}:\d{2}\s*[–\-到至]\s*\d{1,2}:\d{2}|10点到22点|营业时间(?:是|为)?/g, "")
+    .replace(/位于|就在|这里|里面|商场里?|购物中心|分店|刚好|来到|过来|吃一顿饭?|吃了一顿饭?|吃饭|用餐|一顿|泰餐|[来去到在了的也很就是]/g, "")
+    .replace(/[\s。！？!?，,、]/g, "");
+}
+
+/** Drop the place only when it was a leading phrase. Otherwise the clause keeps its own words. */
+function withoutLeadingPlace(clause: string, mallRe: RegExp) {
+  const stripped = stripLocationWords(clause, mallRe);
+  return stripped && clause.endsWith(stripped) ? stripped : clause;
+}
+
 function stripLaterLocationSentence(sentence: string, mallRe: RegExp) {
   const kept = splitLocationClauses(sentence).flatMap((clause) => {
     if (/朋友|同事|听说|约上|终于|之前提过|推荐/.test(clause)) {
       const next = mallRe.test(clause) || mentionsRestaurantName(clause) ? stripLocationWords(clause, mallRe) : clause;
       return hasLocationSubstance(next) ? [next] : [];
     }
-    if (isPureLocationClause(clause, mallRe)) return [];
+    if (isPureLocationClause(clause, mallRe)) {
+      return experienceBeyondPlace(clause, mallRe).length >= 2 ? [withoutLeadingPlace(clause, mallRe)] : [];
+    }
     if (/喜欢/.test(clause)) return hasLocationSubstance(clause) ? [clause] : [];
     const next =
       mallRe.test(clause) ||
       mentionsRestaurantName(clause) ||
       /这家店|这家餐厅|这家分店|这家泰餐|商场|位于|[0-9０-９]+楼/.test(clause)
-        ? stripLocationWords(clause, mallRe)
+        ? withoutLeadingPlace(clause, mallRe)
         : clause;
     return hasLocationSubstance(next) ? [next] : [];
   });

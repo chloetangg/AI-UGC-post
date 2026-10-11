@@ -322,7 +322,7 @@ function mallCount(text: string) {
 
 function tidyJoin(text: string) {
   return text
-    .replace(/来\s*的/g, "刚好来")
+    .replace(/来\s*的(?=[^，,。！？!?、\s])(?!时候)/g, "刚好来")
     .replace(/的{2,}/g, "的")
     .replace(/[，,]\s*[，,]/g, "，")
     .replace(/\s{2,}/g, " ")
