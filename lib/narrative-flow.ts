@@ -4,6 +4,7 @@ import { DISH_RECOMMENDATION_REASONS } from "@/lib/recommendation-reasons";
 import type { RecommendedDish } from "@/types/content";
 import type { EvidenceMap } from "@/lib/content-lock";
 import { withSentenceEnd } from "@/lib/caption-emoji";
+import { mallText } from "@/lib/branches/mall-text";
 
 export type FactGroup = {
   id: "scene" | "experience" | "primary-dish" | "secondary-dish" | "other-dish" | "opinion";
@@ -26,8 +27,9 @@ const UNIQUE_ATTRS: Array<{ marker: RegExp; label: string; dishes: string[] }> =
   { marker: /虾酱/, label: "虾酱", dishes: ["炒空心菜"] },
 ];
 
-const ENDING =
-  /整体用餐|吃下来整体|下次还|值得推荐|大家可以去|喜欢泰餐的|刚好在centralwOrld|这个口味我比较喜欢$/;
+function endingPattern() {
+  return new RegExp(`整体用餐|吃下来整体|下次还|值得推荐|大家可以去|喜欢泰餐的|刚好在${mallText().name}|这个口味我比较喜欢$`);
+}
 const WEAK_RESTATE = /我很喜欢|这次比较喜欢|还蛮喜欢|比较有记忆点|很好吃/;
 
 function selectedDishes(context: CoverTitleContext) {
@@ -104,6 +106,7 @@ export function buildNarrativeGroups(context: CoverTitleContext = {}, map: Evide
   const enjoy = (context.enjoyMost ?? []).filter((item) => item && item !== "其他");
   const reasons = (context.recommendTo ?? []).filter((item) => item && item !== "其他");
   const dishes = selectedDishes(context);
+  const mall = mallText(context.branch).name;
   const primary = map.primaryKind === "dish" ? map.primaryContent : dishes[0] || "";
   const secondary = dishes.filter((dish) => dish !== primary);
   const dishReasons = (dish: string) =>
@@ -116,7 +119,7 @@ export function buildNarrativeGroups(context: CoverTitleContext = {}, map: Evide
       label: "Experience / Scene",
       items: [
         /第一次来|第一次到这家|第一次来这家/.test(note) ? "第一次来" : "",
-        /centralwOrld|商场|逛/.test(`${note}${enjoy.join("")}`) ? "商场/centralwOrld" : "",
+        new RegExp(`${mall}|商场|逛`).test(`${note}${enjoy.join("")}`) ? `商场/${mall}` : "",
         enjoy.find((item) => /温馨|翻新|面积/.test(item)) || (/舒服|温馨/.test(note) ? "氛围" : ""),
       ].filter(Boolean),
     },
@@ -268,17 +271,22 @@ function hasNewFact(sentence: string, already: string) {
 }
 
 function isEndingSentence(sentence: string) {
-  return ENDING.test(sentence) && (dishesInText(sentence).length === 0 || /下次|整体|刚好在centralwOrld/.test(sentence));
+  return (
+    endingPattern().test(sentence) &&
+    (dishesInText(sentence).length === 0 || new RegExp(`下次|整体|刚好在${mallText().name}`).test(sentence))
+  );
 }
 
 function isBarePlaceClause(clause: string) {
+  const mall = mallText();
   const body = clause.replace(/[。！？!?\s]/g, "").replace(/BaanYing/gi, "BaanYing");
-  if (!/BaanYing|centralwOrld|尚泰世界购物中心/i.test(body)) return false;
+  const name = mall.name.replace(/\s/g, "");
+  if (!new RegExp(`BaanYing|${name}|${mall.chinese}`, "i").test(body)) return false;
   if (/服务|老板|小朋友|小孩子|孩子|妈妈|爸爸|老公|老婆|男朋友|女朋友/.test(body)) return false;
   const leftover = body
     .replace(/BaanYing/gi, "")
-    .replace(/centralwOrld/g, "")
-    .replace(/尚泰世界购物中心/g, "")
+    .replace(new RegExp(name, "g"), "")
+    .replace(new RegExp(mall.chinese, "g"), "")
     .replace(/[0-9０-９]+楼/g, "")
     .replace(/这次|刚好|去了|来了|在|的|这家|就|顺便|逛街|逛|时候|吃|泰餐|饭|餐厅|很方便|比较方便|过来|最后/g, "");
   return leftover.length <= 1;
@@ -286,7 +294,8 @@ function isBarePlaceClause(clause: string) {
 
 function isPersonReactionOnly(sentence: string) {
   if (sentenceDish(sentence)) return false;
-  if (/BaanYing|Baan Ying|centralwOrld|尚泰世界购物中心|服务|老板|环境/i.test(sentence)) return false;
+  const mall = mallText();
+  if (new RegExp(`BaanYing|Baan Ying|${mall.name}|${mall.chinese}|服务|老板|环境`, "i").test(sentence)) return false;
   return /小朋友|小孩子|孩子|妈妈|爸爸|老公|老婆|男朋友|女朋友|朋友/.test(sentence) && /喜欢|好吃|开心|觉得/.test(sentence);
 }
 
@@ -306,19 +315,22 @@ function detachTrailingPlace(sentence: string) {
 function softenPlaceSentence(sentence: string) {
   if (!isBarePlaceClause(sentence) || /逛|顺便|方便|时候去了|的时候/.test(sentence)) return sentence;
   const floor = sentence.match(/[0-9０-９]+楼/)?.[0] ?? "";
-  const mall = sentence.includes("尚泰世界购物中心") ? "尚泰世界购物中心" : sentence.includes("centralwOrld") ? "centralwOrld" : "";
+  const names = mallText();
+  const mall = sentence.includes(names.chinese) ? names.chinese : sentence.includes(names.name) ? names.name : "";
   if (!mall || !/Baan\s*Ying/i.test(sentence)) return sentence;
   return floor ? `这次去了${mall} ${floor}的Baan Ying。` : `这次在${mall}的时候去了Baan Ying。`;
 }
 
 function collapsePlaceSentences(places: string[]) {
   if (places.length <= 1) return places;
+  const names = mallText();
   const rich = places.find(
-    (item) => /方便|顺便|逛街/.test(item) && /Baan Ying/.test(item) && /centralwOrld|尚泰世界购物中心/.test(item),
+    (item) =>
+      /方便|顺便|逛街/.test(item) && /Baan Ying/.test(item) && (item.includes(names.name) || item.includes(names.chinese)),
   );
   if (rich) return [rich];
   const text = places.join("");
-  const mall = text.includes("尚泰世界购物中心") ? "尚泰世界购物中心" : text.includes("centralwOrld") ? "centralwOrld" : "";
+  const mall = text.includes(names.chinese) ? names.chinese : text.includes(names.name) ? names.name : "";
   if (mall && /Baan Ying/.test(text)) return [`这次在${mall}的时候去了Baan Ying。`];
   return [places[0]];
 }
@@ -330,9 +342,10 @@ function settleOneVisit(sentences: string[]) {
   let seenMeal = false;
   let seenMall = false;
   let seenRestaurant = false;
+  const names = mallText();
   for (const sentence of flat) {
     const bare = isBarePlaceClause(sentence);
-    const hasMall = /centralwOrld|尚泰世界购物中心/.test(sentence);
+    const hasMall = sentence.includes(names.name) || sentence.includes(names.chinese);
     const hasRestaurant = /Baan\s*Ying/i.test(sentence);
     if (bare) {
       const addsMall = hasMall && !seenMall;

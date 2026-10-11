@@ -1,3 +1,4 @@
+import { mallText } from "@/lib/branches/mall-text";
 import { formatNegativeNeutralizationRules } from "./negative-feedback";
 
 export function complianceGenerationRules() {
@@ -33,7 +34,7 @@ Restaurant copy must NOT hard-sell: 必打卡 全网爆火 网红必吃 曼谷�
 Focus on ordered dishes, taste, texture, atmosphere, interior, location, personal experience, suitable occasions, and only verified price/hours.
 BAD: 曼谷必吃的顶级泰餐！
 GOOD: 这次在曼谷吃到一家风格很舒服的泰餐
-Exception: the pool hashtag #曼谷必吃 may appear in the hashtags array. COVER mainTitle MAY use 必吃 as one natural keyword from 曼谷 / centralwOrld / 泰餐 / 美食 / 必吃. Post titles and caption must still not hard-sell 必吃.
+Exception: the pool hashtag #曼谷必吃 may appear in the hashtags array. COVER mainTitle MAY use 必吃 as one natural keyword from 曼谷 / ${mallText().name} / 泰餐 / 美食 / 必吃. Post titles and caption must still not hard-sell 必吃.
 
 No unverifiable photo claims: 完全无P 100%真实 原图直出 零滤镜 绝对真实.
 

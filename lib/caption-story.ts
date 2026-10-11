@@ -1,3 +1,5 @@
+import { mallText } from "@/lib/branches/mall-text";
+
 const DISH =
   /芒果糯米饭|蒜炒虾仁|咖喱蟹肉|青咖喱牛肉|菠萝炒饭|滑蛋饭|河虾冬阴功汤|冬阴功|青柠蒸鲈鱼|炒空心菜|酸甜酱炒河虾/;
 const DRINK = /粉红奶|泰奶|珍珠奶茶|柠檬茶|咖啡|果汁|椰汁/;
@@ -108,7 +110,7 @@ function isArrivalClause(part: string) {
 
 function sceneClause(part: string) {
   if (DISH.test(part) || DRINK.test(part)) return false;
-  return isArrivalClause(part) || /逛|购物|经过|centralwOrld|第一次来|楼|Baan\s*Ying|吃一顿/i.test(part);
+  return isArrivalClause(part) || new RegExp(`逛|购物|经过|${mallText().name}|第一次来|楼|Baan\\s*Ying|吃一顿`, "i").test(part);
 }
 
 function isCloseClause(part: string) {
@@ -120,7 +122,7 @@ function isRoomClause(part: string) {
 }
 
 function isAddressClause(part: string) {
-  return /尚泰世界购物中心|分店就在|这家(?:店|分店)?就在|就在.*[0-9０-９]+楼/.test(part) && !DISH.test(part);
+  return new RegExp(`${mallText().chinese}|分店就在|这家(?:店|分店)?就在|就在.*[0-9０-９]+楼`).test(part) && !DISH.test(part);
 }
 
 function peel(sentence: string) {
@@ -148,7 +150,7 @@ function slotOf(sentence: string): Slot {
   if (isArrivalClause(text) || (sceneClause(text) && !DISH.test(text) && !RICH.test(text))) return "scene";
   if (/舒服|放松/.test(text) && !DISH.test(text)) return "feeling";
   if (DISH.test(text) || RICH.test(text) || /大头虾|份量/.test(text)) return "food";
-  if (/方便/.test(text) && /central\s*world|逛|商场/i.test(text)) return "scene";
+  if (/方便/.test(text) && new RegExp(`${mallText().spaced}|逛|商场`, "i").test(text)) return "scene";
   return "food";
 }
 
@@ -317,7 +319,7 @@ function dropUnnotedTasteClauses(sentences: string[], note: string) {
 }
 
 function mallCount(text: string) {
-  return text.match(/central\s*world/gi)?.length ?? 0;
+  return text.match(new RegExp(mallText().spaced, "gi"))?.length ?? 0;
 }
 
 function tidyJoin(text: string) {
@@ -332,13 +334,14 @@ function tidyJoin(text: string) {
 
 function collapseMallInSentence(sentence: string) {
   if (mallCount(sentence) < 2) return sentence;
+  const mall = mallText().spaced;
   let next = sentence.replace(
-    /(逛完|逛了|逛街|购物完|经过)\s*(central\s*world)\s*[，,]\s*(?:这次)?(?:来|去|在)\s*central\s*world\s*的/i,
+    new RegExp(`(逛完|逛了|逛街|购物完|经过)\\s*(${mall})\\s*[，,]\\s*(?:这次)?(?:来|去|在)\\s*${mall}\\s*的`, "i"),
     "$1$2，刚好来",
   );
   if (mallCount(next) >= 2) {
     let seen = false;
-    next = next.replace(/central\s*world/gi, (match) => {
+    next = next.replace(new RegExp(mall, "gi"), (match) => {
       if (!seen) {
         seen = true;
         return match;
@@ -368,7 +371,7 @@ function mergeScenes(scenes: string[], laterMeal: string) {
   const awkward = scenes.length > 1 || /经过|购物完/.test(blob);
   if (!awkward) return scenes;
   const floor = blob.match(/[0-9０-９]+楼/)?.[0] ?? "";
-  const mallWord = blob.match(/central\s*world/i)?.[0] ?? "";
+  const mallWord = blob.match(new RegExp(mallText().spaced, "i"))?.[0] ?? "";
   const mall = Boolean(mallWord);
   const shop = /逛|购物|经过/.test(blob);
   const restaurant = /Baan\s*Ying/i.test(blob);
@@ -459,7 +462,10 @@ function dedupeRepeatedFacts(caption: string) {
       continue;
     }
     if (mallCount(previous) && mallCount(sentence) && !DISH.test(previous) && !DISH.test(sentence)) {
-      const leftover = sentence.replace(/central\s*world|baan\s*ying|逛完|逛街|购物|经过|来|去|吃一顿|吃饭|泰餐|的|很|方便/gi, "");
+      const leftover = sentence.replace(
+        new RegExp(`${mallText().spaced}|baan\\s*ying|逛完|逛街|购物|经过|来|去|吃一顿|吃饭|泰餐|的|很|方便`, "gi"),
+        "",
+      );
       if (leftover.replace(/[。！？!?\s]/g, "").length < 2) continue;
     }
     const cleaned = tidyJoin(sentence);

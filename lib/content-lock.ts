@@ -4,6 +4,7 @@ import type { RecommendedDish } from "@/types/content";
 import { ensureNarrativeFlow, ownerOfPhrase } from "@/lib/narrative-flow";
 import { isUnnaturalHeadline, naturalCoverFallback } from "@/lib/cover/cover-natural";
 import { stripUnsupportedFirstThaiMeal } from "@/lib/first-visit-wording";
+import { mallText } from "@/lib/branches/mall-text";
 
 export type EvidenceMap = {
   strongestExperience: string;
@@ -104,7 +105,7 @@ export function buildEvidenceMap(context: CoverTitleContext = {}): EvidenceMap {
   const atmosphere = enjoy.find((item) => /面积|温馨|翻新|环境/.test(item)) || (/舒服|放松|温馨|翻新/.test(note) ? "环境舒适" : "");
   const service = enjoy.find((item) => /服务|中文菜单/.test(item)) || (/服务|老板/.test(note) ? "服务或老板" : "");
   const convenience = enjoy.find((item) => /支付宝|商场/.test(item)) || (/支付宝|商场/.test(note) ? "用餐方便" : "");
-  const mall = selectedCoverLocation(context.branch) || "centralwOrld";
+  const mall = selectedCoverLocation(context.branch) || mallText().name;
   const location = /商场|逛街|central\s*world|siam\s*center|terminal\s*21|one\s*bangkok|暹罗中心|尚泰世界/i.test(`${note}${enjoy.join("")}`)
     ? mall
     : "";
@@ -295,7 +296,8 @@ function restoreCustomerWords(caption: string, map: EvidenceMap, context: CoverT
       continue;
     }
     const parts = next.split(/(?<=[。！？!?])/).map((part) => part.trim()).filter(Boolean);
-    const endingAt = parts.findIndex((part) => /整体用餐|下次还|刚好在centralwOrld/.test(part) && !part.includes(dish));
+    const ending = new RegExp(`整体用餐|下次还|刚好在${mallText().name}`);
+    const endingAt = parts.findIndex((part) => ending.test(part) && !part.includes(dish));
     if (endingAt >= 0) parts.splice(endingAt, 0, restored);
     else parts.push(restored);
     next = parts.join("");

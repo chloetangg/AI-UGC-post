@@ -1,4 +1,5 @@
 import { hashtagPoolForBranchId } from "@/lib/branches/hashtag-pools";
+import { getDeploymentConfig } from "@/lib/deployment/config";
 
 export const REQUIRED_HASHTAGS = ["#BaanYing曼谷"] as const;
 export const RANDOM_HASHTAG_POOL = [
@@ -21,14 +22,20 @@ export const RANDOM_HASHTAG_POOL = [
   "#曼谷必吃",
   "#centralworld泰餐推荐",
 ] as const;
+/** Approved pool for this deployment. centralwOrld keeps RANDOM_HASHTAG_POOL in its original order. */
+export function deploymentHashtagPool(): readonly string[] {
+  const deployment = getDeploymentConfig();
+  return deployment.locationId === "centralworld" ? RANDOM_HASHTAG_POOL : hashtagPoolForBranchId(deployment.branchId);
+}
+
 export const HASHTAG_COUNT = 5;
 export const DYNAMIC_HASHTAG_COUNT = 4;
 export const FIXED_HASHTAG_LINE = REQUIRED_HASHTAGS.join(" ");
-export const POOL_HASHTAG_LINE = RANDOM_HASHTAG_POOL.join(" ");
+export const POOL_HASHTAG_LINE = deploymentHashtagPool().join(" ");
 
 export type GeneratedHashtags = [string, string, string, string, string];
 
-const POOL_KEYS = new Set(RANDOM_HASHTAG_POOL.map((tag) => tag.toLowerCase()));
+const POOL_KEYS = new Set(deploymentHashtagPool().map((tag) => tag.toLowerCase()));
 
 export const CAPTION_NO_HASHTAG_RULES = `【CAPTION MUST NOT CONTAIN HASHTAGS】
 
@@ -51,7 +58,7 @@ Do NOT ask this caption generator to generate hashtags.
 If a previous caption included hashtags, ignore them and do not copy them.`;
 
 export function formatHashtagFieldRules(branchId?: string) {
-  const pool = (branchId ? hashtagPoolForBranchId(branchId) : RANDOM_HASHTAG_POOL).join(" ");
+  const pool = (branchId ? hashtagPoolForBranchId(branchId) : deploymentHashtagPool()).join(" ");
   return `HASHTAGS — JSON field "hashtags" only. Never put hashtags in titles or caption.
 
 Exactly 5 hashtags:
@@ -133,14 +140,14 @@ function sameTagSet(left: string[], right: string[]) {
   return left.every((tag) => right.some((item) => tagKey(item) === tagKey(tag)));
 }
 
-function pickRandomPoolHashtags(exclude: string[] = [], pool: readonly string[] = RANDOM_HASHTAG_POOL): string[] {
+function pickRandomPoolHashtags(exclude: string[] = [], pool: readonly string[] = deploymentHashtagPool()): string[] {
   const blocked = new Set(exclude.map(tagKey));
   const available = pool.filter((tag) => !blocked.has(tagKey(tag)));
   const source = available.length >= DYNAMIC_HASHTAG_COUNT ? available : [...pool];
   return shuffleTags([...source]).slice(0, DYNAMIC_HASHTAG_COUNT);
 }
 
-function fillPoolHashtags(current: string[], exclude: string[], pool: readonly string[] = RANDOM_HASHTAG_POOL) {
+function fillPoolHashtags(current: string[], exclude: string[], pool: readonly string[] = deploymentHashtagPool()) {
   const extras = [...current];
   const seen = new Set(extras.map(tagKey));
   const [firstPass, secondPass] = [
@@ -193,7 +200,7 @@ export function normalizeHashtags(
   options: { shuffle?: boolean; branchId?: string } = {},
 ): GeneratedHashtags {
   const shuffle = options.shuffle !== false;
-  const pool = options.branchId ? hashtagPoolForBranchId(options.branchId) : RANDOM_HASHTAG_POOL;
+  const pool = options.branchId ? hashtagPoolForBranchId(options.branchId) : deploymentHashtagPool();
   const poolKeys = new Set(pool.map((tag) => tag.toLowerCase()));
   const allowed = (tag: string) => poolKeys.has(tagKey(tag));
   const required = REQUIRED_HASHTAGS[0];
