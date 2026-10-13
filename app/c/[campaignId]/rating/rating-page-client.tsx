@@ -20,9 +20,9 @@ const STARS = [1, 2, 3, 4, 5] as const;
 const BUTTON_CLASS = "w-full";
 /** Chinese and Thai glyphs read larger than the Latin serif, so they get a smaller size to stay on one line. */
 const HEADING_SIZE_CLASS = {
-  en: "text-[clamp(2.25rem,10.5vw,2.625rem)] leading-[1.05]",
-  zh: "text-[clamp(1.75rem,8.4vw,2.125rem)] leading-tight",
-  th: "text-[clamp(1.75rem,8.4vw,2.125rem)] leading-tight",
+  en: "text-[clamp(2rem,9.2vw,2.375rem)] leading-[1.05]",
+  zh: "text-[clamp(1.5625rem,7.4vw,1.875rem)] leading-tight",
+  th: "text-[clamp(1.5625rem,7.4vw,1.875rem)] leading-tight",
 } as const;
 
 /** Survives client navigation, resets on a full page load. */
@@ -274,7 +274,7 @@ export function RatingPageClient({
       <StoreLine
         brandName={brandName}
         storeName={storeName}
-        className="mt-2.5 text-[clamp(1.25rem,5.8vw,1.5rem)] leading-snug"
+        className="mt-2.5 text-[clamp(1.0625rem,4.8vw,1.25rem)] leading-snug"
       />
       <div
         role="radiogroup"
