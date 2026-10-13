@@ -4,7 +4,7 @@ import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Star } from "lucide-react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { PageTitle } from "@/components/campaign/PageTitle";
-import { useT } from "@/components/providers/language-provider";
+import { useLanguage, useT } from "@/components/providers/language-provider";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,6 +18,12 @@ import { cn } from "@/lib/utils";
 
 const STARS = [1, 2, 3, 4, 5] as const;
 const BUTTON_CLASS = "w-full";
+/** Chinese and Thai glyphs read larger than the Latin serif, so they get a smaller size to stay on one line. */
+const HEADING_SIZE_CLASS = {
+  en: "text-[clamp(2.25rem,10.5vw,2.625rem)] leading-[1.05]",
+  zh: "text-[clamp(1.75rem,8.4vw,2.125rem)] leading-tight",
+  th: "text-[clamp(1.75rem,8.4vw,2.125rem)] leading-tight",
+} as const;
 
 /** Survives client navigation, resets on a full page load. */
 let thankYouInThisVisit = false;
@@ -128,10 +134,18 @@ function RatingLayout({ children, footer }: { children: ReactNode; footer: React
   );
 }
 
-function StoreLine({ brandName, storeName }: { brandName: string; storeName: string }) {
+function StoreLine({
+  brandName,
+  storeName,
+  className = "mt-1.5 text-sm",
+}: {
+  brandName: string;
+  storeName: string;
+  className?: string;
+}) {
   const t = useT();
   return (
-    <p className="mt-1.5 text-center text-sm text-muted-foreground">
+    <p className={cn("text-center text-muted-foreground", className)}>
       {interpolate(t.rating.storeLine, { brand: brandName, store: storeName })}
     </p>
   );
@@ -150,7 +164,7 @@ export function RatingPageClient({
 }) {
   const router = useRouter();
   const { campaignId } = useParams<{ campaignId: string }>();
-  const t = useT();
+  const { language, t } = useLanguage();
   const onDrawUrl = useSearchParams().get("draw") === "1";
   const [draw, setDraw] = useState(initialDraw);
   const [rating, setRating] = useState<number | null>(() => stepOneRatings.get(campaignId) ?? null);
@@ -237,26 +251,35 @@ export function RatingPageClient({
         <>
           <Button
             type="button"
-            className={BUTTON_CLASS}
+            className="mx-auto flex h-11 w-full max-w-[17.5rem]"
             disabled={rating == null || submitting}
             onClick={continueToReview}
           >
             {t.rating.continueToReview}
           </Button>
-          <p className="mt-2 h-4 text-center text-xs text-muted-foreground" aria-live="polite">
+          <p className="mt-2.5 h-4 text-center text-xs text-muted-foreground" aria-live="polite">
             {rating == null ? t.rating.selectFirst : null}
           </p>
         </>
       }
     >
-      <h1 className="text-center font-display text-2xl leading-tight tracking-tight text-foreground">
+      <h1
+        className={cn(
+          "text-balance text-center font-display tracking-tight text-primary",
+          HEADING_SIZE_CLASS[language],
+        )}
+      >
         {t.rating.heading}
       </h1>
-      <StoreLine brandName={brandName} storeName={storeName} />
+      <StoreLine
+        brandName={brandName}
+        storeName={storeName}
+        className="mt-2.5 text-[clamp(1.25rem,5.8vw,1.5rem)] leading-snug"
+      />
       <div
         role="radiogroup"
         aria-label={t.rating.groupLabel}
-        className="mt-8 flex items-center justify-center gap-3"
+        className="mt-9 flex items-center justify-center gap-2.5"
       >
         {STARS.map((value) => {
           const selected = rating != null && value <= rating;
@@ -269,11 +292,11 @@ export function RatingPageClient({
               aria-label={interpolate(t.rating.starLabel, { count: value })}
               onClick={() => selectRating(value)}
               className={cn(
-                "flex size-12 items-center justify-center rounded-full transition-colors",
+                "flex size-11 items-center justify-center rounded-full transition-colors",
                 selected ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground ring-1 ring-border/70",
               )}
             >
-              <Star className={cn("size-6", selected && "fill-current")} strokeWidth={1.75} />
+              <Star className={cn("size-5", selected && "fill-current")} strokeWidth={1.75} />
             </button>
           );
         })}
@@ -281,7 +304,7 @@ export function RatingPageClient({
       <p className="mt-3 h-5 text-center text-sm font-medium text-primary" aria-live="polite">
         {rating != null ? t.rating.levels[rating - 1] : null}
       </p>
-      <p className="mt-1 text-center text-xs text-muted-foreground">{t.rating.scaleHint}</p>
+      <p className="mt-1 text-center text-[13px] text-muted-foreground">{t.rating.scaleHint}</p>
     </RatingLayout>
   );
 }
