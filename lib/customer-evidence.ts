@@ -10,10 +10,10 @@ import {
 } from "@/lib/cover/cover-natural";
 import { headlinesSharePoint, sameTitleAngle } from "@/lib/headline-overlap";
 import { selectedCoverLocation, type CoverTitleContext } from "@/lib/cover/cover-rules";
-import { keywordInTitle } from "@/lib/title-keywords";
 import { isCopiedCustomerLine } from "@/lib/title-insight";
 import { parseReviewIntoEvaluationUnits } from "@/lib/cover/subtitle-units";
 import { mallText } from "@/lib/branches/mall-text";
+import { headlineEvidenceLines, isNegativeClause } from "@/lib/evidence-priority";
 
 export type CustomerEvidenceCategory =
   | "CUSTOMER_FOOD"
@@ -195,8 +195,9 @@ export function collectCustomerEvidence(input: {
   const note = input.note?.trim() ?? "";
   const mall = placeName(input.branch);
   const customer: EvidencePoint[] = [];
-  for (const clause of clauses(note)) pushUnique(customer, fromClause(clause, mall));
-  for (const reason of input.recommendTo ?? []) pushUnique(customer, fromClause(reason, mall));
+  for (const clause of [...clauses(note), ...(input.recommendTo ?? [])]) {
+    if (!isNegativeClause(clause)) pushUnique(customer, fromClause(clause, mall));
+  }
   customer.sort((a, b) => a.priority - b.priority || b.entity.length - a.entity.length);
 
   const other: EvidencePoint[] = [];
@@ -446,10 +447,7 @@ export function enforceCustomerEvidence(input: {
   recommendTo?: string[];
   branch?: string;
 }) {
-  const evidenceLines = [input.note ?? "", ...(input.recommendTo ?? []), ...(input.enjoyMost ?? [])]
-    .flatMap((item) => item.split(/[。！？!?\n，,]/))
-    .map((item) => item.trim())
-    .filter(Boolean);
+  const evidenceLines = headlineEvidenceLines(input);
   const repairTitle = (title: string, siblings: string[] = [], allowSafeFailure = true) => {
     const result = repairFragmentedDegreeTitle(title, evidenceLines, siblings);
     if (!allowSafeFailure && result.action === "safe-failure") return title;
@@ -506,11 +504,6 @@ export function enforceCustomerEvidence(input: {
   const third = title3Hit ?? pools.find((item) => !used.has(item.entity));
   if (third && !title3Hit && !titleShouldStay(titles[2])) titles[2] = preserveFlag(titles[2], third.titleHook);
   if (third) used.add(third.entity);
-
-  if (!titles.some((title) => keywordInTitle(title)) && !titleShouldStay(titles[1])) {
-    const dish = other.find((item) => item.category === "OTHER_DISH");
-    titles[1] = dish ? `曼谷泰餐的${dish.entity}值得点` : titles[1].includes("曼谷") ? titles[1] : `曼谷泰餐${titles[1]}`;
-  }
 
   let coverTitle = input.coverTitle;
   let coverSubtitle = input.coverSubtitle;

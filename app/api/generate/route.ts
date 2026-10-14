@@ -31,6 +31,7 @@ import {
 } from "@/lib/content-evidence";
 import { layoutCoverOverlay } from "@/lib/cover/cover-title";
 import { selectOneValidSubtitle } from "@/lib/cover/subtitle-units";
+import { alignCoverWithCaption } from "@/lib/cover/cover-caption-fit";
 import { aggregateGenerationCost, logGenerationCost, usageFromCompletion, type OpenAICallUsage } from "@/lib/openai-usage";
 import { resolveAiProvider } from "@/lib/ai-provider";
 import { MODELARK_JSON_RETRY_HINT, MODELARK_OUTPUT_APPENDIX, MODELARK_TITLE_RETRY_HINT, modelArkPostSchema, modelArkRewriteSchema } from "@/lib/modelark/post-schema";
@@ -626,6 +627,7 @@ export async function POST(request: Request) {
       subtitle: selectOneValidSubtitle({
         note: payload.diningExperienceNote,
         preferred: allocated.coverSubtitle,
+        avoid: [allocated.coverTitle],
       }),
     };
     const locatedCaption = ensureCaptionEmojis(allocated.caption, humanStyle, payload.diningExperienceNote);
@@ -676,13 +678,19 @@ export async function POST(request: Request) {
       recommendTo: payload.recommendTo,
       enjoyMost: payload.enjoyMost,
     });
+    const fittedCover = alignCoverWithCaption({
+      coverTitle: distinctHeadlines.coverTitle,
+      coverSubtitle: distinctHeadlines.coverSubtitle,
+      caption: located.caption,
+      context: coverContext,
+    });
     const spelledTitles = distinctHeadlines.titles.map((title) =>
       applyBrandSpelling(scrubForeignBranchFacts(title, payload.branch), brandSpelling),
     ) as typeof headlineTitles;
     const spelledCaption = applyBrandSpelling(located.caption, brandSpelling);
     const spelledCover = {
-      title: applyBrandSpelling(scrubForeignBranchFacts(distinctHeadlines.coverTitle, payload.branch), brandSpelling),
-      subtitle: applyBrandSpelling(scrubForeignBranchFacts(distinctHeadlines.coverSubtitle, payload.branch), brandSpelling),
+      title: applyBrandSpelling(scrubForeignBranchFacts(fittedCover.coverTitle, payload.branch), brandSpelling),
+      subtitle: applyBrandSpelling(scrubForeignBranchFacts(fittedCover.coverSubtitle, payload.branch), brandSpelling),
     };
     snap(
       "applyBrandSpelling",

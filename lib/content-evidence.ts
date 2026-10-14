@@ -12,6 +12,13 @@ import type { RecommendedDish } from "@/types/content";
 import { detectedPartyKinds, customerPartySource, neutralizeInventedPartyCopy } from "@/lib/party-size";
 import { distillCustomerHook } from "@/lib/title-insight";
 import { mallText } from "@/lib/branches/mall-text";
+import {
+  EVIDENCE_SOURCE_RANK,
+  isNegativeClause,
+  negativeNoteAspects,
+  type EvidenceSource,
+  type NoteAspect,
+} from "@/lib/evidence-priority";
 
 export type CoverHookType =
   | "personal-experience"
@@ -29,6 +36,7 @@ export type ExperienceFact = {
   coverSubs: string[];
   titleHooks: string[];
   captionLine: string;
+  source?: EvidenceSource;
 };
 
 const BANNED_DISCOVERY_COVERS =
@@ -393,6 +401,84 @@ function addUncoveredCustomerClause(
   });
 }
 
+const TAG_ASPECT: Record<string, NoteAspect> = {
+  "good-service": "service",
+  comfortable: "atmosphere",
+  spacious: "atmosphere",
+  renovated: "atmosphere",
+  "authentic-taste": "food",
+  variety: "food",
+};
+
+function factSources(context: CoverTitleContext) {
+  const fromNote = new Set(
+    extractExperienceFacts({ ...context, enjoyMost: [], dishes: [], recommendTo: [] }).map((fact) => fact.id),
+  );
+  const withoutTags = new Set(extractExperienceFacts({ ...context, enjoyMost: [] }).map((fact) => fact.id));
+  return (id: string): EvidenceSource => (fromNote.has(id) ? "note" : withoutTags.has(id) ? "selection" : "tag");
+}
+
+/** A tag or a selected dish is restated as given. Feelings, tastes, and scenes come only from the note. */
+function plainWording(fact: ExperienceFact, context: CoverTitleContext): ExperienceFact {
+  const note = context.diningNote ?? "";
+  if (fact.id === "featured-dish" && fact.source !== "note") {
+    const line = `这次点了${fact.markers[0] ?? ""}`;
+    return {
+      ...fact,
+      coverMains: fact.coverMains.filter((item) => item !== "这道真香" && item !== "曼谷必吃"),
+      coverSubs: [line],
+      titleHooks: [line],
+      captionLine: `${line}。`,
+    };
+  }
+  if (fact.id === "mall-chain" && !/逛/.test(note)) {
+    return { ...fact, coverMains: ["商场里吃泰餐"], coverSubs: ["商场里吃饭很方便"], titleHooks: ["商场里吃泰餐很方便"] };
+  }
+  if (fact.source !== "tag") return fact;
+  if (fact.id === "good-service") {
+    return {
+      ...fact,
+      coverMains: ["服务很热情"],
+      coverSubs: ["店员服务很热情"],
+      titleHooks: ["店员服务热情周到"],
+      captionLine: "店员服务很热情周到。",
+    };
+  }
+  if (fact.id === "comfortable") {
+    const warm = /家庭式温馨/.test((context.enjoyMost ?? []).join(" "));
+    const line = warm ? "家庭式氛围很温馨" : "店里环境很好";
+    return {
+      ...fact,
+      coverMains: [warm ? "氛围很温馨" : "环境很好"],
+      coverSubs: [line],
+      titleHooks: [warm ? "这家泰餐氛围很温馨" : "这家泰餐环境很好"],
+      captionLine: warm ? "店里是家庭式的温馨氛围。" : "店里环境很好。",
+    };
+  }
+  if (fact.id === "spacious") {
+    return { ...fact, coverSubs: ["餐厅面积很大"], titleHooks: ["这家泰餐厅面积很大"], captionLine: "餐厅面积很大。" };
+  }
+  return fact;
+}
+
+/**
+ * Facts post-processing may write into titles, cover, or caption. Note facts lead, then selected
+ * dishes, then tags. A tag the note contradicts is dropped, and a negative clause never becomes a hook.
+ */
+export function evidenceFactsForCopy(context: CoverTitleContext = {}): ExperienceFact[] {
+  const sourceOf = factSources(context);
+  const negative = negativeNoteAspects(context.diningNote ?? "");
+  return extractExperienceFacts(context)
+    .map((fact) => ({ ...fact, source: sourceOf(fact.id) }))
+    .filter((fact) => {
+      if (fact.id === "customer-words") return !isNegativeClause(fact.captionLine);
+      const aspect = TAG_ASPECT[fact.id];
+      return !(fact.source === "tag" && aspect && negative.has(aspect));
+    })
+    .map((fact) => plainWording(fact, context))
+    .sort((a, b) => EVIDENCE_SOURCE_RANK[a.source ?? "tag"] - EVIDENCE_SOURCE_RANK[b.source ?? "tag"]);
+}
+
 function tryCoverMain(hook: string) {
   const cleaned = sanitizeCoverLine(hook);
   const candidates = [
@@ -428,34 +514,51 @@ function tryCoverSub(line: string) {
 }
 
 export function evidenceLedCoverPairs(context: CoverTitleContext = {}) {
-  const facts = extractExperienceFacts(context);
+  const facts = evidenceFactsForCopy(context);
   const previousType = context.previousCoverHookType || classifyCoverHookType(context.previousCoverTitle ?? "");
   const pairs: Array<{ title: string; subtitle: string; hookType: CoverHookType }> = [];
 
   for (let index = 0; index < facts.length; index += 1) {
     const primary = facts[index];
-    const secondary = facts[(index + 1) % facts.length];
+    const others = [...facts.slice(index + 1), ...facts.slice(0, index)];
     if (previousType && primary.hookType === previousType && facts.length > 1 && previousType === "discovery") {
       continue;
     }
     if (previousType === "discovery" && primary.hookType === "discovery") continue;
-    if (previousType === "food" && primary.hookType === "food" && facts.some((item) => item.hookType !== "food")) {
+    if (
+      previousType === "food" &&
+      primary.hookType === "food" &&
+      others.some((item) => item.hookType !== "food" && item.coverMains.length > 0 && (item.source !== "tag" || primary.source === "tag"))
+    ) {
       continue;
     }
+    const secondaries = others.length > 0
+      ? [...others.filter((item) => item.source !== "tag"), ...others.filter((item) => item.source === "tag")]
+      : [primary];
     for (const mainHook of primary.coverMains) {
       const title = tryCoverMain(mainHook);
       if (!title) continue;
-      const subSource = secondary && secondary.id !== primary.id ? secondary.coverSubs : primary.coverSubs;
-      for (const subHook of subSource) {
-        const subtitle = tryCoverSub(subHook);
-        if (!subtitle) continue;
-        if (title.includes(sanitizeCoverLine(subHook).slice(0, 4))) continue;
-        pairs.push({ title, subtitle, hookType: primary.hookType });
+      for (const secondary of secondaries) {
+        const found = secondary.coverSubs
+          .filter((subHook) => tryCoverSub(subHook) && !title.includes(sanitizeCoverLine(subHook).slice(0, 4)))
+          .map((subHook) => ({ title, subtitle: tryCoverSub(subHook), hookType: primary.hookType }));
+        if (found.length === 0) continue;
+        pairs.push(...found);
+        break;
       }
     }
   }
 
   return pairs;
+}
+
+/** Cover lines from facts the customer gave and the caption actually tells. Tags are left out. */
+export function captionBackedCoverLines(caption: string, context: CoverTitleContext = {}) {
+  const facts = evidenceFactsForCopy(context).filter((fact) => fact.source !== "tag" && textHasFact(caption, fact));
+  return {
+    mains: facts.flatMap((fact) => fact.coverMains.map(tryCoverMain)).filter(Boolean),
+    subs: facts.flatMap((fact) => fact.coverSubs.map(tryCoverSub)).filter(Boolean),
+  };
 }
 
 function textHasFact(text: string, fact: ExperienceFact) {
@@ -514,7 +617,7 @@ function rewriteDiscoveryTitles(
 }
 
 export function previousPrimaryExperienceId(context: CoverTitleContext = {}, previousTitles: string[] = []) {
-  const facts = extractExperienceFacts(context);
+  const facts = evidenceFactsForCopy(context);
   const hay = `${context.previousCoverTitle ?? ""} ${previousTitles.join(" ")}`;
   return facts.find((fact) => textHasFact(hay, fact))?.id ?? "";
 }
@@ -528,10 +631,11 @@ CUSTOMER INPUT → EXTRACT REAL FACTS → PICK THE MOST ATTRACTIVE TRUE FACTS �
 Never write a generic Xiaohongshu title first and then look for a reason. Facts first, then wording.
 
 TITLE / COVER MATERIAL PRIORITY
-Priority 1 — customer-written experience, feelings, review points, recommend reasons (dining note + custom other text).
-Priority 2 — customer-selected restaurant highlights / enjoy-most tags.
-Priority 3 — customer-selected dishes and their real recommend reasons.
+Priority 1 — customer-written experience, feelings, review points, recommend reasons (dining note + custom other text). Never override it, reverse it, or soften it into the opposite.
+Priority 2 — customer-selected dishes and their explicit recommend reasons. A selected dish means they ordered or picked it, not that they described its taste, quality, or experience.
+Priority 3 — customer-selected restaurant highlights / enjoy-most tags / style options. They may guide tone, length, and angle, but they never override the note and they are not lived experience.
 Priority 4 — confirmed restaurant facts only, e.g. dining location ${mall}, confirmed menu/payment/atmosphere already in the system.
+A lower priority may add detail only when it does not conflict with a higher one. Your own inference is never a customer experience.
 Do not invent an experience, like, selling point, scene, price, promo, or “必吃/隐藏宝藏” conclusion that is not in the input.
 
 USER DETAIL PRESERVATION: 老板很帅 ≠ 店员很亲切. 服务很好 ≠ 环境很好. 老板很亲切 ≠ 店里很温馨. You may rewrite the wording, not the fact. Do not invent a boss, service, atmosphere, or emotion the customer did not write.
@@ -553,21 +657,27 @@ Forbidden trio: 曼谷美食发现 / 曼谷美食推荐 / 曼谷泰餐推荐`;
 }
 
 export function formatEvidencePriorityInstance(context: CoverTitleContext = {}, previousTitles: string[] = []) {
-  const facts = extractExperienceFacts(context);
+  const facts = evidenceFactsForCopy(context);
   const previousHook = context.previousCoverHookType || classifyCoverHookType(context.previousCoverTitle ?? "");
   const previousPrimary = context.previousPrimaryExperience || previousPrimaryExperienceId(context, previousTitles);
-  const primary = facts.find((fact) => fact.id !== previousPrimary) ?? facts[0];
+  const primary =
+    facts.find((fact) => fact.id !== previousPrimary && fact.source !== "tag") ??
+    facts.find((fact) => fact.source !== "tag") ??
+    facts.find((fact) => fact.id !== previousPrimary) ??
+    facts[0];
   const secondary = facts.find((fact) => fact.id !== primary?.id);
   const food = facts.find((fact) => fact.kind === "food");
+  const label = (fact: ExperienceFact) =>
+    fact.coverMains.find((item) => !/必吃/.test(item)) ?? fact.coverSubs[0] ?? fact.markers[0] ?? fact.id;
   const allowedMaterial = facts.length
     ? facts.map((fact) => `${fact.id}: ${fact.markers.join("/")}`).join("; ")
     : `confirmed dining location ${selectedCoverLocation(context.branch) || mallText().name} + selected dishes/reasons only`;
   return `ALLOWED TITLE MATERIAL THIS VISIT: ${allowedMaterial}
 
 THIS VISIT INTERNAL BRIEF:
-PRIMARY EXPERIENCE: ${primary ? `${primary.id} (${primary.coverMains[0]})` : "none — use food/scene from selected answers"}
-SECONDARY EXPERIENCE: ${secondary ? `${secondary.id} (${secondary.coverMains[0]})` : "none"}
-FOOD / DISH ANGLE: ${food ? food.coverMains[0] : firstDishShort(context) || "none"}
+PRIMARY EXPERIENCE: ${primary ? `${primary.id} (${label(primary)})` : "none — use food/scene from selected answers"}
+SECONDARY EXPERIENCE: ${secondary ? `${secondary.id} (${label(secondary)})` : "none"}
+FOOD / DISH ANGLE: ${food ? label(food) : firstDishShort(context) || "none"}
 SEARCH KEYWORD: SEO only, weave in, do not become the headline topic. Real customer facts > generic keywords > AI flourish.
 
 COVER HOOK TYPE this round: prefer ${
@@ -598,7 +708,7 @@ export function ensureEvidenceLedCopy(input: {
   previousTitles?: string[];
 }) {
   const context = input.context ?? {};
-  const facts = extractExperienceFacts(context);
+  const facts = evidenceFactsForCopy(context);
   const previousType = context.previousCoverHookType || classifyCoverHookType(context.previousCoverTitle ?? "");
   let titles: [string, string, string] = [...input.titles];
   let caption = input.caption;
@@ -621,7 +731,7 @@ export function ensureEvidenceLedCopy(input: {
 
   if (facts.length > 0 && layersWithFacts(titles, caption, coverTitle, coverSubtitle, facts) < 2) {
     const primary = facts[0];
-    if (!textHasFact(caption, primary)) caption = injectFactIntoCaption(caption, primary);
+    if (primary.source !== "tag" && !textHasFact(caption, primary)) caption = injectFactIntoCaption(caption, primary);
     if (
       headlineNeedsEvidenceReplacement(titles[0]) &&
       !titles.some((title) => textHasFact(title, primary))
@@ -782,7 +892,7 @@ export function ensureGroundedHeadlineCopy(input: {
   context?: CoverTitleContext;
 }) {
   const context = input.context ?? {};
-  const facts = extractExperienceFacts(context);
+  const facts = evidenceFactsForCopy(context);
   let titles: [string, string, string] = [
     normalizeExactMall(input.titles[0], context),
     normalizeExactMall(input.titles[1], context),

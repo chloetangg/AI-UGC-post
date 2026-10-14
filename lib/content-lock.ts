@@ -5,6 +5,8 @@ import { ensureNarrativeFlow, ownerOfPhrase } from "@/lib/narrative-flow";
 import { isUnnaturalHeadline, naturalCoverFallback } from "@/lib/cover/cover-natural";
 import { stripUnsupportedFirstThaiMeal } from "@/lib/first-visit-wording";
 import { mallText } from "@/lib/branches/mall-text";
+import { keepParagraphBreaks } from "@/lib/caption-story";
+import { contradictsNote, noteExperienceLine, positiveNoteText } from "@/lib/evidence-priority";
 
 export type EvidenceMap = {
   strongestExperience: string;
@@ -70,7 +72,7 @@ function dishesInText(text: string) {
 }
 
 function scoreDish(full: string, context: CoverTitleContext) {
-  const note = noteText(context);
+  const note = positiveNoteText(noteText(context));
   const reasons = (context.recommendTo ?? []).join(" ");
   const enjoy = (context.enjoyMost ?? []).join(" ");
   let score = 0;
@@ -94,17 +96,20 @@ function extractCustomerWords(context: CoverTitleContext) {
 
 export function buildEvidenceMap(context: CoverTitleContext = {}): EvidenceMap {
   const note = noteText(context);
-  const enjoy = (context.enjoyMost ?? []).filter((item) => item && item !== "其他");
+  const ownNote = positiveNoteText(note);
+  const enjoy = (context.enjoyMost ?? []).filter((item) => item && item !== "其他" && !contradictsNote(item, note));
   const reasons = (context.recommendTo ?? []).filter((item) => item && item !== "其他");
   const dishes = selectedDishes(context);
-  const ranked = [...dishes].sort((a, b) => scoreDish(b, context) - scoreDish(a, context));
-  const favoriteDish = ranked.find((dish) => /最喜欢|最难忘/.test(note) && textMentionsDish(note, dish)) || ranked[0] || "";
+  const ranked = [...dishes]
+    .sort((a, b) => scoreDish(b, context) - scoreDish(a, context))
+    .filter((dish) => textMentionsDish(ownNote, dish) || !textMentionsDish(note, dish));
+  const favoriteDish = ranked.find((dish) => /最喜欢|最难忘/.test(ownNote) && textMentionsDish(ownNote, dish)) || ranked[0] || "";
   const recommendedDish = dishes[0] || "";
   const customerWords = extractCustomerWords(context);
   const specificObservations = [...customerWords, ...reasons.filter((item) => TIER1.test(item) || item.length >= 4)];
-  const atmosphere = enjoy.find((item) => /面积|温馨|翻新|环境/.test(item)) || (/舒服|放松|温馨|翻新/.test(note) ? "环境舒适" : "");
-  const service = enjoy.find((item) => /服务|中文菜单/.test(item)) || (/服务|老板/.test(note) ? "服务或老板" : "");
-  const convenience = enjoy.find((item) => /支付宝|商场/.test(item)) || (/支付宝|商场/.test(note) ? "用餐方便" : "");
+  const atmosphere = enjoy.find((item) => /面积|温馨|翻新|环境/.test(item)) || (/舒服|放松|温馨|翻新/.test(ownNote) ? "环境舒适" : "");
+  const service = enjoy.find((item) => /服务|中文菜单/.test(item)) || (/服务|老板/.test(ownNote) ? "服务或老板" : "");
+  const convenience = enjoy.find((item) => /支付宝|商场/.test(item)) || (/支付宝|商场/.test(ownNote) ? "用餐方便" : "");
   const mall = selectedCoverLocation(context.branch) || mallText().name;
   const location = /商场|逛街|central\s*world|siam\s*center|terminal\s*21|one\s*bangkok|暹罗中心|尚泰世界/i.test(`${note}${enjoy.join("")}`)
     ? mall
@@ -116,8 +121,12 @@ export function buildEvidenceMap(context: CoverTitleContext = {}): EvidenceMap {
       : context.visitFrequency || "";
   const strongestExperience = customerWords[0] || favoriteDish || atmosphere || service || convenience || "";
   const dishPrimary = ranked[0] && scoreDish(ranked[0], context) > 0 ? ranked[0] : "";
-  const experiencePrimary = /老板/.test(note) ? "老板很帅" : atmosphere || service;
-  const primaryContent = dishPrimary || experiencePrimary || strongestExperience;
+  const noteDish = ranked.find((dish) => textMentionsDish(ownNote, dish)) || "";
+  const noteExperience = noteExperienceLine(note);
+  const noteOnFood = /好吃|味道|口味|菜|食物/.test(ownNote);
+  const experiencePrimary = noteExperience || atmosphere || service;
+  const primaryContent =
+    noteDish || (noteOnFood ? dishPrimary : "") || noteExperience || dishPrimary || experiencePrimary || strongestExperience;
   const supportingContent = [...ranked.slice(1, 3), ...specificObservations, atmosphere, service, convenience].filter(
     (item) => item && item !== primaryContent,
   );
@@ -136,7 +145,7 @@ export function buildEvidenceMap(context: CoverTitleContext = {}): EvidenceMap {
     customerWords,
     primaryContent,
     supportingContent: [...new Set(supportingContent)].slice(0, 5),
-    primaryKind: dishPrimary ? "dish" : convenience && !experiencePrimary ? "scene" : "experience",
+    primaryKind: dishes.includes(primaryContent) ? "dish" : convenience && !experiencePrimary ? "scene" : "experience",
   };
 }
 
@@ -229,7 +238,10 @@ function dishLineFromEvidence(map: EvidenceMap, context: CoverTitleContext) {
   if (map.recommendationReason && (map.recommendationReason.includes(dish) || ownerOfPhrase(map.recommendationReason, context) === dish)) {
     return `${dish}${map.recommendationReason.replace(dish, "")}。`;
   }
-  return `${dish}这次还蛮喜欢的。`;
+  const ownClause = positiveNoteText(noteText(context))
+    .split("，")
+    .find((clause) => textMentionsDish(clause, dish));
+  return ownClause ? `${ownClause}。` : "";
 }
 
 const DISH_MARKERS = ["芒果", "菠萝", "蟹", "虾", "蒜", "鲈鱼", "青柠", "咖喱", "冬阴功", "空心菜", "糯米"];
@@ -246,13 +258,20 @@ function evaluationBelongsToNamedDish(line: string, dish: string, target: string
   );
 }
 
-function alignLineToPrimary(line: string, map: EvidenceMap, captionDishes: string[], forCover = false) {
+function alignLineToPrimary(
+  line: string,
+  map: EvidenceMap,
+  captionDishes: string[],
+  forCover = false,
+  keep: ReadonlySet<string> = new Set(),
+) {
   const named = dishesInText(line);
   const captionHero = captionDishes.includes(map.primaryContent) ? map.primaryContent : captionDishes[0] || "";
   const target = map.primaryKind === "dish" ? map.primaryContent : captionHero || map.primaryContent;
   const isolated = named.filter((dish) => {
     if (!target) return false;
     if (dish === target) return false;
+    if (keep.has(dish)) return false;
     if (evaluationBelongsToNamedDish(line, dish, target)) return false;
     if (captionDishes.includes(dish) && named.includes(target)) return false;
     if (map.primaryKind === "dish" && dish !== map.primaryContent && (named.length === 1 || !captionDishes.includes(dish))) {
@@ -335,7 +354,7 @@ export function ensureContentLock(input: {
   caption = ensureNarrativeFlow(caption, context, map);
   captionDishes = dishesInText(caption);
   const titles = input.titles.map((title, index) => {
-    const aligned = alignLineToPrimary(neutralizeSemanticConflicts(title, context), map, captionDishes);
+    const aligned = alignLineToPrimary(neutralizeSemanticConflicts(title, context), map, captionDishes, false, evidencedDishes);
     return isUnnaturalHeadline(aligned) ? naturalCoverFallback(context, index) : aligned;
   }) as [string, string, string];
   let coverTitle = alignLineToPrimary(neutralizeSemanticConflicts(input.coverTitle, context), map, captionDishes, true);
@@ -345,6 +364,7 @@ export function ensureContentLock(input: {
     map,
     captionDishes,
     true,
+    evidencedDishes,
   );
-  return { titles, caption, coverTitle, coverSubtitle, map };
+  return { titles, caption: keepParagraphBreaks(input.caption, caption), coverTitle, coverSubtitle, map };
 }

@@ -1,12 +1,13 @@
 import {
-  extractExperienceFacts,
+  evidenceFactsForCopy,
   type ExperienceFact,
 } from "@/lib/content-evidence";
 import { selectedCoverLocation, type CoverTitleContext } from "@/lib/cover/cover-rules";
-import { chineseFullDishName } from "@/lib/cover/dish-names";
+import { chineseFullDishName, collectFullDishNames } from "@/lib/cover/dish-names";
+import { positiveNoteText } from "@/lib/evidence-priority";
 import { stripGeneratedLocationTime } from "@/lib/locations";
 import { withSentenceEnd } from "@/lib/caption-emoji";
-import { collapseRepeatedSkeletons } from "@/lib/caption-story";
+import { collapseRepeatedSkeletons, keepParagraphBreaks } from "@/lib/caption-story";
 import { neutralizeInventedPartyCopy } from "@/lib/party-size";
 import { buildEvidenceMap } from "@/lib/content-lock";
 import { mallText } from "@/lib/branches/mall-text";
@@ -261,18 +262,21 @@ function dishFactsFromContext(context: CoverTitleContext): ExperienceFact[] {
       hookType: "food",
       markers: [name],
       coverMains: [name],
-      coverSubs: [`这口${name}很香`],
-      titleHooks: [`曼谷泰餐${name}很满足`],
+      coverSubs: [detail ? `${name}${detail}` : `这次点了${name}`],
+      titleHooks: [detail ? `${name}${detail}` : `这次点了${name}`],
       captionLine: detail ? `${name}${detail}。`.replace(/。+$/g, "。") : "",
+      source: "selection" as const,
     };
   });
 }
 
+/** Facts the plan and the rewrite may use: note facts first, then selected dishes, then tags. */
 function workingFacts(context: CoverTitleContext) {
-  const extracted = extractExperienceFacts(context);
+  const extracted = evidenceFactsForCopy(context);
   const dishes = dishFactsFromContext(context);
   if (dishes.length === 0) return extracted;
-  return [...dishes, ...extracted.filter((fact) => fact.id !== "featured-dish")];
+  const rest = extracted.filter((fact) => fact.id !== "featured-dish");
+  return [...rest.filter((fact) => fact.source === "note"), ...dishes, ...rest.filter((fact) => fact.source !== "note")];
 }
 
 function resolveFactId(item: string, facts: ExperienceFact[]) {
@@ -539,7 +543,12 @@ export function planGenerationVariation(input: {
     dishOrder = hero ? [hero, ...nextRest] : nextRest;
   }
 
-  let informationPriority = factPriorityForFocus(contentFocus, facts, dishOrder, seed)
+  const noteDishes = collectFullDishNames({ sourceTexts: [positiveNoteText(context.diningNote ?? "")] });
+  const noteLed = [
+    ...dishOrder.filter((dish) => noteDishes.includes(dish)),
+    ...facts.filter((fact) => fact.source === "note").map((fact) => fact.id),
+  ];
+  let informationPriority = [...new Set([...noteLed, ...factPriorityForFocus(contentFocus, facts, dishOrder, seed)])]
     .filter((item) => Boolean(resolveFactId(item, facts)));
   if (usedPriorities.has(informationPriority.join(">")) && informationPriority.length > 1) {
     informationPriority = [...informationPriority.slice(1), informationPriority[0]!];
@@ -927,6 +936,9 @@ function openingFor(
         : `刚好在${mall}的Baan Ying，想找一家泰餐吃饭。`;
     case "dining-feel":
     case "atmosphere-to-food":
+      if (!hasOwner && !facts.some((fact) => fact.id === "comfortable" && fact.source !== "tag")) {
+        return dish ? dishLineFor(dish, traitForDish(facts, dish), plan.dishEntryPattern) : "这顿有几个点印象比较深。";
+      }
       return pickUnusedLine(
         hasOwner
           ? ["老板很帅这一点很难不注意到。", "这顿比较让我记得住的，是用餐时的感觉。", "店里坐着比较放松。"]
@@ -997,7 +1009,7 @@ function rebuildCaption(
     if (!sentences.some((sentence) => sentence.includes(lastDish))) {
       sentences.push(`${lastDish}这次还记得住。`);
     }
-  } else if (plan.endingPattern === "feeling" && facts.some((fact) => fact.id === "comfortable")) {
+  } else if (plan.endingPattern === "feeling" && facts.some((fact) => fact.id === "comfortable" && fact.source !== "tag")) {
     if (!/放松|舒服/.test(sentences.at(-1) ?? "")) {
       sentences.push("店里坐着还挺放松的。");
     }
@@ -1243,11 +1255,15 @@ export function ensureGenerationVariation(input: {
 }) {
   const context = input.context ?? {};
   const facts = workingFacts(context);
+  const groundedFacts = facts.filter((fact) => fact.source !== "tag");
+  const keepCustomerCaption = Boolean(context.diningNote?.trim());
   const seed = input.variantIndex ?? 0;
   let activePlan = input.plan;
   let titles = rotateTitles(input.titles, facts);
-  let cover = rotateCover(input.coverTitle, input.coverSubtitle, input.previousCoverTitle ?? "", facts);
+  let cover = rotateCover(input.coverTitle, input.coverSubtitle, input.previousCoverTitle ?? "", groundedFacts);
   let caption = stripGeneratedLocationTime(input.caption);
+  const original = caption;
+  let rebuilt = false;
   const previousCaption = input.previousCaption ?? "";
   const shouldRebuild =
     GENERIC_OPENER.test(caption) ||
@@ -1258,16 +1274,17 @@ export function ensureGenerationVariation(input: {
         (HIGH_FREQ_TEMPLATE.test(caption) && HIGH_FREQ_TEMPLATE.test(previousCaption)) ||
         (Boolean(factOrder(caption, facts).join(">")) &&
           factOrder(caption, facts).join(">") === factOrder(previousCaption, facts).join(">"))));
-  if (shouldRebuild) {
-    caption = rebuildCaption(context, facts, input.plan, seed);
+  if (shouldRebuild && !keepCustomerCaption) {
+    caption = rebuildCaption(context, groundedFacts, input.plan, seed);
+    rebuilt = true;
   } else {
-    caption = expandMentionOnly(caption, context, facts, input.plan, seed);
+    caption = expandMentionOnly(caption, context, groundedFacts, input.plan, seed);
   }
   caption = joinSentences(
-    splitSentences(caption).map((sentence, index) => polishSentence(sentence, context, facts, seed + index)),
+    splitSentences(caption).map((sentence, index) => polishSentence(sentence, context, groundedFacts, seed + index)),
   );
   caption = preserveSentiment(caption, context);
-  caption = expandToBand(caption, context, facts, input.plan, seed);
+  caption = expandToBand(caption, context, groundedFacts, input.plan, seed);
   caption = joinSentences(splitSentences(trimToBand(caption, input.plan)));
 
   let verdict = evaluateGenerationVariation({
@@ -1280,6 +1297,7 @@ export function ensureGenerationVariation(input: {
 
   if (
     input.previousCaption &&
+    !keepCustomerCaption &&
     (verdict.reasons.includes("caption-similar") ||
       verdict.reasons.includes("thin-coverage") ||
       verdict.reasons.includes("same-opening-family") ||
@@ -1289,9 +1307,10 @@ export function ensureGenerationVariation(input: {
       verdict.reasons.includes("same-focus") ||
       verdict.reasons.includes("same-info-order"))
   ) {
-    caption = rebuildCaption(context, facts, input.plan, seed + 21);
+    caption = rebuildCaption(context, groundedFacts, input.plan, seed + 21);
+    rebuilt = true;
     caption = preserveSentiment(caption, context);
-    caption = expandToBand(caption, context, facts, input.plan, seed + 21);
+    caption = expandToBand(caption, context, groundedFacts, input.plan, seed + 21);
     caption = joinSentences(splitSentences(trimToBand(caption, input.plan)));
     verdict = evaluateGenerationVariation({
       ...input,
@@ -1302,7 +1321,7 @@ export function ensureGenerationVariation(input: {
     });
   }
 
-  if (Boolean(input.previousCaption) && verdict.reasons.includes("caption-similar")) {
+  if (Boolean(input.previousCaption) && !keepCustomerCaption && verdict.reasons.includes("caption-similar")) {
     const retryPlan = planGenerationVariation({
       context,
       variantIndex: seed + 17,
@@ -1312,12 +1331,13 @@ export function ensureGenerationVariation(input: {
       previousMemories: input.previousMemories,
     });
     activePlan = retryPlan;
-    caption = rebuildCaption(context, facts, retryPlan, seed + 99);
+    caption = rebuildCaption(context, groundedFacts, retryPlan, seed + 99);
+    rebuilt = true;
     caption = preserveSentiment(caption, context);
-    caption = expandToBand(caption, context, facts, retryPlan, seed + 99);
+    caption = expandToBand(caption, context, groundedFacts, retryPlan, seed + 99);
     caption = joinSentences(splitSentences(trimToBand(caption, retryPlan)));
     titles = rotateTitles(titles, facts);
-    cover = rotateCover(cover.coverTitle, cover.coverSubtitle, input.previousCoverTitle ?? "", facts);
+    cover = rotateCover(cover.coverTitle, cover.coverSubtitle, input.previousCoverTitle ?? "", groundedFacts);
     verdict = evaluateGenerationVariation({
       ...input,
       plan: retryPlan,
@@ -1334,7 +1354,10 @@ export function ensureGenerationVariation(input: {
       neutralizeInventedPartyCopy(titles[1], context),
       neutralizeInventedPartyCopy(titles[2], context),
     ] as [string, string, string],
-    caption: neutralizeInventedPartyCopy(collapseRepeatedSkeletons(caption), context),
+    caption: neutralizeInventedPartyCopy(
+      collapseRepeatedSkeletons(rebuilt ? caption : keepParagraphBreaks(original, caption)),
+      context,
+    ),
     coverTitle: neutralizeInventedPartyCopy(cover.coverTitle, context),
     coverSubtitle: neutralizeInventedPartyCopy(cover.coverSubtitle, context),
     needsRetry: false,

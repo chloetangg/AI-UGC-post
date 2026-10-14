@@ -8,6 +8,7 @@ import {
 } from "./dish-names";
 import { sanitizeCoverLine, toCoverGraphemes } from "./cover-title-text";
 import { distillCustomerHook } from "@/lib/title-insight";
+import { isNegativeClause } from "@/lib/evidence-priority";
 import { parseReviewIntoEvaluationUnits, selectOneValidSubtitle } from "@/lib/cover/subtitle-units";
 
 export const COVER_LOCATION_KEYWORDS = [
@@ -365,7 +366,7 @@ function noteClauseWithinSubtitle(note: string) {
     .map((item) => item.trim())
     .filter(Boolean);
   for (const clause of clauses) {
-    if (/第一次/.test(clause)) continue;
+    if (/第一次/.test(clause) || isNegativeClause(clause)) continue;
     if (/^(招牌泰式料理|曼谷热门美食|正宗泰国料理)$/.test(clause)) continue;
     if (parseReviewIntoEvaluationUnits(clause).length > 1) continue;
     const distilled = distillCustomerHook(clause);

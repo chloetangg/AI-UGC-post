@@ -5,6 +5,7 @@ import type { RecommendedDish } from "@/types/content";
 import type { EvidenceMap } from "@/lib/content-lock";
 import { withSentenceEnd } from "@/lib/caption-emoji";
 import { mallText } from "@/lib/branches/mall-text";
+import { contradictsNote, noteExperienceLine, positiveNoteText } from "@/lib/evidence-priority";
 
 export type FactGroup = {
   id: "scene" | "experience" | "primary-dish" | "secondary-dish" | "other-dish" | "opinion";
@@ -103,11 +104,13 @@ export function ownerOfPhrase(text: string, context: CoverTitleContext = {}) {
 
 export function buildNarrativeGroups(context: CoverTitleContext = {}, map: EvidenceMap): FactGroup[] {
   const note = context.diningNote?.trim() ?? "";
-  const enjoy = (context.enjoyMost ?? []).filter((item) => item && item !== "其他");
+  const ownNote = positiveNoteText(note);
+  const ownerLine = noteExperienceLine(note);
+  const enjoy = (context.enjoyMost ?? []).filter((item) => item && item !== "其他" && !contradictsNote(item, note));
   const reasons = (context.recommendTo ?? []).filter((item) => item && item !== "其他");
   const dishes = selectedDishes(context);
   const mall = mallText(context.branch).name;
-  const primary = map.primaryKind === "dish" ? map.primaryContent : dishes[0] || "";
+  const primary = map.primaryKind === "dish" ? map.primaryContent : map.favoriteDish || dishes[0] || "";
   const secondary = dishes.filter((dish) => dish !== primary);
   const dishReasons = (dish: string) =>
     reasons.filter((reason) => reason.includes(dish) || dishTerms(dish).some((term) => reason.includes(term)));
@@ -120,7 +123,7 @@ export function buildNarrativeGroups(context: CoverTitleContext = {}, map: Evide
       items: [
         /第一次来|第一次到这家|第一次来这家/.test(note) ? "第一次来" : "",
         new RegExp(`${mall}|商场|逛`).test(`${note}${enjoy.join("")}`) ? `商场/${mall}` : "",
-        enjoy.find((item) => /温馨|翻新|面积/.test(item)) || (/舒服|温馨/.test(note) ? "氛围" : ""),
+        enjoy.find((item) => /温馨|翻新|面积/.test(item)) || (/舒服|温馨/.test(ownNote) ? "氛围" : ""),
       ].filter(Boolean),
     },
     {
@@ -141,7 +144,7 @@ export function buildNarrativeGroups(context: CoverTitleContext = {}, map: Evide
     {
       id: "opinion",
       label: "Overall Opinion",
-      items: [/老板/.test(note) ? "老板很帅" : "", enjoy.find((item) => /服务|支付宝|中文菜单/.test(item)) || ""].filter(Boolean),
+      items: [/老板/.test(ownerLine) ? ownerLine : "", enjoy.find((item) => /服务|支付宝|中文菜单/.test(item)) || ""].filter(Boolean),
     },
   ];
   return groups.filter((group) => group.items.length > 0);
@@ -407,6 +410,10 @@ export function ensureNarrativeFlow(caption: string, context: CoverTitleContext 
     }
     const previous = merged[existing] ?? "";
     const detail = continuationClause(sentence, dish);
+    if (detail && /(?:选|点|推荐|喜欢|爱|要|是)$/.test(detail.replace(/[。！？!?，,\s]/g, ""))) {
+      merged.push(sentence);
+      continue;
+    }
     if (!detail || previous.includes(detail)) continue;
     if (WEAK_RESTATE.test(detail) && !hasNewFact(sentence, previous) && detail.replace(/我很喜欢|这次比较喜欢|还蛮喜欢|比较有记忆点|很好吃/g, "").replace(/[，、\s]/g, "").length < 4) {
       continue;
