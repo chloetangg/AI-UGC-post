@@ -1017,6 +1017,29 @@ function rebuildCaption(
   return joinSentences(sentences);
 }
 
+/**
+ * 就在X上班 is already told by 上班就在附近: one comma clause holds every word of the note clause besides the
+ * place name. Words split across clauses, or under three characters left (从X出来 → 出来), do not count.
+ */
+function placeClauseTold(caption: string, fact: ExperienceFact, context: CoverTitleContext) {
+  if (fact.id !== "customer-words") return false;
+  const mall = mallText(context.branch);
+  const names = [mall.chinese, mall.chineseStem, mall.chineseShort]
+    .filter(Boolean)
+    .map((name) => name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  const place = new RegExp([mall.spaced, "baan\\s*ying", ...names].join("|"), "gi");
+  const clause = fact.captionLine.replace(/[。！？!?]+$/, "");
+  if (clause.replace(place, "") === clause) return false;
+  const pieces = clause
+    .split(place)
+    .map((piece) => piece.trim())
+    .filter((piece) => piece.length >= 2);
+  if (pieces.join("").length < 3) return false;
+  return splitSentences(caption)
+    .flatMap((sentence) => sentence.split(/[，,；;]/))
+    .some((part) => pieces.every((piece) => part.includes(piece)));
+}
+
 function dishesAlreadyTold(caption: string, context: CoverTitleContext) {
   const names = selectedDishNames(context);
   return names.length > 0 && names.every((name) => caption.includes(name));
@@ -1034,7 +1057,12 @@ function expandMentionOnly(
   );
   if (dishesAlreadyTold(caption, context)) return joinSentences(sentences);
   const used = new Set(
-    facts.filter((fact) => sentences.some((sentence) => factDescribed(sentence, fact))).map((fact) => fact.id),
+    facts
+      .filter(
+        (fact) =>
+          sentences.some((sentence) => factDescribed(sentence, fact)) || placeClauseTold(caption, fact, context),
+      )
+      .map((fact) => fact.id),
   );
   const needed = targetFactCount(plan, facts.length);
   const extras = structureFactOrder(facts, plan).filter((fact) => !used.has(fact.id));
@@ -1067,7 +1095,7 @@ function expandToBand(
   if (storyHanCount(next) >= plan.lengthMin) return next;
   for (const [index, fact] of structureFactOrder(facts, plan).entries()) {
     if (storyHanCount(next) >= plan.lengthMin) break;
-    if (fact.markers.some((marker) => marker && next.includes(marker))) continue;
+    if (fact.markers.some((marker) => marker && next.includes(marker)) || placeClauseTold(next, fact, context)) continue;
     next = joinSentences([...splitSentences(next), descriptionFor(fact, context, seed + index, plan)]);
   }
   return joinSentences(splitSentences(next));
