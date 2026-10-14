@@ -811,10 +811,13 @@ const repeatedCrab = separateOverlappingHeadlines({
   recommendTo: ["咖喱蟹肉很下饭", "芒果糯米饭芒果很新鲜"],
   enjoyMost: ["店员服务热情周到"],
 });
-assert(!headlinesSharePoint(repeatedCrab.coverSubtitle, repeatedCrab.titles[0]), `subtitle and post title still share a point: ${repeatedCrab.titles[0]}`);
-assert(repeatedCrab.coverSubtitle.includes("很下饭"), `subtitle lost the supported point: ${repeatedCrab.coverSubtitle}`);
-assert(/新鲜/.test(repeatedCrab.titles[0]), `replacement was not a supported point: ${repeatedCrab.titles[0]}`);
-assert(!/环境很好|价格实惠|排队/.test(repeatedCrab.titles.join("")), `dedupe invented a fact: ${repeatedCrab.titles.join(" | ")}`);
+assert(!headlinesSharePoint(repeatedCrab.coverSubtitle, repeatedCrab.titles[0]), `subtitle and post title still share a point: ${repeatedCrab.coverSubtitle}`);
+assert(
+  JSON.stringify(repeatedCrab.titles) === JSON.stringify(["咖喱蟹肉很下饭🦀", "店员服务很热情", "到店的过程很顺"]),
+  `cover dedupe rewrote a post title: ${repeatedCrab.titles.join(" | ")}`,
+);
+assert(/新鲜/.test(repeatedCrab.coverSubtitle), `subtitle replacement was not a supported point: ${repeatedCrab.coverSubtitle}`);
+assert(!/环境很好|价格实惠|排队/.test(`${repeatedCrab.coverTitle}${repeatedCrab.coverSubtitle}`), `dedupe invented a fact: ${repeatedCrab.coverSubtitle}`);
 
 const sameDish = separateOverlappingHeadlines({
   titles: ["咖喱蟹肉拌饭", "芒果糯米饭很新鲜", "朋友介绍来吃的"],
@@ -858,8 +861,9 @@ const afterFormat = separateOverlappingHeadlines({
   note: "是朋友介绍来吃的",
   recommendTo: ["咖喱蟹肉很下饭", "菠萝炒饭配料很足"],
 });
-assert(!headlinesSharePoint(afterFormat.coverSubtitle, afterFormat.titles[0]), `format restored the repeated point: ${afterFormat.titles[0]}`);
-assert(/配料/.test(afterFormat.titles[0]), `format path replacement lacked support: ${afterFormat.titles[0]}`);
+assert(!headlinesSharePoint(afterFormat.coverSubtitle, afterFormat.titles[0]), `format restored the repeated point: ${afterFormat.coverSubtitle}`);
+assert(JSON.stringify(afterFormat.titles) === JSON.stringify(formattedRepeat), `format path rewrote a post title: ${afterFormat.titles.join(" | ")}`);
+assert(/配料/.test(afterFormat.coverSubtitle), `format path replacement lacked support: ${afterFormat.coverSubtitle}`);
 
 assert(!headlinesSharePoint("咖喱蟹肉很香", "咖喱蟹肉很下饭"), "aroma and rice-friendly were merged");
 assert(!headlinesSharePoint("咖喱蟹肉拌饭", "咖喱蟹肉很下饭"), "a bare dish name was treated as the same claim");
@@ -890,11 +894,11 @@ const coverAndPost = separateOverlappingHeadlines({
   note: "是朋友介绍来吃的",
   recommendTo: ["咖喱蟹肉很下饭", "芒果糯米饭芒果很新鲜"],
 });
-assert(!headlinesSharePoint(coverAndPost.coverTitle, coverAndPost.titles[0]), `cover and post title still repeat: ${coverAndPost.titles[0]}`);
-assert(coverAndPost.coverTitle === "咖喱蟹肉很下饭", `cover and post changed the distinct cover: ${coverAndPost.coverTitle}`);
+assert(!headlinesSharePoint(coverAndPost.coverTitle, coverAndPost.titles[0]), `cover and post title still repeat: ${coverAndPost.coverTitle}`);
+assert(coverAndPost.titles[0] === "咖喱蟹肉很下饭🦀", `cover dedupe rewrote the post title or its emoji: ${coverAndPost.titles[0]}`);
 assert(coverAndPost.coverSubtitle === "芒果糯米饭芒果很新鲜", `cover and post changed the distinct subtitle: ${coverAndPost.coverSubtitle}`);
-assert(/朋友|介绍/.test(coverAndPost.titles[0]), `cover and post replacement lacked support: ${coverAndPost.titles[0]}`);
-assert(!coverAndPost.titles[0].includes("🦀"), `crab emoji moved onto another angle: ${coverAndPost.titles[0]}`);
+assert(/朋友|介绍/.test(coverAndPost.coverTitle), `cover replacement lacked support: ${coverAndPost.coverTitle}`);
+assert(!/\p{Extended_Pictographic}/u.test(coverAndPost.coverTitle), `cover replacement carried an emoji: ${coverAndPost.coverTitle}`);
 
 const subtitleAndPost = separateOverlappingHeadlines({
   titles: ["咖喱蟹肉很下饭", "到店的过程很顺", "这顿吃完就走了"],
@@ -904,9 +908,9 @@ const subtitleAndPost = separateOverlappingHeadlines({
   recommendTo: ["咖喱蟹肉很下饭", "菠萝炒饭配料很足"],
 });
 assert(subtitleAndPost.coverTitle === "商场里的泰餐", `theme cover was rewritten: ${subtitleAndPost.coverTitle}`);
-assert(subtitleAndPost.coverSubtitle === "咖喱蟹肉很下饭", `supported subtitle was rewritten: ${subtitleAndPost.coverSubtitle}`);
-assert(!headlinesSharePoint(subtitleAndPost.coverSubtitle, subtitleAndPost.titles[0]), `subtitle and post title still repeat: ${subtitleAndPost.titles[0]}`);
-assert(/朋友|介绍/.test(subtitleAndPost.titles[0]), `subtitle pair replacement lacked support: ${subtitleAndPost.titles[0]}`);
+assert(subtitleAndPost.titles[0] === "咖喱蟹肉很下饭", `cover dedupe rewrote the post title: ${subtitleAndPost.titles[0]}`);
+assert(!headlinesSharePoint(subtitleAndPost.coverSubtitle, subtitleAndPost.titles[0]), `subtitle and post title still repeat: ${subtitleAndPost.coverSubtitle}`);
+assert(/配料/.test(subtitleAndPost.coverSubtitle), `subtitle replacement lacked support: ${subtitleAndPost.coverSubtitle}`);
 
 const differentClaims = separateOverlappingHeadlines({
   titles: ["咖喱蟹肉很下饭", "到店的过程很顺", "这顿吃完就走了"],
@@ -1167,12 +1171,15 @@ const coconutReturned = {
   coverTitle: applyBrandSpelling(scrubForeignBranchFacts(coconutDistinct.coverTitle, branch), coconutSpelling),
   coverSubtitle: applyBrandSpelling(scrubForeignBranchFacts(coconutDistinct.coverSubtitle, branch), coconutSpelling),
 };
-assert(!headlinesSharePoint(coconutReturned.coverTitle, coconutReturned.titles[0]), `returned cover and post title still share coconut: ${coconutReturned.titles[0]}`);
-assert(coconutReturned.coverTitle === "青咖喱牛肉椰香很足", `returned cover lost the supported dish point: ${coconutReturned.coverTitle}`);
+assert(!headlinesSharePoint(coconutReturned.coverTitle, coconutReturned.titles[0]), `returned cover and post title still share coconut: ${coconutReturned.coverTitle}`);
+assert(
+  JSON.stringify(coconutDistinct.titles) === JSON.stringify(coconutPolished),
+  `cover dedupe rewrote a post title: ${coconutDistinct.titles.join(" | ")}`,
+);
+assert(/椰香/.test(coconutReturned.titles[0]) && coconutReturned.titles[0].includes("🍛"), `post title lost its point or emoji: ${coconutReturned.titles[0]}`);
 assert(coconutReturned.coverSubtitle.includes("温馨"), `returned subtitle lost the room point: ${coconutReturned.coverSubtitle}`);
-assert(/朋友|介绍/.test(coconutReturned.titles[0]), `returned post title was not a supported angle: ${coconutReturned.titles[0]}`);
-assert(!coconutReturned.titles[0].includes("🍛"), `curry emoji moved to another angle: ${coconutReturned.titles[0]}`);
-assert(!/环境很好|价格实惠|排队|很下饭/.test(coconutReturned.titles[0]), `returned title invented a point: ${coconutReturned.titles[0]}`);
+assert(/朋友|介绍/.test(coconutReturned.coverTitle), `returned cover was not a supported angle: ${coconutReturned.coverTitle}`);
+assert(!/环境很好|价格实惠|排队|很下饭/.test(coconutReturned.coverTitle), `returned cover invented a point: ${coconutReturned.coverTitle}`);
 
 const coconutOnly = separateOverlappingHeadlines({
   titles: ["青咖喱牛肉椰香真的很足🍛", "到店的过程很顺", "这顿吃完就走了"],
@@ -1193,10 +1200,9 @@ const warmthReuse = separateOverlappingHeadlines({
   recommendTo: ["青咖喱牛肉椰香味很足"],
   enjoyMost: ["店里是满满的家庭温馨感"],
 });
-assert(warmthReuse.coverTitle === "青咖喱牛肉椰香很足", `warmth reuse changed the cover: ${warmthReuse.coverTitle}`);
+assert(warmthReuse.coverTitle === "店里是满满的家庭温馨感", `warmth was not used for the cover: ${warmthReuse.coverTitle}`);
 assert(warmthReuse.coverSubtitle === "芒果糯米饭很新鲜", `warmth reuse changed the other dish: ${warmthReuse.coverSubtitle}`);
-assert(warmthReuse.titles[0] === "店里是满满的家庭温馨感", `warmth was rewritten onto the beef: ${warmthReuse.titles[0]}`);
-assert(!warmthReuse.titles[0].includes("🍛"), `curry emoji moved onto the room line: ${warmthReuse.titles[0]}`);
+assert(warmthReuse.titles[0] === "青咖喱牛肉椰香真的很足🍛", `cover dedupe rewrote the post title: ${warmthReuse.titles[0]}`);
 
 type HeadlineInput = Parameters<typeof enforceCustomerEvidence>[0];
 function returnedHeadlines(input: HeadlineInput) {

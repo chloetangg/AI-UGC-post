@@ -133,7 +133,10 @@ assert(emojiCount(keptEmoji) === 1, `stacked another emoji: ${keptEmoji}`);
 
 const start = deliver(sample, note, "inline", 0);
 const end = deliver(sample, note, "inline", 0.01);
-assert(emojiCount(storyOf(start)) === 1 && emojiCount(storyOf(end)) === 1, "variation changed the emoji count");
+assert(
+  emojiCount(storyOf(start)) === emojiCount(storyOf(end)) && emojiCount(storyOf(start)) >= 2,
+  `variation changed the emoji count, or a long caption stayed at one: ${storyOf(start)} || ${storyOf(end)}`,
+);
 assert(start !== end, "emoji position did not vary");
 
 const modelShaped = "朋友之前提过 Centralworld 的 baan ying。这次总算约上一起过来。河虾冬阴功汤的虾真的很新鲜，是我印象比较深的一道。菠萝炒饭配料给得很足，一口下去口感很丰富。青柠蒸鲈鱼酸香的味道刚好提鲜，也很开胃。味道很正宗，吃起来就是很熟悉的泰式风味。店员服务很热情周到，招呼得很舒服。吃下来感觉很顺畅。";

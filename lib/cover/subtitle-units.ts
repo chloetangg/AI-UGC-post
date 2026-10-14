@@ -3,6 +3,7 @@
  * It only reads the review string passed in. It does not load another branch's data
  * and it does not write back to the stored customer review.
  */
+import { headlinesSharePoint } from "@/lib/headline-overlap";
 
 export type SubtitleInvalidReason =
   | "INVALID_EMPTY"
@@ -200,15 +201,19 @@ export function finalValidateCoverSubtitle(subtitle: string, source = ""): Subti
   return validateSubtitleCandidate(subtitle, source);
 }
 
-export function selectOneValidSubtitle(input: { note?: string; preferred?: string; extras?: string[] } = {}) {
+/** `avoid`: the cover main title. A subtitle that repeats its point is skipped while another valid one exists. */
+export function selectOneValidSubtitle(
+  input: { note?: string; preferred?: string; extras?: string[]; avoid?: string[] } = {},
+) {
   const note = input.note?.trim() ?? "";
   const ranked = generateSubtitleCandidates(note)
     .map((item, index) => ({ item, index }))
     .sort((a, b) => specificity(a.item) - specificity(b.item) || a.index - b.index)
     .map((item) => item.item);
   const pool = [input.preferred ?? "", ...ranked, ...(input.extras ?? []), SAFE_SUBTITLE];
-  for (const item of pool) {
-    if (finalValidateCoverSubtitle(item, note).ok) return clean(item);
-  }
-  return SAFE_SUBTITLE;
+  const valid = pool.filter((item) => finalValidateCoverSubtitle(item, note).ok);
+  const avoid = (input.avoid ?? []).filter(Boolean);
+  const distinct = valid.find((item) => !avoid.some((line) => headlinesSharePoint(line, item)));
+  const picked = distinct ?? valid[0];
+  return picked ? clean(picked) : SAFE_SUBTITLE;
 }
