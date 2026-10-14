@@ -1,7 +1,11 @@
 import { mallText } from "@/lib/branches/mall-text";
 import { formatNegativeNeutralizationRules } from "./negative-feedback";
 
-export function complianceGenerationRules() {
+const NO_FALSE_PRAISE_RULES = `NO FALSE PRAISE: Do NOT invent 超好吃 / 必吃 / 性价比超高 / 超划算 / 人气爆棚 / 超级推荐 / 绝对不会踩雷 / 全网第一 / 曼谷最好吃 / 必打卡 unless verified brand information already supports that exact claim. Cover keyword 必吃 is the only exception, and only in mainTitle/subTitle.
+Never invent extra incidents, wait times, staff names, or praise the customer did not give.`;
+
+/** `negativeFeedback: false` keeps only the general no-false-praise lines; send `formatNegativeNeutralizationRules` when the input has a negative. */
+export function complianceGenerationRules(options: { negativeFeedback?: boolean } = {}) {
   return `XIAOHONGSHU COMPLIANCE — MANDATORY. Compliance beats a stronger hook.
 
 Write naturally as a real diner. Do NOT sound robotic. Prefer 真实体验 + 具体信息 + 轻度情绪.
@@ -42,7 +46,7 @@ Titles must pass the same rules. BAD: 曼谷最好吃的泰餐！这家店直接
 
 Do not copy sample posts, openings, or paragraph skeletons.
 
-${formatNegativeNeutralizationRules()}
+${options.negativeFeedback === false ? NO_FALSE_PRAISE_RULES : formatNegativeNeutralizationRules()}
 
 INTERNAL ONLY: before returning JSON, rewrite any risky sentence into neutral personal experience and re-check. Never return risky copy. Never output this checklist, risk scores, or draft unsafe text.`;
 }

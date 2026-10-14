@@ -1057,12 +1057,41 @@ export function planLocationTime(input: {
   };
 }
 
-export function formatLocationTimeStaticRules(branch = "") {
+function formatInlineLocationModeRules(branch = "") {
+  const mall = officialLocationForBranch(branch)?.englishName || "this branch's mall";
+  return `INLINE (locationDisplayMode=inline) — one LOCATION FACT in the story. No 📍/⏰ block.
+- Mall name and Baan Ying share one sentence. Fold them into the customer's own reason when they gave one. Do not replace that reason, and do not add a second sentence that only introduces the restaurant.
+- Do not write 这次在${mall}的Baan Ying吃了一顿饭 / 这次在${mall}逛街，选择了Baan Ying / 逛完商场来吃泰餐 unless they actually wrote a shopping trip.
+- After that one sentence, do not say the mall again, the restaurant again, or the same relationship in other words (这家店就在商场 / 位置很方便 / 商场里吃泰餐 / 刚好在商场). A later 环境 or 服务 line keeps the experience and drops the place name.`;
+}
+
+const STANDALONE_LOCATION_MODE_RULES = `STANDALONE (locationDisplayMode=standalone) — the story is the meal only. The system appends Location & Time.
+- Do not write the mall, Baan Ying, the floor, hours, 📍, or ⏰. Not even once.
+- Do not say the restaurant is in the mall, or that eating there is convenient, in any wording.
+- Good body: 咖喱蟹肉是这次吃下来很喜欢的一道。芒果糯米饭也很新鲜。`;
+
+/** The rules for the one mode this round uses. */
+export function formatLocationModeRules(placement: LocationPlacement, branch = "") {
+  return placement === "standalone" ? STANDALONE_LOCATION_MODE_RULES : formatInlineLocationModeRules(branch);
+}
+
+/** `modeSections: false` leaves out both mode sections; send `formatLocationModeRules` for the chosen mode instead. */
+export function formatLocationTimeStaticRules(branch = "", options: { modeSections?: boolean } = {}) {
   const location = officialLocationForBranch(branch);
-  const mall = location?.englishName || "this branch's mall";
   const chineseRule = location?.chineseName
     ? `The only approved Chinese name for this mall is ${location.chineseName}.`
     : "Use this branch's official mall name. Do not invent a Chinese mall name.";
+  const modes =
+    options.modeSections === false
+      ? ""
+      : `LOCATION MODE IS RANDOM AND MUST CHANGE:
+The system picks one mode per caption and switches on the next generation. Do not use the same mode every time. Dishes in the story do not force the place into the body.
+
+${formatInlineLocationModeRules(branch)}
+
+${STANDALONE_LOCATION_MODE_RULES}
+
+`;
   return `LOCATION DISPLAY MODE (locationDisplayMode / THIS ROUND LOCATION PLAN) — official facts only. Follow that one mode only. Never mix inline and standalone logic.
 
 HARD RULES:
@@ -1072,20 +1101,7 @@ HARD RULES:
 - If hours appear, they must be the official locked hours. Never change the time to sound natural.
 - Do not invent 刚好路过 / 看到招牌 / 朋友推荐 / 下班后来 / 从BTS走过来 / 离某个出口很近 unless the customer wrote that.
 
-LOCATION MODE IS RANDOM AND MUST CHANGE:
-The system picks one mode per caption and switches on the next generation. Do not use the same mode every time. Dishes in the story do not force the place into the body.
-
-INLINE (locationDisplayMode=inline) — one LOCATION FACT in the story. No 📍/⏰ block.
-- Mall name and Baan Ying share one sentence. Fold them into the customer's own reason when they gave one. Do not replace that reason, and do not add a second sentence that only introduces the restaurant.
-- Do not write 这次在${mall}的Baan Ying吃了一顿饭 / 这次在${mall}逛街，选择了Baan Ying / 逛完商场来吃泰餐 unless they actually wrote a shopping trip.
-- After that one sentence, do not say the mall again, the restaurant again, or the same relationship in other words (这家店就在商场 / 位置很方便 / 商场里吃泰餐 / 刚好在商场). A later 环境 or 服务 line keeps the experience and drops the place name.
-
-STANDALONE (locationDisplayMode=standalone) — the story is the meal only. The system appends Location & Time.
-- Do not write the mall, Baan Ying, the floor, hours, 📍, or ⏰. Not even once.
-- Do not say the restaurant is in the mall, or that eating there is convenient, in any wording.
-- Good body: 咖喱蟹肉是这次吃下来很喜欢的一道。芒果糯米饭也很新鲜。
-
-Do not write a floor or hours inside the story, and do not open every post with 这次来到Baan Ying. Hashtags stay out of the caption.`;
+${modes}Do not write a floor or hours inside the story, and do not open every post with 这次来到Baan Ying. Hashtags stay out of the caption.`;
 }
 
 export function formatLocationTimePlanRules(plan: LocationTimePlan, branch: string) {

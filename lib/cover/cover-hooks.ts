@@ -90,9 +90,9 @@ export function suggestCoverHookFamily(input: {
   return rotation[variant % rotation.length] ?? "HOOK-01";
 }
 
-export function formatCoverHookRules(context: CoverTitleContext = {}) {
+export function formatCoverHookRules(context: CoverTitleContext = {}, options: { dishTable?: boolean } = {}) {
   const mall = selectedCoverLocation(context.branch) || mallText().name;
-  return `${formatCoverTitleStaticRules()}
+  return `${formatCoverTitleStaticRules({ dishTable: options.dishTable })}
 
 HOOK FAMILIES — pick from evidence after the coverTitle keyword + one-evidence subtitle rules are satisfied. Do not copy these exact sentences:
 HOOK-01 Search keyword is SEO only. A customer reason outranks 曼谷/泰餐/美食. Never output 曼谷美食发现 / 曼谷泰餐推荐 / 曼谷美食推荐 / 商场里吃泰餐 as the whole cover.

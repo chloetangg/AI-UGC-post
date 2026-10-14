@@ -155,6 +155,16 @@ export function containsHarshNegative(text: string) {
   return findHarshNegativeHits(text).length > 0;
 }
 
+/** Deliberately broad: a false positive only sends the full negative-feedback rules. */
+const NEGATIVE_CUE =
+  /一般|普通|不太|不怎么|不够|不好|不行|不对|差|慢|久|等了|咸|淡|油|腻|偏|有点|有些|失望|可惜|遗憾|贵|性价比|抽奖|送东西|不会再|不再|避雷|踩雷|雷|不值|不推荐|不喜欢|态度|难|凉|冷|少|吵|脏|挤|退|投诉|问题|bad|slow|expensive|not good|disappoint/i;
+
+export function mayContainNegativeFeedback(texts: string[]) {
+  const text = texts.map((item) => item?.trim() ?? "").filter(Boolean).join("\n");
+  if (!text) return false;
+  return containsHarshNegative(text) || NEGATIVE_CUE.test(text);
+}
+
 export function formatNegativeNeutralizationRules() {
   return `CUSTOMER NEGATIVE FEEDBACK — MANDATORY.
 

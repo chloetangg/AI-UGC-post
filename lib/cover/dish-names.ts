@@ -225,10 +225,15 @@ export function hasIllegalCoverDishShort(text: string, fullNames: string[] = [])
   return false;
 }
 
-export function formatCoverDishNameStaticRules() {
+/** `table: false` leaves the short-name table to `formatCoverDishNameInstance(dishes, { shorts: true })`. */
+export function formatCoverDishNameStaticRules(options: { table?: boolean } = {}) {
   const lines = OFFICIAL_COVER_DISHES.map((item) => `${item.full} → ${item.cover}`).join("\n");
-  return `COVER DISH NAMES — titles[] and caption still use the COMPLETE name. mainTitle / subTitle may only use these approved shorts (never invent another short):
-${lines}
+  const table =
+    options.table === false
+      ? "mainTitle / subTitle may only use the approved shorts listed for this customer's dishes in the user message (never invent another short)."
+      : `mainTitle / subTitle may only use these approved shorts (never invent another short):
+${lines}`;
+  return `COVER DISH NAMES — titles[] and caption still use the COMPLETE name. ${table}
 Never 冬阴功汤 if the approved short is 冬阴功. Never 芒果 / 菠萝 / 鲈鱼 / 青咖喱 / 咖喱蟹 as a cover short.
 If a customer-written dish is not in this table, keep its complete name. Do not shorten 泰式青咖喱鸡 to 青咖喱 or 泰式香辣打抛猪肉饭 to 打抛.
 A dish in subTitle is the ONE core reason — do not also add price or first-visit in the same line.
@@ -237,9 +242,21 @@ A food or drink the customer wrote in the dining note, such as 粉红奶, counts
 Allowed cover dishes = the recommended/mentioned list plus items the customer actually wrote. Never invent Pad Thai, Som Tam, or other unsupported dishes.`;
 }
 
-export function formatCoverDishNameInstance(dishes: string[] = []) {
+/**
+ * `shorts: true` also prints the table rows for every menu dish the customer selected or wrote in `sourceTexts`,
+ * for prompts whose static rules were built with `table: false`.
+ */
+export function formatCoverDishNameInstance(
+  dishes: string[] = [],
+  options: { shorts?: boolean; sourceTexts?: string[] } = {},
+) {
   const named = dishes.filter((dish) => dish.trim());
-  return `This customer's dishes: ${named.join(" / ") || "none — do not invent a dish"}. Use the approved cover short from COVER DISH NAMES. A name they wrote that is not in that table stays in full.`;
+  const base = `This customer's dishes: ${named.join(" / ") || "none — do not invent a dish"}. Use the approved cover short from COVER DISH NAMES. A name they wrote that is not in that table stays in full.`;
+  if (!options.shorts) return base;
+  const involved = new Set(collectFullDishNames({ dishes: named, sourceTexts: options.sourceTexts }));
+  const rows = OFFICIAL_COVER_DISHES.filter((item) => involved.has(item.full)).map((item) => `${item.full} → ${item.cover}`);
+  return `${base}
+Approved cover shorts for these dishes: ${rows.join("; ") || "none on the menu table"}`;
 }
 
 export function formatCoverDishNameRules(dishes: string[] = []) {
