@@ -654,6 +654,81 @@ export function collapseRepeatedSkeletons(caption: string) {
     .join("\n\n");
 }
 
+const EMOJI_TAIL = /[\p{Extended_Pictographic}\p{Emoji_Modifier}\uFE0F\u200D]/u;
+
+/** Sentence spans: a run of 。！？ ends one, so does an emoji after words. Emoji before any words lead the next sentence. */
+function sentenceSpans(text: string) {
+  const spans: Array<{ start: number; end: number }> = [];
+  let start = 0;
+  let words = false;
+  const close = (end: number) => {
+    const lead = text.slice(start, end).match(/^\s*/)?.[0].length ?? 0;
+    if (text.slice(start, end).trim()) spans.push({ start: start + lead, end });
+    start = end;
+    words = false;
+  };
+  let index = 0;
+  while (index < text.length) {
+    const char = String.fromCodePoint(text.codePointAt(index) ?? 0);
+    let next = index + char.length;
+    if (char === "\n") {
+      close(index);
+      start = next;
+    } else if (/[。！？!?]/.test(char)) {
+      while (next < text.length && /[。！？!?]/.test(text[next] ?? "")) next += 1;
+      close(next);
+    } else if (/\p{Extended_Pictographic}/u.test(char)) {
+      while (next < text.length) {
+        const tail = String.fromCodePoint(text.codePointAt(next) ?? 0);
+        if (!EMOJI_TAIL.test(tail)) break;
+        next += tail.length;
+      }
+      if (words) close(next);
+    } else if (/[\p{Script=Han}A-Za-z0-9]/u.test(char)) {
+      words = true;
+    }
+    index = next;
+  }
+  close(text.length);
+  return spans;
+}
+
+function sentenceKey(sentence: string) {
+  return sentence.replace(/[\p{Extended_Pictographic}\p{Emoji_Modifier}\uFE0F\u200D\s。！？!?，,、；;：:]/gu, "");
+}
+
+/**
+ * Put back the paragraph breaks a sentence-level pass flattened. A break returns only before the sentence that still opens
+ * its paragraph: the same words (or those words with a clause merged on), found once, in the same order as the other
+ * paragraphs. Anything less certain keeps the text as it is. Only "\n\n" is inserted; no sentence moves, changes, or repeats.
+ */
+export function keepParagraphBreaks(original: string, processed: string) {
+  const paragraphs = original.trim().split(/\n\n+/).filter((block) => block.trim());
+  if (paragraphs.length < 2 || !processed.trim()) return processed;
+  const originalKeys = sentenceSpans(original).map((span) => sentenceKey(original.slice(span.start, span.end)));
+  const spans = sentenceSpans(processed).map((span) => ({ ...span, key: sentenceKey(processed.slice(span.start, span.end)) }));
+  const found = paragraphs.slice(1).map((paragraph) => {
+    const first = sentenceSpans(paragraph)[0];
+    const anchor = first ? sentenceKey(paragraph.slice(first.start, first.end)) : "";
+    if (anchor.length < 4 || originalKeys.filter((key) => key.startsWith(anchor)).length !== 1) return -1;
+    const hits = spans.filter((span) => span.key.startsWith(anchor));
+    return hits.length === 1 ? (hits[0]?.start ?? -1) : -1;
+  });
+  const inOrder = found.filter(
+    (at, index) =>
+      at > 0 &&
+      found.slice(0, index).every((other) => other < 0 || other < at) &&
+      found.slice(index + 1).every((other) => other < 0 || other > at),
+  );
+  let text = processed;
+  for (const at of [...inOrder].reverse()) {
+    const before = text.slice(0, at);
+    if (/\n\s*$/.test(before)) continue;
+    text = `${before.replace(/[ \t]+$/, "")}\n\n${text.slice(at)}`;
+  }
+  return text;
+}
+
 export function paragraphSentenceCounts(caption: string) {
   return caption
     .split(/\n\n+/)
