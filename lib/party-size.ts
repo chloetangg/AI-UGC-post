@@ -5,7 +5,7 @@ export type PartyKind = "two" | "solo" | "family" | "kids" | "friends" | "partne
 const PARTY_KIND_PATTERNS: Array<{ kind: PartyKind; pattern: RegExp }> = [
   { kind: "two", pattern: /两个人|两人来|两人吃|两人用餐|两个人约会|二人世界|就我们俩|俩人/ },
   { kind: "solo", pattern: /一个人来|一个人吃|一个人用餐|自己一个人|独自(?:来|吃)|一个人也/ },
-  { kind: "family", pattern: /和家人|跟家人|家人一起|带家人|全家(?:人|出)|一家[一二三四五六七八九十两\d]口|一家三口|一家四口/ },
+  { kind: "family", pattern: /和家人|跟家人|家人一起|带家人|一家人|全家(?:人|出)|一家[一二三四五六七八九十两\d]口|一家三口|一家四口/ },
   { kind: "kids", pattern: /和孩子|带孩子来|带娃来|带了小孩|和小朋友一起|带小朋友来/ },
   { kind: "family-suitable", pattern: /适合带小朋友|适合家庭|家庭用餐/ },
   { kind: "friends", pattern: /和朋友|跟朋友|朋友一起|和闺蜜|跟闺蜜|和同事一起/ },

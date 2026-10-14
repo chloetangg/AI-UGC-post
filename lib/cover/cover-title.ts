@@ -375,16 +375,26 @@ function substantiveCoverLine(
 }
 
 function inventedTaste(text: string, context: CoverTitleContext) {
-  if (/很香|有点特别/.test(text) && !customerSaid(context, /香/)) return true;
+  if (/香|有点特别/.test(text) && !customerSaid(context, /香/)) return true;
   if (/很满足/.test(text) && !customerSaid(context, /满足/)) return true;
   if (/很好吃|好好吃/.test(text) && !customerSaid(context, /好吃/)) return true;
   return false;
+}
+
+/** Main and subtitle each carry their own fact, so they do not name the same dish. */
+function sharesCoverDish(left: string, right: string, context: CoverTitleContext) {
+  return collectFullDishNames({ dishes: context.dishes, sourceTexts: [left, right] }).some((name) => {
+    const short = coverDishShortName(name);
+    const names = (text: string) => text.includes(name) || Boolean(short && text.includes(short));
+    return names(left) && names(right);
+  });
 }
 
 function replacementMain(context: CoverTitleContext, currentSubtitle: string) {
   for (const pair of evidenceLedCoverPairs(context)) {
     const title = prepareCoverLine(pair.title);
     if (!title || title === currentSubtitle) continue;
+    if (currentSubtitle && sharesCoverDish(title, currentSubtitle, context)) continue;
     if (isWeakSeoCover(title) || !isNaturalCoverChinese(title) || looksIncompleteCover(title)) continue;
     if (inventedTaste(title, context)) continue;
     return title;
@@ -439,6 +449,7 @@ export function layoutCoverOverlay(
   const subtitle = selectOneValidSubtitle({
     note: context.diningNote,
     preferred: picked.subtitle,
+    avoid: [picked.title],
   });
   return {
     title: picked.title,

@@ -17,7 +17,7 @@ function splitGluedTopics(text: string) {
     .replace(/(新鲜|开胃|提鲜|丰富|好吃|好喝)(店员|服务)/g, "$1。$2")
     .replace(new RegExp(`([^。！？!?\\n和与的、，\\s\\p{Extended_Pictographic}])(${dishEdge})`, "gu"), (full, before: string, name: string, offset: number, whole: string) => {
       const prefix = whole.slice(Math.max(0, offset - 12), offset + before.length);
-      if (/喜欢|是$|点了|吃了|选了|的$|和$|与$|还有|以及|里面|这几道|然后/.test(prefix)) return full;
+      if (/喜欢|是$|点了|吃了|选了|[选点]$|的$|和$|与$|还有|以及|里面|这几道|然后/.test(prefix)) return full;
       return `${before}。${name}`;
     });
   return next.replace(

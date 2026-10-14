@@ -1,3 +1,5 @@
+import { headlineEvidenceLines } from "@/lib/evidence-priority";
+
 const DISH_NAMES = [
   "河虾冬阴功汤",
   "酸甜酱炒河虾",
@@ -110,11 +112,15 @@ export function headlinesSharePoint(left: string, right: string) {
   });
 }
 
+/** Names a dish another headline already carries, and says nothing new about it. */
+export function addsNoNewPoint(line: string, others: string[]) {
+  const point = pointOf(line);
+  if (!point.dish || point.claims.length > 0) return false;
+  return others.some((other) => sameDish(pointOf(other).dish, point.dish));
+}
+
 function evidenceLines(input: { note?: string; recommendTo?: string[]; enjoyMost?: string[] }) {
-  return [input.note ?? "", ...(input.recommendTo ?? []), ...(input.enjoyMost ?? [])]
-    .flatMap((item) => item.split(/[。！？!?\n，,]/))
-    .map((item) => item.trim())
-    .filter((item) => item.length >= 2);
+  return headlineEvidenceLines(input).filter((item) => item.length >= 2);
 }
 
 function usableLine(text: string) {
@@ -151,6 +157,10 @@ function pickAlternate(current: string, blocked: string[], lines: string[], pref
   );
 }
 
+/**
+ * The cover gives way. Post titles are never rewritten here: a cover line must not
+ * replace a title with a raw note fragment or strip the batch's only title emoji.
+ */
 export function separateOverlappingHeadlines(input: {
   titles: [string, string, string];
   coverTitle: string;
@@ -163,18 +173,16 @@ export function separateOverlappingHeadlines(input: {
   const titles: [string, string, string] = [...input.titles];
   let coverTitle = input.coverTitle;
   let coverSubtitle = input.coverSubtitle;
-  const frozen = () => [titles[1], titles[2]];
   let coverLocked = false;
   let subtitleLocked = false;
-  let titleLocked = false;
 
   if (headlinesSharePoint(coverTitle, coverSubtitle)) {
-    const nextCover = pickAlternate(coverTitle, [coverSubtitle, titles[0], ...frozen()], lines, "theme");
+    const nextCover = pickAlternate(coverTitle, [coverSubtitle, ...titles], lines, "theme");
     if (nextCover) {
       coverTitle = keepDecoration(coverTitle, nextCover);
       coverLocked = true;
     } else {
-      const nextSubtitle = pickAlternate(coverSubtitle, [coverTitle, titles[0], ...frozen()], lines, "dish");
+      const nextSubtitle = pickAlternate(coverSubtitle, [coverTitle, ...titles], lines, "dish");
       if (nextSubtitle) {
         coverSubtitle = keepDecoration(coverSubtitle, nextSubtitle);
         subtitleLocked = true;
@@ -182,28 +190,14 @@ export function separateOverlappingHeadlines(input: {
     }
   }
 
-  if (headlinesSharePoint(coverTitle, titles[0])) {
-    const nextTitle = titleLocked ? "" : pickAlternate(titles[0], [coverTitle, coverSubtitle, ...frozen()], lines, "angle");
-    if (nextTitle) {
-      titles[0] = keepDecoration(titles[0], nextTitle);
-      titleLocked = true;
-    } else if (!coverLocked) {
-      const nextCover = pickAlternate(coverTitle, [titles[0], coverSubtitle, ...frozen()], lines, "theme");
-      if (nextCover) {
-        coverTitle = keepDecoration(coverTitle, nextCover);
-        coverLocked = true;
-      }
-    }
+  if (!coverLocked && headlinesSharePoint(coverTitle, titles[0])) {
+    const nextCover = pickAlternate(coverTitle, [coverSubtitle, ...titles], lines, "theme");
+    if (nextCover) coverTitle = keepDecoration(coverTitle, nextCover);
   }
 
-  if (headlinesSharePoint(coverSubtitle, titles[0])) {
-    const nextTitle = titleLocked ? "" : pickAlternate(titles[0], [coverTitle, coverSubtitle, ...frozen()], lines, "angle");
-    if (nextTitle) {
-      titles[0] = keepDecoration(titles[0], nextTitle);
-    } else if (!subtitleLocked) {
-      const nextSubtitle = pickAlternate(coverSubtitle, [coverTitle, titles[0], ...frozen()], lines, "dish");
-      if (nextSubtitle) coverSubtitle = keepDecoration(coverSubtitle, nextSubtitle);
-    }
+  if (!subtitleLocked && headlinesSharePoint(coverSubtitle, titles[0])) {
+    const nextSubtitle = pickAlternate(coverSubtitle, [coverTitle, ...titles], lines, "dish");
+    if (nextSubtitle) coverSubtitle = keepDecoration(coverSubtitle, nextSubtitle);
   }
 
   return { titles, coverTitle, coverSubtitle };
