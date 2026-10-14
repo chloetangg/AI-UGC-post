@@ -1,10 +1,10 @@
 # AI 小红书 / Rednote UGC 生成器
 
-**版本：** Consumer Demo v0.23  
-**日期：** 2026-10-09  
-**状态：** 同一套生成代码、两个互相隔离的分店部署（centralwOrld 与 Siam Center）。消费者端前端 + 星级入口 + OpenAI 或 ModelArk 真实生成（标题 / 正文 / 话题标签 / 封面 mainTitle + subTitle / 封面选图）+ 内部 Content Strategy Layer + Human Style（正文和标题同一套写法）+ Cover Composer + 各分店自己的 MongoDB + GitHub / Vercel 部署
+**版本：** Consumer Demo v0.25  
+**日期：** 2026-10-12  
+**状态：** 同一套生成代码、两个互相隔离的分店部署（centralwOrld 与 Siam Center）。消费者端前端 + 两步星级入口 + ModelArk（默认）或 OpenAI 真实生成（标题 / 正文 / 话题标签 / 封面 mainTitle + subTitle / 封面选图）+ 内部 Content Strategy Layer + Human Style（正文和标题同一套写法）+ Cover Composer + 各分店自己的 MongoDB + GitHub / Vercel 部署
 
-本文记录当前代码里的行为。标题和正文的表情写法另见 `title-rules.md`、`emoji-rules.md`。不是完整产品 spec。v0.23 的写法还在这份代码里，两个生产地址要各自重新部署后才会带上。
+本文记录当前代码里的行为。标题和正文的表情写法另见 `title-rules.md`、`emoji-rules.md`。不是完整产品 spec。线上两个地址跑的不一定是这份代码。
 
 ---
 
@@ -21,13 +21,13 @@
 | centralwOrld | [https://seedai-baanying.vercel.app](https://seedai-baanying.vercel.app) | `/c/baan-ying-centralworld/rating` |
 | Siam Center | [https://baan-ying-siam-center.vercel.app](https://baan-ying-siam-center.vercel.app) | `/c/baan-ying-siam-center/rating` |
 
-[https://aiugcpost.vercel.app](https://aiugcpost.vercel.app) 会跳到 centralwOrld 那个地址。部署：Vercel（Hobby），两个项目各一份环境变量。
+[https://aiugcpost.vercel.app](https://aiugcpost.vercel.app) 会跳到 centralwOrld 那个地址。部署：Vercel（Hobby，团队 `chloe-20b3`），两个项目各一份环境变量：centralwOrld 是 `ai_ugc_post`，Siam Center 是 `baan-ying-siam-center`。Git 分支：centralwOrld 从 `main` 发布；Siam Center 的代码在 `siam-center` 分支。
 
 消费者进入后：
 
-1. 星级：标题为「这次用餐体验怎么样？」。1–2 星停在感谢页和抽奖按钮，不进入后面的填写，也不调用 OpenAI。3–5 星点 Continue 后才继续
-2. YOU：标题为「感谢您参与分享！」；年龄、性别、来自哪个国家；游客/本地；是否第一次来 Baan Ying
-3. RATE：本餐开销、喜欢的点、推荐菜、推荐理由、用餐补充说明、上传 1–5 张照片
+1. 星级第一步：标题「为这次用餐体验评分」，下方「Baan Ying · 分店名」。选 1–5 星后点「继续评价」
+2. 1–2 星：进入反馈页「欢迎告知我们有待优化的地方」，意见必填，提交后到感谢页「感谢你的反馈！/ 感谢你的评价，请向店员出示此页面」，只有一个「重新评分」按钮。不进入后面的填写，也不生成帖子
+3. 3–5 星：点「继续评价」时记下评分，直接进入体验页「这次 Baan Ying 用餐体验怎么样？」：是否第一次、游客/本地、喜欢的点、推荐菜、推荐理由、用餐补充说明、本餐开销、来自哪里、上传 1–5 张照片
 4. Generating：一次文本请求写出标题 + 正文 + 5 个标签 + 封面 mainTitle / subTitle + 封面照片选择；地点按本轮模式写入或由系统追加，再调用 Cover Composer 自动生成封面
 5. POST：看封面、换封面风格（Style 1–6）、选正文标题、改正文、改标签
 6. SHARE：点「去发布」后选择小红书（系统分享发图）或大众点评（复制文案后手动发布）
@@ -50,14 +50,14 @@ npm install
 npm run dev
 ```
 
-打开：**http://localhost:3000**（若被占用则看终端实际端口，常见 3001）。没设部署变量时，`/` 会跳到 `/c/baan-ying-centralworld/rating`。旧路径 `/c/baan-ying` 在 centralwOrld 部署上仍然打开 centralwOrld。
+打开：**http://localhost:3000**（若被占用则看终端实际端口，常见 3001）。没设部署变量时，`/` 会跳到 `/c/baan-ying-centralworld/rating?new=1`。旧路径 `/c/baan-ying` 在 centralwOrld 部署上仍然打开 centralwOrld。
 
 复制 `.env.example` 为 `.env.local`（不提交 Git）：
 
 ```text
 OPENAI_API_KEY=
 OPENAI_MODEL=gpt-4o
-AI_PROVIDER=openai
+AI_PROVIDER=modelark
 MODELARK_API_KEY=
 MODELARK_MODEL=dola-seed-2-1-turbo-260628
 MONGODB_URI=
@@ -66,7 +66,7 @@ DEPLOYMENT_ID=baan-ying-centralworld
 NEXT_PUBLIC_DEPLOYMENT_ID=baan-ying-centralworld
 ```
 
-生成帖子默认走 OpenAI，必须有 `OPENAI_API_KEY`。把 `AI_PROVIDER` 设成 `modelark` 后，同一次 `/api/generate` 改走 ModelArk Responses API，prompt 和后处理不变；ModelArk 失败不会自动改回 OpenAI。`MODELARK_API_KEY` 只放在服务器环境或 `.env.local`。`npm run test:modelark` 只测连通性，不生成整篇帖子。`npm run test:modelark-response` 用固定样例检查响应解析。`npm run test:modelark-titles` 用模拟响应检查标题数量和重试次数，不打真实接口。MongoDB 用于保存每次成功生成的 `generations`（含 YOU / RATE 快照 + 文案）；缺了不会挡住翻页或出帖，但数据不会入库。
+生成帖子默认走 ModelArk Responses API：`AI_PROVIDER` 不设或设成 `modelark` 都一样，必须有 `MODELARK_API_KEY`。缺了这个 key，`/api/generate` 直接返回 500「ModelArk is not configured: MODELARK_API_KEY is missing on the server.」，不会偷偷改走 OpenAI。只有明确写 `AI_PROVIDER=openai` 才走 OpenAI，这时才需要 `OPENAI_API_KEY`；OpenAI 拒绝请求（如 429 额度不足）时，错误写成「OpenAI error (AI_PROVIDER=openai): …」，消息里像密钥的内容会被隐去。两种 provider 的 prompt 和后处理相同；ModelArk 失败不会自动改回 OpenAI。API key 只放在服务器环境或 `.env.local`，不进浏览器，也不打进日志。`npx tsx scripts/validate-ai-provider.ts` 检查 provider 选择和这两种错误提示，不打真实接口。`npm run test:modelark` 只测连通性，不生成整篇帖子。`npm run test:modelark-response` 用固定样例检查响应解析。`npm run test:modelark-titles` 用模拟响应检查标题数量和重试次数，不打真实接口。MongoDB 用于保存每次成功生成的 `generations`（含 YOU / RATE 快照 + 文案）；缺了不会挡住翻页或出帖，但数据不会入库。
 
 本地默认就是 centralwOrld，数据库名是 `baan-ying-centralworld`。要在本机看 Siam Center，两个部署变量都设成 `baan-ying-siam-center`，并且 `MONGODB_DB_NAME` 必须是 `baan-ying-siam-center`，不能用 `baan-ying-centralworld`。
 
@@ -78,11 +78,11 @@ Vercel 上是两个项目，环境变量都要配 Production / Preview / Develop
 | `NEXT_PUBLIC_DEPLOYMENT_ID` | 与上面相同 | 与上面相同 |
 | `MONGODB_DB_NAME` | `baan-ying-centralworld` | `baan-ying-siam-center` |
 | `MONGODB_URI` | 各自的连接串 | 各自的连接串 |
-| `OPENAI_API_KEY` / `OPENAI_MODEL` | 各自配置 | 各自配置 |
-| `AI_PROVIDER` | 不设或 `openai`。要改用 ModelArk 时才写 `modelark` | 同左 |
-| `MODELARK_API_KEY` / `MODELARK_MODEL` | 只用 ModelArk 时配置。模型默认 `dola-seed-2-1-turbo-260628` | 同左 |
+| `AI_PROVIDER` | 不设或 `modelark`。要改用 OpenAI 时才写 `openai` | 同左 |
+| `MODELARK_API_KEY` / `MODELARK_MODEL` | 默认必配。模型默认 `dola-seed-2-1-turbo-260628` | 同左 |
+| `OPENAI_API_KEY` / `OPENAI_MODEL` | 只在 `AI_PROVIDER=openai` 时需要 | 同左 |
 
-`NEXT_PUBLIC_DEPLOYMENT_ID` 给浏览器里的分店锁定用，只写服务端的 `DEPLOYMENT_ID` 不够。一个进程只加载一个部署。生成默认走 OpenAI；设了 `AI_PROVIDER=modelark` 才走 ModelArk。成功后把文案写入**当前部署**的 Mongo `generations`，失败不挡住出帖。封面中文字体依赖 `public/fonts` 被打进 serverless bundle。
+`NEXT_PUBLIC_DEPLOYMENT_ID` 给浏览器里的分店锁定用，只写服务端的 `DEPLOYMENT_ID` 不够。一个进程只加载一个部署。生成默认走 ModelArk；设了 `AI_PROVIDER=openai` 才走 OpenAI。成功后把文案写入**当前部署**的 Mongo `generations`，失败不挡住出帖。封面中文字体依赖 `public/fonts` 被打进 serverless bundle。
 
 如果浏览器报 `ERR_CONNECTION_REFUSED`，说明 `npm run dev` 没在跑。
 
@@ -99,7 +99,7 @@ Vercel 上是两个项目，环境变量都要配 Production / Preview / Develop
 | 流程状态 | React 内存（同一次填写可前后翻页）；Continue 不等待 MongoDB |
 | 客户资料 | YOU / RATE 只存在浏览器内存；生成成功后一并写入 `generations`。刷新后表单仍清空 |
 | UI 语言 | EN / 中文 / ไทย；`localStorage` key：`xhs-ugc-ui-language` |
-| AI | 默认 OpenAI Chat Completions。`AI_PROVIDER=modelark` 时改走 ModelArk Responses API。同一次请求写出标题 + 正文 + 标签 + 封面 mainTitle / subTitle + 封面选图 |
+| AI | 默认 ModelArk Responses API。`AI_PROVIDER=openai` 时改走 OpenAI Chat Completions。同一次请求写出标题 + 正文 + 标签 + 封面 mainTitle / subTitle + 封面选图 |
 | 照片 | 浏览器 `File API`；发给 `/api/generate` 前会在客户端压缩，避免 Vercel 4.5MB 限制 |
 | 封面 | Cover Composer：`POST /api/compose-cover`；字体从 `public/fonts` 读取（Vercel 需 file tracing） |
 | 数据库 | MongoDB Atlas。centralwOrld 用数据库 `baan-ying-centralworld`；Siam Center 用数据库 `baan-ying-siam-center`。各自有 `generations` 和 `analytics_events` |
@@ -113,27 +113,40 @@ Vercel 上是两个项目，环境变量都要配 Production / Preview / Develop
 ```text
 打开网站
         ↓
-星级（1–5）
+星级第一步（为这次用餐体验评分 / Baan Ying · 分店 / 1–5 星 / 继续评价）
         ↓
-1–2 星 → 感谢 + 抽奖按钮（不调用 OpenAI）
-3–5 星 → Continue
+1–2 星 → 反馈页（意见必填 / 提交评价 / 返回）→ 感谢页（请向店员出示此页面 / 重新评分），不生成
+3–5 星 → 点「继续评价」时记评分
         ↓
-YOU（感谢您参与分享！/ 年龄 / 性别 / 国家 / 游客或本地 / 是否第一次）
+体验页（这次 Baan Ying 用餐体验怎么样？/ 是否第一次 / 游客或本地 / 喜欢的点 / 菜 / 理由 / 补充说明 / 本餐开销 / 来自哪里 / 上传 1–5 张）
         ↓
-RATE（本餐开销 / 喜欢的点 / 菜 / 理由 / 补充说明 / 上传 1–5 张）
-        ↓
-Generating（1 次 OpenAI → 地点按本轮模式处理 → 1 次 Cover Composer）
+Generating（1 次模型请求 → 地点按本轮模式处理 → 1 次 Cover Composer）
         ↓
 POST（看封面 / 换 Style 1–6 / 选正文标题 / 改正文 / 改标签）
         ↓
 SHARE（点「去发布」打开系统分享；可复制文案、保存图片）
 ```
 
-星级页不进进度条。进入填写之后，进度条中英文都是：**YOU → RATE → SHARE**。
+星级页不进进度条。进入填写之后，进度条是：**REVIEW → POST → SHARE**。
 
-1–2 星不会进入 YOU / RATE，也不会打 `/api/generate`。3–5 星点 Continue 后才放开后面的步骤。没填完 YOU、RATE（含餐费、补充说明至少 10 个计数单位、至少 1 张照片），不能进生成。
+1–2 星不会进入体验页，也不会打 `/api/generate`。3–5 星点「继续评价」后才放开后面的步骤。没填完体验页（含餐费、补充说明至少 10 个计数单位、至少 1 张照片），不能进生成。
 
-刷新星级感谢页会回到星星。刷新填写页会清空表单，并回到星级。同一次访问里按返回，已填内容还在。抽奖按钮在；`LUCKY_DRAW_URL` 为空时点击不跳转。
+### 4.1 星级两步的细节
+
+| 情况 | 行为 |
+| --- | --- |
+| 第一步刷新 | 星星清空，「继续评价」变回不可点 |
+| 第二步（反馈页）点「返回」 | 回到第一步，刚选的星级保留；先刷新第二步再点「返回」也保留 |
+| 第二步刷新 | 星级（地址里的 `?stars=N`）和门店名保留 |
+| 1–2 星反馈 | 必填：去掉首尾空格后为空时「提交评价」不可点。只发给 1–2 星；3–5 星不显示反馈框 |
+| 直接打开 `rating/review?stars=3/4/5` | 送回第一步 |
+| 感谢页刷新 | 本轮已提交低分时仍是感谢页；没有提交记录就回第一步 |
+| 感谢页「重新评分」 | 开始新一轮：清掉上一轮的星级、评价 ID 和已提交标记，显示未选星的第一步 |
+| 扫码进入（`/qr/...`、`/`、`/c/[campaignId]`、别家 Campaign 路径） | 带 `?new=1` 开始新一轮，同样只清这三项，然后把 `new` 从地址里去掉 |
+
+第一步选的星级只存在页面内存里：站内返回还在，浏览器刷新就没了。本轮的评价 ID 和已提交标记存在 `sessionStorage`（`ugc-entry-review:{campaignId}`、`ugc-entry-review-submitted:{campaignId}`），星级另存 `ugc-entry-rating:{campaignId}`。新一轮只删这三个键，不清空整个 `sessionStorage`。
+
+刷新体验页会清空表单，并回到星级。同一次访问里按返回，已填内容还在。感谢页不再有抽奖按钮。
 
 ---
 
@@ -141,11 +154,13 @@ SHARE（点「去发布」打开系统分享；可复制文案、保存图片）
 
 | 路由 | 页面 |
 | --- | --- |
-| `/` | 跳到当前部署的星级页。默认是 `/c/baan-ying-centralworld/rating` |
-| `/c/[campaignId]` | 跳转到 `rating` |
-| `/c/[campaignId]/rating` | 星级入口。1–2 星感谢 + 抽奖；3–5 星 Continue 后进入 YOU |
-| `/c/[campaignId]/customer` | YOU：感谢您参与分享！年龄、性别、国家、游客/本地、是否第一次 |
-| `/c/[campaignId]/experience` | RATE：餐费、喜欢的点、菜、理由、补充说明、上传 1–5 张照片 |
+| `/` | 跳到当前部署的星级页并开始新一轮。默认是 `/c/baan-ying-centralworld/rating?new=1` |
+| `/c/[campaignId]` | 跳转到 `rating?new=1` |
+| `/qr/[qrCodeId]` | 记下来源码 cookie，跳转到 `rating?new=1` |
+| `/c/[campaignId]/rating` | 星级第一步。3–5 星点「继续评价」后直接进入 experience；`?draw=1` 是 1–2 星的感谢页 |
+| `/c/[campaignId]/rating/review?stars=1\|2` | 1–2 星反馈页。3–5 星或无效星级送回第一步 |
+| `/c/[campaignId]/customer` | 只做跳转：评分已通过就转到 experience |
+| `/c/[campaignId]/experience` | 体验页：是否第一次、游客/本地、喜欢的点、菜、理由、补充说明、餐费、来自哪里、上传 1–5 张照片 |
 | `/c/[campaignId]/preferences` | 重定向到 experience |
 | `/c/[campaignId]/upload` | 重定向到 experience（照片已并入 RATE） |
 | `/c/[campaignId]/generating` | 生成中 |
@@ -156,7 +171,7 @@ SHARE（点「去发布」打开系统分享；可复制文案、保存图片）
 当前部署的 Campaign ID：centralwOrld 是 `baan-ying-centralworld`（旧 id `baan-ying` 仍打开这一家）；Siam Center 是 `baan-ying-siam-center`。别的 Campaign 路径会被送回当前部署，不会在这个网站里打开另一家店。
 
 消费者主生成接口：`POST /api/generate`  
-封面合成接口：`POST /api/compose-cover`（非 OpenAI）  
+封面合成接口：`POST /api/compose-cover`（不调用文本模型，在服务端用 satori / resvg / sharp 合成图片）  
 生成结果接口：成功的 `/api/generate` 写入 `generations`（YOU / RATE、标题、正文、hashtag、封面标题、封面副标题、token 费用）
 另有 `POST /api/generate-content`（JSON 入参的备用生成接口）。
 
@@ -186,6 +201,8 @@ SHARE（点「去发布」打开系统分享；可复制文案、保存图片）
 ---
 
 ## 7. YOU（客户资料）
+
+> **当前页面：** `/customer` 不再显示表单，只跳到体验页。游客/本地、是否第一次、来自哪里都在体验页。年龄和性别目前没有页面收集（`CustomerForm` 组件还在代码里）。本节下面是旧 YOU 表单的规则，留作参考。
 
 **不再收集** Name / Nickname、Email、Phone Number。表单上已删除这三项；继续不依赖它们。
 
@@ -335,17 +352,27 @@ CONTENT_LANGUAGE = "zh-CN"
 
 同一品牌，不同消费者应像不同的人在写。不要固定成一种「Baan Ying 小红书官腔」。
 
-### 12.1 一次 OpenAI 请求
+**两家店用同一套规则。** Prompt、Human Style、标题、封面、正文整理、Emoji、地点、话题标签、JSON 解析都相同，只有商场名换成本店的。规则里要用到商场名的地方，都从 `lib/branches/mall-text.ts` 取：centralwOrld 是 `centralwOrld` / 尚泰世界购物中心，Siam Center 是 `Siam Center` / 暹罗中心。所以「商场只提一次」「逛街场景合并」「结尾句识别」这些整理，两家店的行为一样。
+
+一个已知的小问题，两家店相同：判断「顾客是否写到商场」时区分大小写。顾客写 `centralwOrld`（大写 O）或 `Siam Center` 时不算写到；写 `centralworld`、`siam center`、尚泰世界、暹罗中心时算。要改就两家一起改。
+
+`npx tsx scripts/validate-branch-parity.ts` 用同一份问卷和同一份模拟模型回复，分别以两家店的部署跑真实的 `/api/generate`。要求两边发给 ModelArk 的 prompt 除了本店资料外完全相同，返回的标题、正文、封面、话题标签、Location 结构相同；不能出现另一家的商场、楼层或营业时间，不能留下编造的菜，不能调用 OpenAI。它只模拟 ModelArk，不连数据库。
+
+### 12.1 一次文本模型请求（ModelArk / OpenAI）
+
+`resolveAiProvider()`（`lib/ai-provider.ts`）选 provider：没设 `AI_PROVIDER` 或设为 `modelark` 时走 ModelArk，设为 `openai` 时走 OpenAI。两条路径的 prompt 精简程度（见 12.2）、模型调用和重试不同（ModelArk 的重试见下文）；模型返回之后走同一套本地整理。
 
 ```text
 用户点 Generate
         ↓
 POST /api/generate
         ↓
-正好 1 次 openai.chat.completions.create
-（structured JSON：titles[3] + caption + hashtags[5] + mainTitle + subTitle + selectedPhotoIndex + photoSelectionReason）
+ModelArk：createModelArkResponse 1 次
+（structured JSON：titles[3] + captionParagraphs + hashtags[5] + mainTitle + subTitle + 选图字段）
+OpenAI：openai.chat.completions.create 1 次
+（structured JSON：titles[3] + caption + hashtags[5] + mainTitle + subTitle + 选图字段 + 内部策略 id）
         ↓
-本地整理：顾客证据、标题不照搬原句、同一事实只留一次、段落按场景/菜/环境重组、按本轮 Human Style 整理 emoji（不给标题补表情）、本轮品牌名写法、封面叠字、从正文剥 hashtag
+本地整理：顾客证据、标题不照搬原句、同一事实只留一次、尽量保留模型分好的段落（被句子级整理压平时按原段首句还原换行，没有段落或某段超过 3 句时才按来由 / 菜 / 收尾重组，见 12.5）、按本轮 Human Style 整理 emoji（标题全没有时补 1 个；正文只动表情）、本轮品牌名写法、封面叠字、从正文剥 hashtag
         ↓
 地点：standalone 追加锁定模板；inline 把商场名和店名嵌进已有的那一句，不另起「来这家店吃了一顿饭」
         ↓
@@ -366,7 +393,7 @@ ModelArk 的正文用 `captionParagraphs` 返回，每段一条字符串、段�
 
 文本生成的成本目标大约 **USD $0.05 / 篇**，最好更低。prompt 里不重复同一条禁令，不发送 README，参考帖只发送写法特征。2026-10-06 用 gpt-4o、无照片测过短 / 中 / 长三条：都是 `Calls: 1`，费用大约 $0.026–$0.041，平均约 $0.032。第一次没有缓存会高一些；同一段系统 prompt 被缓存后输入更便宜。单价在 `lib/openai-pricing.ts`。
 
-封面合成失败时点 Retry Cover：**不再调用 OpenAI**，只再打 `/api/compose-cover`。
+封面合成失败时点 Retry Cover：**不再调用文本模型**（ModelArk 和 OpenAI 都不调用），只再打 `/api/compose-cover`。
 
 开发环境下 Generating 页的 `useEffect` 可能被 React Strict Mode 跑两遍。`generatePost()` 有进行中去重：第二次会复用同一条请求，不会打两次 `/api/generate`。点「重新生成」时锁已释放，可以再生成一次。
 
@@ -400,6 +427,8 @@ Input Tokens: ...
 
 合并时去掉重复的品牌说明、标题规则和 Location & Time 模板原文（模板由系统追加，不让模型写）。
 
+ModelArk 路径发精简版 prompt（`lean`）：同一份 prompt 里别处已经写过的规则不再重复，例如本轮地点计划已经说明的地点写法；封面菜名短称表只发这一单选到、或用餐说明里写到的菜，不发整张表。精简只去掉重复，不删除约束本身。OpenAI 路径仍发完整版。负面反馈中性化规则每次都发，不按顾客这次有没有写负面内容开关。
+
 冲突时按这个顺序：安全事实 → 顾客自己的经历和来意 → 内容策略（这篇还讲什么）→ 这一轮 Human Style（这个人怎么说）→ 用得上的品牌和分店信息 → 和上一篇不一样。品牌、商场、泰餐、楼层、KSP 和菜品名单不是因为系统知道，就自动变成题目。
 
 用户提示里，用餐备注在品牌介绍前面。
@@ -411,9 +440,9 @@ Input Tokens: ...
 | 3. 内容策略 | KSP / Storyline / Content Angle / Search Keyword。只决定还写哪些真实点，不能换成商场或菜系介绍 |
 | 4. 写法风格 | 这一轮 Human Style。管语气、节奏、表情，不改事实。标题和正文是同一个人 |
 | 5. 品牌和分店 | 故事需要时才用。地点模式由系统指定 |
-| 6. 输出和检查 | JSON：3 个正文标题 + 1 篇正文 + 5 个 hashtags + mainTitle + subTitle + 选图 + 内部策略 id。同一次请求里做 Anti-AI 检查 |
+| 6. 输出和检查 | JSON：3 个正文标题 + 1 篇正文 + 5 个 hashtags + mainTitle + subTitle + 选图；OpenAI 另返回 4 个内部策略 ID，ModelArk 不返回，用本地 suggested 组合。同一次请求里做 Anti-AI 检查 |
 
-JSON 形状：
+JSON 形状（**OpenAI 返回格式示例**，只列主要字段；ModelArk 的格式不同，见下方说明）：
 
 ```json
 {
@@ -433,9 +462,11 @@ JSON 形状：
 
 `selectedKspId` / `selectedStorylineId` / `selectedContentAngleId` / `selectedSearchKeyword` 只存在生成状态里，**不展示给消费者**。
 
+这四个内部策略 ID 只有 OpenAI 会返回。ModelArk 的 schema 不接收这四个字段，正文也改用 `captionParagraphs` 按段返回（见 12.1）；它的策略 ID 用本地的 suggested 组合（见 12.3）。
+
 ### 12.3 内容策略层（内部）
 
-一次 OpenAI 请求里先做策略选择，再写文案。消费者不选手动 KSP / Storyline / Angle / Keyword。
+策略选择不单独请求模型，和写文案在同一次文本请求里。消费者不选手动 KSP / Storyline / Angle / Keyword。两种 provider 的差别在策略 ID 由谁给出：OpenAI 在 JSON 里返回 `selectedKspId` / `selectedStorylineId` / `selectedContentAngleId` / `selectedSearchKeyword` 四个内部策略 ID；ModelArk 的 schema 不收这四个字段，策略 ID 由本地选择（见下文 suggested 组合）。
 
 ```text
 顾客自己写的体验（最高）
@@ -450,11 +481,13 @@ JSON 形状：
 
 顾客写了具体食物或饮品，即使不在官方菜单里也保留原名。粉红奶不能改成「饮品」。不能补顾客没写的味道、口感、食材或服务特点。顾客没写老板、服务或某道菜时，不要编出来。
 
+**本地整理也按这个顺序取材。** 生成之后本地改标题、封面和正文时，依据的先后是：顾客自己写的用餐说明 → 顾客选的菜和推荐理由 → 问卷里勾选的一般性标签（`lib/evidence-priority.ts`，`evidenceFactsForCopy`）。标签和用餐说明冲突时不用这个标签，例如说明写「服务有点慢」，就不用「店员服务热情周到」。只选了一道菜、没写它怎么样，不算对这道菜的评价。
+
 可复用结构：`lib/content-strategy/`。Baan Ying 的 10 个 KSP、10 条 Storyline、12 个 Content Angle、主/次搜索词和兼容矩阵在 `lib/brand/baan-ying-strategy.ts`。
 
 Storyline **只定义叙事意图**，禁止写成「ST-01 必须用某某开头」。
 
-本地会按顾客证据给一个 suggested 组合；模型可在证据支持时另选。重新生成会避开上一轮的 KSP / Storyline / Angle（还有别的合法选项时），并换标题关键词、开头、结构和随机话题标签。顾客事实不变，不为了变化而编造经历。
+本地会按顾客证据给一个 suggested 组合（浏览器端 `pickSuggestedStrategy`，`lib/content-strategy/select.ts`），两种 provider 的 prompt 都带上它，并允许模型在建议和顾客证据冲突时换一个组合来写。记录和返回的策略 ID：OpenAI 用模型返回的值，某项为空时才用 suggested；ModelArk 始终是本地 suggested 组合，模型实际按哪个组合写，接口里看不出来。重新生成会避开上一轮的 KSP / Storyline / Angle（还有别的合法选项时），并换标题关键词、开头、结构和随机话题标签。顾客事实不变，不为了变化而编造经历。
 
 KSP-03 Family Recipes & Heritage 是低频策略，不默认写 1999 / Auntie Ying / Siam Square。
 
@@ -470,13 +503,15 @@ KSP-03 Family Recipes & Heritage 是低频策略，不默认写 1999 / Auntie Yi
 
 例如顾客写「这次我最喜欢芒果糯米饭，甜度刚刚好，吃完还想再点。」标题可以是「芒果糯米饭甜度刚刚好」，不能是原句，也不能是「最喜欢芒果糯米饭，甜度刚刚好」。封面 mainTitle / subTitle 同样先提炼。本地 `lib/title-insight.ts` 会在同一次生成之后改掉仍在照搬的标题，不再打一次模型。
 
+本地只在这几种情况下换标题，其余合格的标题一个字不动：照搬顾客原句（包括和顾客某个 6 字以上的短句一字不差）；和已保留的标题同一个点，或只差表情、标点；只剩「终于 / 不得不说 / POV / Must-have」这类开头（开头本身会先被去掉，剩下的句子合格就保留）；冷模板（「曼谷泰餐X很满足」「曼谷泰餐的X值得点」「X是这顿记得住的」）。替换句只从顾客原文里的菜、特点、人和场景换个说法（如「咖喱蟹肉是真的下饭」「老婆说好吃的那家」「店员一直很热情」），不能和别的标题同一个点；找不到时保留原标题，冷模板最后才用「A和B都点了」这种只陈述点了什么的句子。三个标题都是「菜名 + 好吃 / 好喝」时，第 3 个换成不写菜的角度。
+
 有顾客自己写的具体体验时：标题 1 从这件事提炼，不要改成商场或泰餐。标题 2 和标题 3 用这顿饭里还没写过的点。顾客自己的点不够时，才用一道菜或别的餐厅事实。不要为了凑标题而写商场。封面主标题跟这个人的理由走，副标题必须是另一件事实，不能把主标题换个说法。不要三句和封面都写同一道菜，也不要都写「第一次」。
 
 每个标题只讲一个点。不要用逗号、`｜` 或冒号把两个卖点拼在一起。不要三个都是「菜名 + 好吃 / 滑嫩 / 刚刚好 / 必吃」。可以换成发现、当时的情境、还想再吃，或别人的推荐，但必须是顾客原文里有的。不要三个都以店名、「终于」「不得不说」或问句开头。不要默认写成广告句（POV、Must-have、终于找到、你需要这个）。这些话只有顾客原文真的是这个意思时才可以用。
 
-曼谷搜索词是辅助，不是题目本身。可以自然放进已经完整的那一句。不要每句都塞同一个词，也不要用「必吃」当正文标题卖点。提示词不要求标题和封面必须出现商场名。顾客没写逛街时，不要写成「商场里吃泰餐」或「逛街顺便吃泰餐」。如果标题、封面主标题和副标题都没有本店商场名，本地 `ensureGroundedHeadlineCopy` 仍会把这家店的商场名补进其中一条标题，不会改成另一家店。
+曼谷搜索词是辅助，不是题目本身。可以自然放进已经完整的那一句。不要每句都塞同一个词，也不要用「必吃」当正文标题卖点。提示词不要求标题和封面必须出现商场名。顾客没写逛街时，不要写成「商场里吃泰餐」或「逛街顺便吃泰餐」。本地 `ensureGroundedHeadlineCopy` 只在标题、封面都没有商场名、顾客自己写了商场、而且某条标题本来就在说「逛 / 商场」时，把本店商场名嵌进那条标题；不会为了加商场名改写合格的标题，也不会写成另一家店。本地也不再为了凑曼谷搜索词改写标题：合格的标题里没有搜索词，就原样保留。
 
-**格式必须有变化。** 至少一句是纯文字。每一批 3 个标题里至少 1 个带表情，通常是 1–2 个标题各带 1 个。放在句首或句尾，不粘在菜名后面，也不跟正文用同一种摆法，三个标题也不能共用同一种表情位置。表情的选择和语气跟这一轮 Human Style 走。不为了凑数在每个标题里堆表情。顾客写了「不要表情 / 不要 emoji / 无表情」时，这个要求优先，不为了凑满 1 个而加。本地会把菜名上的表情挪到句首或句尾；三个都没有、而且顾客没有禁止时，补 1 个和这句内容相配的。配错的食物表情会换成对的，不会为了凑数留着。🇹🇭 大约每 5 个标题出现一次，只能放在句首，一批三个标题里最多一个。禁止「🇹🇭 + 关键词 + 冒号或 ｜」。
+**格式必须有变化。** 至少一句是纯文字。每一批 3 个标题里至少 1 个带表情，通常是 1–2 个标题各带 1 个。放在句首或句尾，不粘在菜名后面，也不跟正文用同一种摆法，三个标题也不能共用同一种表情位置。表情的选择和语气跟这一轮 Human Style 走。不为了凑数在每个标题里堆表情。顾客写了「不要表情 / 不要 emoji / 无表情」时，这个要求优先，不为了凑满 1 个而加。本地会把菜名上的表情挪到句首或句尾；三个都没有、而且顾客没有禁止时，补 1 个和这句内容相配的（食物对食物，否则按感受：舒服 😌、好吃 😋、想再点 🤤、喜欢 🥰、没想到 👀、逛 🛍️、拍照 ✨、家人朋友 ☺️）。三个都带时去掉一个，保证至少一个纯文字。同一个表情不在两条标题里重复。配错的食物表情会换成对的，对不上就去掉。最后一次表情整理在所有标题改写之后，之后的封面去重只改封面，不再动标题。🇹🇭 大约每 5 个标题出现一次，只能放在句首，一批三个标题里最多一个。禁止「🇹🇭 + 关键词 + 冒号或 ｜」。
 
 重新生成时，同一风格里 3 个标题各自偏向的开头会轮换。不合格时**不再第二次调用 OpenAI**，只做本地整理。同一次请求里会检查标题是否像广告、是否没有具体信息、是否和 Human Style 不一致。不要为了躲这些检查，把三个标题都改成同样短、同样冷的一句。
 
@@ -498,11 +533,19 @@ KSP-03 Family Recipes & Heritage 是低频策略，不默认写 1999 / Auntie Yi
 
 **篇幅：** 至少 3 句，不要每次都刚好 3 句。普通输入大约 3–6 句；信息多时最多大约 8 句。只写最有用的 2–4 个点，不要为了写全问卷而加长，也不要编造句子来凑数。本地长度带的上限是 240 个汉字左右。
 
+正文偏短时，本地会从顾客证据里补一两句。正文里已经出现某件事的关键词时，不再追加同一件事。顾客原话里带商场名或店名的那一句，模型常换说法，所以另有一道检查：例如顾客写「就在{商场}上班」，正文已经写了「上班就在附近」，就不再在文末追加「就在{商场}上班」。这道检查是保守的，去掉商场名和店名后剩下的词要在正文同一个逗号分句里全部出现才算已经写过，剩下不到 3 个字的不算。
+
 **来由要留着。** 顾客写了为什么来，就从那里起笔，而且这是整篇的骨架，不是中间带过的一句。朋友推荐和「终于约上 / 总算约上」写在同一处，放在菜的前面，不先写菜再回头说来由，也不把这两句拆开各说一遍。笔记里没有来由时，不编「朋友推荐过来的」或「逛完商场刚好来吃」。例如「跟着同事的推荐过来的太好吃啦」，保留「同事推荐 → 来试试 → 发现好吃」。「老婆上次来就说很好吃，这次带着一家人来了」是老婆来过、觉得好吃、这次带家人回来，不是「在商场吃正宗泰餐」或「逛完商场来吃」。不要把原句解释成「这次是因为……所以……」。同事推荐不是「和同事一起来」，除非原文就是这么写的。顾客没写逛街、商场或店名时，不要为了完整而在开头介绍餐厅，也不要把「来了这家店」粘到一道菜后面。顾客没写逛街时，本地会去掉凭空出现的「逛完」。模型把来由丢掉时，本地用顾客原文补回，不另写一句套话。
 
 **不要把问卷拼成一篇。** 只留这一轮最有用的 2–4 个点。多道菜是一次用餐，不是菜单。一道菜的味道说完，再写下一道。不要粘成「芒果糯米饭……加上青柠蒸鲈鱼……滑蛋饭……」。也不要每道菜各写一句相同的「X 是我这次还会想再点的一道 / X 很好吃 / X 吃起来」。本地发现相邻句子是同一句式时，会收成一句，不删掉菜名。
 
-**段落：** 先从来由写，再按顾客写到菜的顺序写菜，不按信息量把一道菜提前，最后才是服务或有依据的收尾。段数随内容变，不固定四段。一段最多 3 句，通常 2 或 3 句。模型已经分成段落、来由还在、而且每段不超过 3 句时，本地保持原来的句序，只去掉没有依据的空话和重复味道，不再整篇重排成同一种「到店、菜、收尾」。乱成一整段时，才按这个顺序整理。4 句拆成 2+2，5 句拆成 3+2，不会为了凑规则拆成一句一段。一段只有 1 句只用于真正需要强调的时候。段和段之间是空行（caption 字符串里的 `\n\n`）。地点清理不再把空行收成空格。inline 会把地点句和紧跟着的「总算约上」并进同一段，合起来仍不超过 3 句。standalone 去掉商场名和店名，但留下「朋友之前提过」这类来由。返回给前端之前这段结构还在。
+**段落：** 先从来由写，再按顾客写到菜的顺序写菜，不按信息量把一道菜提前，最后才是服务或有依据的收尾。段数随内容变，不固定四段。一段最多 3 句，通常 2 或 3 句。模型已经分成段落、而且每段不超过 3 句时，本地保持原来的段落和句序，只在段内去掉没有依据的空话和重复味道，不再整篇重排成同一种「到店、菜、收尾」。没有段落、或某段超过 3 句时，才按这个顺序重组（`arrangeDiningStory`，由 `enforceCustomerEvidence` 调用）。4 句拆成 2+2，5 句拆成 3+2，不会为了凑规则拆成一句一段。一段只有 1 句只用于真正需要强调的时候。段和段之间是空行（caption 字符串里的 `\n\n`）。地点清理不再把空行收成空格。inline 会把地点句和紧跟着的「总算约上」并进同一段，合起来仍不超过 3 句。standalone 去掉商场名和店名，但留下「朋友之前提过」这类来由。返回给前端之前这段结构还在。
+
+**段落还原：** `ensureGenerationVariation` 和 `ensureContentLock` 按句处理，可能把模型写的段落压平。两处处理完都用 `keepParagraphBreaks`（`lib/caption-story.ts`）对照处理前的正文还原换行：原来每段的首句（去掉表情和标点后至少 4 个字）在原文里只出现一次、在处理后的正文里正好找到一处、而且和其他段的先后顺序一致，才在那句前面补回空行。它只插入空行，不新增、删除、改写或移动句子；某段首句对不上时，这段不还原，保持处理后的样子。`ensureGenerationVariation` 判定要重写整篇正文时，用重写后的结构，不做还原。
+
+`/api/generate` 里的顺序（`app/api/generate/route.ts`）：合规检查 → `ensureGenerationVariation` → `ensureContentLock` → `enforceCustomerEvidence`。合规检查触发第二次模型请求时，改写后的正文直接替换原正文，不对照改写前的正文还原段落；后面两道还原以改写后的正文为准。ModelArk 的改写要求按段返回 `captionParagraphs`，服务端用空行拼接；OpenAI 的改写只返回一条 `caption`，没有分段要求。待核实：改写模型实际是否保留原来的段落，取决于模型输出，代码不能保证，也还没有用真实请求验证。
+
+备用接口 `/api/generate-content` 只走 OpenAI，不经过 `ensureGenerationVariation`、`ensureContentLock`、`enforceCustomerEvidence`，也不调用 `keepParagraphBreaks`。它的段落取决于模型输出，以及之后的合规替换、表情和地点整理。
 
 同一道菜已经说过的味道不再在下一句重复，例如虾的「新鲜」只留一次。笔记把「开胃」给了鲈鱼，就不会再安到汤上；模型把这句味道丢掉时，用笔记里的原词补回。笔记没写的空收尾会拿掉，例如「这顿味道很正宗」「吃着很满足」「印象最深」「吃起来就是很熟悉的泰式风味」。笔记里真的写了，就留着。不编排队、价格、环境或额外的服务细节。
 
@@ -548,6 +591,8 @@ KSP-03 Family Recipes & Heritage 是低频策略，不默认写 1999 / Auntie Yi
 
 封面字数不够时用更短同义：口味看个人喜好 / 整体风味比较经典 / 价格看个人预期。禁止把难吃改成超级好吃。
 
+本地整理时，用餐说明里的负面短句（如「有点咸」「服务有点慢」）不拿来当标题、封面或正文的卖点，也不因为某个勾选标签是好评，就把顾客说过的负面意思写成好评。这是本地检查覆盖的范围，不保证模型输出完全没有偏差。
+
 品牌固定标签是 `#BaanYing曼谷` 或 `#baanying曼谷`；正文和标题里不再把「必吃」当卖点。封面可以在顾客这句话里带上池子里的「必吃」，不是每篇都要有。`#曼谷必吃` 只作为话题池选项，不是固定标签。用户只看到终稿，看不到内部合规分析。
 
 写法应口语、自然、略带情绪。除非顾客自己写出了这个意思，否则不要写：正宗泰餐、味道很正宗、正宗的泰式风味、很有泰国味、很有记忆点、为用餐体验加分、增添了不少温暖、让人吃得安心、一次愉快的用餐体验、整体来说非常满意、非常值得推荐、强烈推荐大家、值得一提的是、总体来说、不得不说。把「非常正宗」改成「很正宗」或「比较正宗」仍算同一类。也不要写「作为一家…」「如果你正在寻找…」「这次来到…」「给我的感觉是…」「是一家非常…」「对于喜欢……的人来说…」。开头不要默认「这次在商场…」「逛完商场…」「来到 Baan Ying…」「这家泰餐真的…」。结尾不必是「下次还会再来 / 赶紧码住 / 大家一定要去 / 直接冲 / 值得推荐」。
@@ -556,25 +601,29 @@ KSP-03 Family Recipes & Heritage 是低频策略，不默认写 1999 / Auntie Yi
 
 ### 12.6 Emoji
 
-表情跟这一轮选中的 Human Style 走，不是先选数量档位再往文案里填。没有 none / light / natural / playful 这四档，也没有正文字数上限。这不是鼓励堆叠。
+表情跟这一轮选中的 Human Style 走，不是先选数量档位再往文案里填。没有 none / light / natural / playful 这四档，也没有硬性上限。这不是鼓励堆叠。
 
 | 人格 | 表情的自然写法 |
 | --- | --- |
 | Foodie | 跟口感、甜度、质地走，不堆成每道菜一个 |
 | Chatty | 在碎碎念、语气词和感叹里，分布不规律 |
-| Casual | 轻轻带一个，跟感受或句尾 |
+| Casual | 偏少，一般一两个，跟感受或句尾；顾客写得平淡也不默认整篇不放 |
 | Story | 在情绪节点或叙事转折，不打断故事 |
 | Short | 短句里只在点睛的位置 |
 | Playful | 可以偶尔叠一两个，跟轻松语气走 |
 | Travel | 跟有依据的地点或场景 |
-| Local | 几乎不放；要放也只在一个自然的位置 |
+| Local | 偏少，一两个放在自然的位置，第二个只在合适时才放；不当导览贴纸，也不默认整篇不放或只放一个 |
 | Emotional | 跟顾客真实情绪的浓淡走 |
 
 这些是习惯，不是固定模板。不能每次 Foodie 都贴在菜名后，也不能每次 Casual 都放句尾。
 
-Local 和 Short 可以很少，但不能因为写得短、简单或安静，就默认整篇都不放。正文里已经有自然的表情时，不再补一遍。没有对得上的句子时不硬塞。顾客写了「不要表情 / 不要 emoji / 无表情」时不新增。不要每句一个，也不要每道菜一个，也不要把表情粘在每个菜名后面。
+Local 和 Short 可以很少，但不能因为写得短、简单或安静，就默认整篇都不放。正文里已经有自然的表情时，不再补一遍。没有对得上的句子时不硬塞。顾客写了「不要表情 / 不要 emoji / 无表情」时不新增，模型已经写的也全部去掉（标题、正文都一样）。不要每句一个，也不要每道菜一个，也不要把表情粘在每个菜名后面。
 
-食物对应：芒果 🥭、柠檬 🍋、鲈鱼 🐟、蟹 🦀、虾 / 河虾冬阴功汤 / 酸甜酱炒河虾 🍤、炒饭 / 糯米饭 🍚、咖喱 🍛。河虾冬阴功汤用 🍤，不用 🍜。「这顿饭」里的「饭」不算米饭。感觉对应：好吃或好喝 😋、帅 😍、舒服 😌。逛街 🛍️。🍋 只给柠檬，🥭 只给芒果。🐟 只贴在写鱼的那一句，不能因为前面提过鱼，就贴到后面的「安心」上。
+**常见分布，不是配额。** 只数故事正文，不数 📍 / ⏰ 和话题标签。1–2 句通常 1 个；3–6 句通常 2–4 个，落在不同的句子上。Local / Short 在 3 句以内 1 个就够。Prompt 里不再写「全篇最多一个」。模型写少了，本地 `ensureCaptionEmojis` 只补到这个下限：找还没用过、和那一句内容对得上的表情（食物优先，其次是感受），放在那句句尾（替换句号）或偶尔放在段首；同一个表情不重复，不放在两个相邻的句子上。对不上的句子不补，所以可能仍然少于下限。已经够了的不加也不删。只讲服务的句子不补通用的 😊。
+
+`ensureCaptionEmojis` 只改表情：句子、顺序、段落、Location & Time 都原样。它会修正配错的食物表情（没写这道菜的句子就去掉），把夹在两个汉字中间的表情挪开（后面还有话就补一个空格，粘在菜名后就挪到句首），并去掉表情后面的中文句号。
+
+食物对应：芒果 🥭、柠檬 🍋、鲈鱼 🐟、蟹 🦀、虾 / 河虾冬阴功汤 / 酸甜酱炒河虾 🍤、炒饭 / 糯米饭 🍚、咖喱 🍛、面 / 河粉 / 米粉 🍜、辣 🌶️、奶茶 / 泰奶 / 粉红奶 / 奶绿 🧋。河虾冬阴功汤用 🍤，不用 🍜。「这顿饭」「午饭」里的「饭」不算米饭。感觉对应：好吃或好喝 😋（写食物的「不错」也算）、香 / 想再点 🤤、喜欢 / 满意 🥰、没想到 👀、帅 😍、舒服 😌、拍照 ✨。逛街 🛍️。🍋 只给柠檬，🥭 只给芒果。🐟 只贴在写鱼的那一句，不能因为前面提过鱼，就贴到后面的「安心」上。
 
 位置要换：句首、句尾、跟在感受后面，或自然出现在句中。夹在两个汉字中间、或直接粘在菜名后的表情，会挪到同一句的句首或句尾，不会挪到另一句。Playful / Emotional 可以偶尔叠一次，其他风格不叠。
 
@@ -630,6 +679,13 @@ Generating 页文案：先 `Generating your post...`，再 `Creating your cover.
 `必吃` **只允许作为封面池子关键词**（如 曼谷必吃 / 必吃泰式料理）。话题池里的 `#曼谷必吃` 有时会被抽到。封面禁止排名/绝对化：最 / 第一 / Top 1 / No.1 / 冠军 / 无敌 / 全曼谷 等。`最爱` 一律改成 `超爱`。不是排名的例外：第一次 / 第一道 / 最近 / 最后 / 最终。「绝绝子 / 封神 / 天花板」不是排名，只在顾客已经很夸时偶尔出现。不要编造「泰国人爱吃 / 明星爱吃」。清洗在 `lib/cover/cover-absolute.ts`，只作用于封面叠字；正文仍可写「最喜欢」。
 
 主标题如果只剩商场或菜系词，在**同一次** JSON 里改回顾客的那件事，不再多打 OpenAI。校验失败才用证据向的短标题兜底，不截原句。`layoutCoverOverlay` 的叠字架构不变。
+
+**封面只用正文有依据的点。** 返回前，`alignCoverWithCaption`（`lib/cover/cover-caption-fit.ts`）拿最终正文检查 mainTitle 和 subTitle：写到的菜必须在正文里出现过，而且不是顾客抱怨过的菜；用「好吃 / 下饭 / 必点」这类词夸一道菜时，这道菜必须在用餐说明或推荐理由里被评价过（推荐理由没点名具体菜时，选过的菜也算）。不合格的那一行，先换成正文里已经写到的点，找不到才用现有的安全兜底。只改封面，不为了配合封面改正文。
+
+这条规则分两层，覆盖范围不同：
+
+- **Prompt 约束**（`formatCoverTitleStaticRules`，`lib/cover/cover-rules.ts`，两种 provider 都发）：主标题留的悬念必须在正文里兑现；副标题写另一件有依据的事实，没有第二个点时不编；不编菜；搜索词只是可选。模型是否照做，代码不能保证。
+- **本地代码检查**：`alignCoverWithCaption` 只对照最终正文检查菜名和对菜的夸奖。服务、环境、同伴、体验等其他点，不和最终正文对照。另外，封面排版 `layoutCoverOverlay`（`lib/cover/cover-title.ts`）通过 `inventsUnsupportedCoverClaim` 拦下少数固定说法，例如「服务真的很好」「帅老板」「像家里」「两个人」：顾客证据里没有对应的词时，这一行不用。这里的顾客证据包括用餐说明、选的菜、勾选标签、推荐理由和当时的标题、正文。它只覆盖这几类说法，而且对照的是顾客证据，不是最终正文。
 
 ### 封面标题换行（Style 1–6 共用）
 
@@ -718,15 +774,15 @@ Cover Composer 失败时：「Cover generation failed」+ Retry Cover（只重�
 
 | 事件 | 何时写入 | 去重 |
 | --- | --- | --- |
-| `qr_scan` | 服务端渲染星级页时 | 每次进入一条；`?draw=1` 不再记第二次。跳过 Link prefetch。`/qr/:qrCodeId` 只跳到星级页，不单独记 |
-| `rating_submitted` | 点选星级时 | 同一次评分记一条。`rating` 为 1–5，`band` 为 `rating_low`（1–2）或 `rating_positive`（3–5） |
+| `qr_scan` | 服务端渲染星级页时 | 每次进入一条；`?draw=1`、带 `?stars=N` 的返回不再记。跳过 Link prefetch。`/qr/:qrCodeId` 只跳到星级页，不单独记 |
+| `rating_submitted` | 1–2 星：反馈页点「提交评价」时。3–5 星：第一步点「继续评价」时，等写入请求结束再跳体验页 | 每一轮评分一条：`eventId` 为 `rating_submitted:{本轮评价 ID}`，同一轮重试会被唯一索引丢掉；本轮已提交过就不再发送。`rating` 为 1–5，`band` 为 `rating_low`（1–2）或 `rating_positive`（3–5）。1–2 星带 `feedback`（最多 1000 字），3–5 星不带。后端拒绝不是 1–5 整数的星级（400） |
 | `form_submit` | 现有 `POST /api/generate` 真正发出时 | 每 session 一次 |
 | `generation_complete` | 现有 `/api/generate` 成功返回前 | 每 session 一次 |
 | `publish_click` | 小红书系统分享成功，或确认打开 `xhsdiscover://post` | 每 session + platform 一次。系统分享：`platform=unknown`，`method=web_share`。Deep Link：`platform=xiaohongshu`，`method=deep_link`。取消不记 |
 | `publish_platform_selected` | SHARE 选择小红书或大众点评 | 每 session + platform 一次。大众点评只记选择，不记「已发布」 |
 | `xhs_publish_click` | 旧版 SHARE 点 Publish to Rednote | 历史数据保留读取。新的系统分享成功**不**再记此事件。看板 XHS 数 = 旧事件 + `publish_click` 且 platform 为 rednote/xiaohongshu |
 
-进入星级页记一次 `qr_scan`，来源是 `rating-page`。`/qr/:qrCodeId` 只跳到星级页，避免扫码被记两次。首页 `/` 和 `/c/baan-ying` 会先到星级页再记。`?draw=1` 是 1–2 星的感谢页，刷新时不重复记扫码。访客 cookie：`ugc_sid`（httpOnly session）、`ugc_qr`（来源码）。不存 IP、姓名、电话、邮箱。1–2 星只记 `rating_submitted`，不记 `form_submit` / `generation_complete`。
+进入星级页记一次 `qr_scan`，来源是 `rating-page`。`/qr/:qrCodeId` 只跳到星级页（`?new=1`），避免扫码被记两次。首页 `/` 和 `/c/baan-ying` 会先到星级页再记。`?draw=1` 是 1–2 星的感谢页，刷新时不重复记扫码。新一轮评分会换一个新的评价 ID，所以同一个标签页再扫码或点「重新评分」可以正常再记一条 `rating_submitted`，不会被上一轮挡住。访客 cookie：`ugc_sid`（httpOnly session）、`ugc_qr`（来源码）。不存 IP、姓名、电话、邮箱。1–2 星只记 `rating_submitted`，不记 `form_submit` / `generation_complete`。
 
 看板：`GET /api/analytics?range=today|yesterday|last_7_days|last_30_days|this_month|all`，可加 `startDate` / `endDate` / `qrCodeId` / `branch`。`branch` 只能是 `baan-ying-centralworld` 或 `baan-ying-siam-center`，对应上面两个数据库，不是在一个库里按字段过滤。页面 [https://seedai-baanying.vercel.app/analytics](https://seedai-baanying.vercel.app/analytics) 有 centralwOrld / Siam Center 两个按钮。日期按 Asia/Bangkok。
 
@@ -918,7 +974,9 @@ Baan Ying
 
 随机 4 个：只能从批准池里选，且彼此不同。不能自造、缩短、合并、翻译或改写池子里的标签。每次生成应换一组，不要总用同一组。
 
-生成时 5 个标签**打乱顺序**，品牌标签不一定排第一。centralwOrld 池子里带商场名的标签，大小写跟本轮商场名走。Siam Center 的商场标签固定是 `#SiamCenter` 这一组。用户在 POST 页手动改标签时**保留当前顺序**。
+生成时 5 个标签**打乱顺序**，品牌标签不一定排第一。centralwOrld 池子里带商场名的标签，大小写跟本轮商场名走。Siam Center 的商场标签固定是 `#SiamCenter` 这一组，标签里商场名不带空格。用户在 POST 页手动改标签时**保留当前顺序**。
+
+没有指定分店时，解析、合规改写、结果页和标签编辑器都用**当前部署**的池子。浏览器里靠 `NEXT_PUBLIC_DEPLOYMENT_ID` 判断，所以这个变量必须配。
 
 两家店共用这 13 个：
 
@@ -997,7 +1055,7 @@ Siam Center 再加这 5 个，不能抽到 centralwOrld 的标签：
 | `components/ui/menu-select.tsx` | 自定义下拉（年龄、性别共用样式） |
 | `components/customer/OriginCityField.tsx` | Origins 国家下拉（置顶 TH / SG / MY / CN / HK / TW） |
 | `components/customer/ConsentCheckbox.tsx` | 同意勾选组件（当前 YOU 页未使用） |
-| `components/customer/CustomerForm.tsx` | YOU 表单（年龄、性别、国家；游客/本地与是否第一次在同一页下方） |
+| `components/customer/CustomerForm.tsx` | 旧 YOU 表单（年龄、性别、国家）。当前没有页面渲染它 |
 | `snapshots/you-page-2026-09-06/` | 含姓名 / 邮箱 / 电话的旧版 YOU 快照 |
 | `app/c/[campaignId]/privacy/page.tsx` | 隐私政策页 |
 | `lib/mongodb.ts` | MongoDB Atlas 连接。写入只用当前部署的库名 |
@@ -1005,11 +1063,21 @@ Siam Center 再加这 5 个，不能抽到 centralwOrld 的标签：
 | `lib/deployment/databases.ts` | 看板允许读取的分店数据库名单 |
 | `lib/deployment/isolation.ts` | 成稿里不能出现另一家店的商场、楼层或营业时间 |
 | `lib/branches/` | 两家店的店名、标签池、大众点评店铺。生成规则不在这里分叉 |
+| `lib/branches/mall-text.ts` | 当前分店的商场英文名、中文名和匹配写法。生成规则里要用商场名的地方都从这里取 |
+| `scripts/validate-branch-parity.ts` | 两家店用同一份输入跑 `/api/generate`，要求 prompt 和后处理结果只差本店资料；只模拟 ModelArk |
+| `scripts/validate-final-title-emoji.ts` | 15 个固定样本 × ModelArk / OpenAI（都是模拟）× 两家店，跑真实 `/api/generate`，检查最终返回的标题、标题表情、正文表情、封面和店铺隔离；另直接测 `ensureCaptionEmojis`。`FINAL_COPY_TRACE=1` 打印每一步的改动，`FINAL_COPY_DUMP=路径` 存下结果做前后对比 |
+| `scripts/validate-customer-clause-placement.ts` | 顾客原话里带商场名的那句（如「就在{商场}上班」），模型已经换个说法写过时，不被重复追加；仍需补的情况照常补。直接测 `ensureGenerationVariation`，再在进程内调用 `/api/generate` 的路由代码；两家店各跑一遍。ModelArk 回复是脚本写好的模拟数据，不发真实模型请求，MongoDB 用内存替身 |
+| `scripts/validate-paragraph-breaks.ts` | 模型写的段落经过 generation variation 和 content lock 后仍保留，`enforceCustomerEvidence` 不再重排已经分好段的正文。直接测 `keepParagraphBreaks` 和调用它的两处，再在进程内调用 `/api/generate` 的路由代码；两家店各跑一遍。ModelArk 回复是脚本写好的模拟数据，不发真实模型请求，MongoDB 用内存替身 |
+| `scripts/validate-evidence-priority.ts` | 用餐说明 > 选的菜和推荐理由 > 问卷标签。本地整理不能加只有标签支持的体验、反转顾客的评价或编造味道。直接测相关函数，再在进程内调用 `/api/generate` 的路由代码（首次生成和重新生成）；两家店各跑一遍。ModelArk 回复是脚本写好的模拟数据，不发真实模型请求，MongoDB 用内存替身 |
+| `scripts/validate-prompt-evidence-priority.ts` | 只组装 prompt：OpenAI 和 ModelArk 按同样顺序排证据，标签不压过用餐说明，抱怨不当主角，只选了菜不算评价。两家店各跑一遍；纯函数组装，不调用路由和模型，不连数据库。`PRINT_PROMPT_HASHES=1` 打印负面反馈样例的 ModelArk prompt 哈希 |
+| `scripts/validate-cover-caption-fit.ts` | 最终封面要和最终正文对得上，只选了菜不算评价。先直接测 `alignCoverWithCaption`、封面候选（`evidenceLedCoverPairs`）和 `ensureContentLock`，再在进程内调用 `/api/generate` 的路由代码（首次生成和重新生成）；两家店各跑一遍。ModelArk 回复是脚本写好的模拟数据，不发真实模型请求，MongoDB 用内存替身 |
+| `scripts/validate-title-keyword-postprocess.ts` | 本地整理不为了凑搜索词改写合格的标题。直接测 `enforceCustomerEvidence`，再在进程内调用 `/api/generate` 的路由代码；两家店各跑一遍。ModelArk 回复是脚本写好的模拟数据，不发真实模型请求，MongoDB 用内存替身 |
+| `scripts/validate-negative-feedback-prompt.ts` | ModelArk prompt 每次都带一次负面反馈中性化规则，不管顾客写了什么；OpenAI 和备用 `/api/generate-content` 的 prompt 用哈希固定。两家店各跑一遍；纯函数组装，不调用路由和模型，不连数据库。有意改 prompt 后用 `PRINT_PROMPT_HASHES=1` 打印新哈希 |
 | `lib/analytics/` | 转化事件写入、日期窗口、看板查询 |
 | `middleware.ts` | 匿名 `ugc_sid` session cookie |
-| `app/qr/[qrCodeId]/route.ts` | 扫码后跳到星级页；`qr_scan` 在星级页服务端记 |
+| `app/qr/[qrCodeId]/route.ts` | 扫码后跳到星级页 `?new=1`（开始新一轮）；`qr_scan` 在星级页服务端记 |
 | `app/api/analytics/route.ts` | 看板汇总 / 转化率 / 按日 / 按 QR |
-| `app/api/analytics/events/route.ts` | 客户端点击事件（XHS） |
+| `app/api/analytics/events/route.ts` | 客户端事件（评分、XHS 等）。`rating_submitted` 的星级不是 1–5 整数时返回 400 |
 | `app/analytics/page.tsx` | 内部转化看板。可切换 centralwOrld / Siam Center，各自读自己的数据库 |
 | `lib/submissions.ts` | 旧 `submissions` 类型（现流程不再写入该集合） |
 | `lib/generations.ts` | `generations` 写入（YOU / RATE 快照 + 标题、正文、hashtag、封面标题、token 费用） |
@@ -1042,24 +1110,27 @@ Siam Center 再加这 5 个，不能抽到 centralwOrld 的标签：
 | `lib/brand/baan-ying-strategy.ts` | Baan Ying 的 KSP / Storyline / Angle / 搜索词 / 兼容矩阵 |
 | `lib/content-angles.ts` | 兼容层，转调新的 CA-01…CA-12 |
 | `lib/brand/baan-ying-context.ts` | 品牌故事、个性、可用事实、参考帖特征 |
-| `lib/title-keywords.ts` | 标题曼谷搜索关键词、去重、校验与兜底 |
+| `lib/title-keywords.ts` | 标题曼谷搜索关键词的 prompt 规则。文件里的本地补词函数 `ensureTitleKeywords` 目前没有被 `/api/generate` 调用 |
 | `lib/human-style/` | 9 种写法。选择器按顾客证据和 `variantIndex` 选风格；标题习惯和正文习惯在同一个库里 |
-| `lib/title-formats.ts` | 三个标题句式不同。正常情况下至少 1 个、通常 1–2 个标题各带 1 个表情，放句首或句尾。顾客禁止表情时不补。🇹🇭 大约每 5 个标题一次，只在句首 |
-| `lib/caption-emoji.ts` | 正文表情按本轮 Human Style 的习惯放，不按数量档位补。已有自然表情时不重复补。对不上就不补。顾客写了的来由如果被丢掉，用原句补回 |
-| `lib/caption-story.ts` | 已经分段、并且来由还在的正文保持原有句序，只做事实清理。乱成一块的正文才按来由、菜、收尾整理。笔记没写的空收尾和重复味道会拿掉 |
+| `lib/title-formats.ts` | 三个标题句式不同。正常情况下至少 1 个、通常 1–2 个标题各带 1 个表情，放句首或句尾，至少 1 个纯文字，同一表情不重复，食物表情对得上那句。顾客禁止表情时不补。🇹🇭 大约每 5 个标题一次，只在句首 |
+| `lib/title-insight.ts` | 照搬原句、重复同一个点、冷模板、只剩「终于 / 不得不说」开头的标题，用顾客原文里的点换个说法；合格标题不动。封面主标题照搬原句时同样处理 |
+| `lib/caption-emoji.ts` | 正文表情按本轮 Human Style 的习惯放。只改表情，不动句子和段落。太少时补到常见下限（3 句以上通常 2 个），只补对得上那句的表情。顾客禁止时全部去掉 |
+| `lib/caption-story.ts` | 已经分段、而且每段不超过 3 句的正文保持原有段落和句序，只做事实清理；没有段落或某段超过 3 句才按来由、菜、收尾整理。`keepParagraphBreaks` 按原段首句还原被句子级整理压平的段落。笔记没写的空收尾和重复味道会拿掉 |
 | `lib/caption-voice.ts` | 正文口吻、篇幅和段落。用餐说明留下意思再改写，不逐字解释。未写出的「正宗 / 很有记忆点」整类禁用 |
 | `lib/customer-evidence.ts` | 顾客自己写的食物、饮品、人和体验先进入标题和封面。商场不是默认的第二条标题 |
-| `lib/brand-spelling.ts` | 餐厅名 `Baan Ying` / `baan ying`。centralwOrld 商场名在 `Centralworld` / `centralworld` 里抽；Siam Center 固定 `Siam Center` |
+| `lib/brand-spelling.ts` | 餐厅名 `Baan Ying` / `baan ying`。centralwOrld 商场名在 `Centralworld` / `centralworld` 里抽；Siam Center 固定 `Siam Center`。话题标签里的商场名和餐厅名都去掉空格 |
 | `lib/title-insight.ts` | 标题照搬顾客原句时，本地提炼成 hook |
 | `lib/first-visit-wording.ts` | 第一次来 Baan Ying；没有写明就去掉「第一次吃泰餐」 |
-| `lib/entry-rating.ts` | 3–5 星通过后才允许进入 YOU |
-| `lib/lucky-draw.ts` | 抽奖链接；当前为空，按钮不跳转 |
-| `app/c/[campaignId]/rating/` | 星级入口 |
+| `lib/entry-rating.ts` | 3–5 星通过后才允许进入体验页；`newRatingPath()` 生成开始新一轮的 `rating?new=1` |
+| `lib/lucky-draw.ts` | 抽奖链接；当前为空。感谢页已不显示抽奖按钮，留作以后恢复 |
+| `app/c/[campaignId]/rating/` | 星级两步：`page.tsx` 第一步 / 感谢页，`review/page.tsx` 1–2 星反馈页，`rating-page-client.tsx` 选星、提交、返回、重新评分 |
+| `scripts/validate-rating-flow.ts` | 检查星级范围、反馈规则、提交去重、新一轮入口、感谢页文案；不写数据库 |
+| `scripts/validate-ai-provider.ts` | 检查默认 ModelArk、缺 key 和 OpenAI 拒绝时的错误提示；不打真实接口 |
 | `types/content.ts` | 体验问卷类型；10 道菜 + 其他；默认分店、到访 Yes/No、补充说明计数 |
 | `lib/generate-prompt.ts` | 同一次请求的 system / user prompt。顾客经历在品牌前面；JSON 形状不变 |
 | `lib/generate-hashtags/prompt.ts` | 备用接口的标签 prompt |
 | `lib/generate-hashtags/generate.ts` | 备用接口的标签生成 + 重试（主路径不用） |
-| `lib/hashtags.ts` | 1 固定 + 4 池子、打乱、从正文剥离 `#` |
+| `lib/hashtags.ts` | 1 固定 + 4 池子、打乱、从正文剥离 `#`。没指定分店时用当前部署的池子 |
 | `components/result/HashtagEditor.tsx` | POST 页标签编辑：固定标签不能删，池子标签最多 4 个 |
 | `lib/locations.ts` | 分店官方地点和营业时间、6 种 Location & Time 模板。清理外店事实时保留空行。inline 把地点和「总算约上」并成一段，不把「来了这家店」粘到菜上 |
 | `lib/openai-pricing.ts` | OpenAI 模型单价（每百万 token），改价只改这里 |
@@ -1067,12 +1138,12 @@ Siam Center 再加这 5 个，不能抽到 centralwOrld 的标签：
 | `lib/parse-generated.ts` | 解析标题 + 正文 + hashtags + mainTitle / subTitle + 封面选图。ModelArk 的 `captionParagraphs` 用空行拼成 `caption`。空标题滤掉后仍要 3 个非空标题 |
 | `lib/modelark/post-schema.ts` | ModelArk 的 JSON Schema。标题正好 3 个，每条至少 1 个字符 |
 | `lib/modelark/title-check.ts` | 只在正文还在且有效标题少于 3 个时再请求一次。失败不补标题，也不改走 OpenAI |
-| `lib/ai-provider.ts` | `AI_PROVIDER` 为空或 `openai` 用 OpenAI；`modelark` 用 ModelArk；其他值直接报错 |
+| `lib/ai-provider.ts` | `AI_PROVIDER` 为空或 `modelark` 用 ModelArk；`openai` 用 OpenAI；其他值直接报错 |
 | `app/api/generate/route.ts` | 消费者主生成：1 次文本请求 → 本地补全 → 追加地点；最多 5 张图。ModelArk 的 JSON 重试和标题重试见 12.1 |
 | `app/api/generate-content/route.ts` | 备用 JSON 生成接口 |
-| `app/c/[campaignId]/rating/page.tsx` | 星级入口；非 `draw=1` 时记 `qr_scan` |
-| `app/c/[campaignId]/customer/page.tsx` | YOU：感谢标题、年龄/性别/国家、游客/本地、是否第一次 |
-| `app/c/[campaignId]/experience/page.tsx` | RATE：餐费、菜、理由、补充说明、上传照片 |
+| `app/c/[campaignId]/rating/page.tsx` | 星级第一步；非 `draw=1`、不带 `stars` 时记 `qr_scan`；`?new=1` 开始新一轮 |
+| `app/c/[campaignId]/customer/page.tsx` | 只做跳转：评分已通过就转到 experience |
+| `app/c/[campaignId]/experience/page.tsx` | 体验页：是否第一次、游客/本地、餐费、菜、理由、补充说明、来自哪里、上传照片 |
 | `app/c/[campaignId]/*` | 消费者页面 |
 | `vercel.json` | `maxDuration`（Hobby 实际仍可能被平台上限截断） |
 | `next.config.ts` | `outputFileTracingIncludes`（字体 / 国旗） |
@@ -1084,7 +1155,9 @@ Siam Center 再加这 5 个，不能抽到 centralwOrld 的标签：
 - 登录 / 注册 / 品牌后台配置
 - Cloudinary / 图片存储（照片和封面 JPEG 都不进 Mongo）
 - KSP 写入 Mongo（用餐补充说明会在生成成功时写入 `generations`）
-- 1–2 星调用 OpenAI 或进入 YOU / RATE
+- 1–2 星生成帖子或进入体验页
+- 感谢页抽奖按钮（已移除；`lib/lucky-draw.ts` 留着）
+- 后端强制 1–2 星必须带反馈（只在页面上必填，API 契约未改）
 - 小红书 / 大众点评自动填文案或自动发布（SHARE 只把 files/text/title 交给系统分享；网站不知道用户选了哪个 App）
 - AI 生图 / 修图 / 用模型绘制中文封面（封面是 Cover Composer 叠字，不是生图）
 - QR 图片生成服务（只追踪已有 `/qr/:qrCodeId` 扫码）
