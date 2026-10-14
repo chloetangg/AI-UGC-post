@@ -5,7 +5,12 @@ import type {
 } from "@/lib/content-strategy/types";
 import { photoSelectionHint, readStrategySignals } from "@/lib/content-strategy/select";
 
-export function formatStrategyLibrary(library: ContentStrategyLibrary) {
+/**
+ * `lean` leaves out the KSP → Storyline → Angle maps (the server already applies them when it picks the
+ * suggested ids, and the ModelArk schema does not return ids) and the keyword lines that TITLE SEARCH KEYWORDS
+ * and COMPLIANCE already state.
+ */
+export function formatStrategyLibrary(library: ContentStrategyLibrary, options: { lean?: boolean } = {}) {
   const ksps = library.ksps
     .map((item) => {
       const frequency = item.frequency === "low" ? " [LOW FREQUENCY — do not default to 1999 / Auntie Ying / brand history]" : "";
@@ -27,6 +32,26 @@ export function formatStrategyLibrary(library: ContentStrategyLibrary) {
   const stMap = Object.entries(library.compatibility.storylineToAngles)
     .map(([storyline, angleIds]) => `- ${storyline} → ${angleIds.join(", ")}`)
     .join("\n");
+
+  if (options.lean) {
+    return `CONTENT STRATEGY LAYER (internal; never print KSP / Storyline / Content Angle / Search Keyword names in the consumer post)
+
+Decision layer only. Customer evidence wins. Do not force a brand-priority KSP. Follow SAFETY.
+
+KSPs:
+${ksps}
+
+STORYLINES (narrative intention only; vary opening, paragraph count, length, emoji, and wording):
+${storylines}
+
+CONTENT ANGLES:
+${angles}
+
+SEARCH KEYWORDS
+Primary: ${library.searchKeywords.primary.join(" / ")}
+Secondary: ${library.searchKeywords.secondary.join(" / ")}
+Choose one natural keyword that fits this Storyline + Angle, guided by customer context. Put it in a title only when it sits naturally inside one real point; follow TITLE SEARCH KEYWORDS. Do not keyword-stuff the caption.`;
+  }
 
   return `CONTENT STRATEGY LAYER (internal; never print KSP / Storyline / Content Angle / Search Keyword names in the consumer post)
 

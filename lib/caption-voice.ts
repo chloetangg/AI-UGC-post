@@ -16,7 +16,17 @@ GOOD: 蒜香比较足，虾仁吃起来Q弹。 BAD: 整体来说，这是一家�
  * Additive Caption voice layer.
  * Does not replace length, compliance, Storyline, hashtag, cover, or photo-order rules.
  */
-export function formatCaptionConsumerVoiceRules() {
+/**
+ * `lean` leaves out lines that the /api/generate system prompt already states once elsewhere
+ * (绝绝子 / 封神 / 天花板 in COMPLIANCE, both location modes in THIS ROUND LOCATION PLAN,
+ * dish grouping in SPOKEN SHAPE). Default output is unchanged for other callers.
+ */
+type VoiceRuleOptions = { lean?: boolean };
+
+export function formatCaptionConsumerVoiceRules(options: VoiceRuleOptions = {}) {
+  const strongPraise = options.lean
+    ? ""
+    : " 绝绝子 / 封神 / 天花板 are optional and only for strong praise they already gave.";
   return `CAPTION VOICE — a diner who just ate, posting a personal share. Not a brand intro.
 
 First person when the evidence supports it. Do not open every post with 我觉得 / 没想到 / 真的. If they wrote 同事推荐 / 朋友推荐 / 老婆上次说好吃 / 带一家人 / 推荐过来, keep that reason. Do not write 朋友推荐 / 和朋友 / 两个人 / 一家人 when they did not.
@@ -25,7 +35,7 @@ BANNED unless their own words already say it. A softer degree is the same ban: �
 Also banned unless they wrote it: 作为一家 / 如果你正在寻找 / 这次来到 / 给我的感觉是 / 是一家非常 / 对于喜欢……的人来说 / 无论是……还是…… / XX很好吃，XX也很好吃，整体体验很好.
 Keep their scale: like can be 这道我下次应该还会点; ordinary stays 味道还可以; a dislike they wrote stays a dislike. Follow NEGATIVE FEEDBACK for raw 贵/难吃/踩雷 — keep the direction, never false praise.
 Concrete notes only when they wrote or selected them. Do not invent 虾很大 / 汤底很浓 / 上菜慢, and do not invent a flaw to sound real.
-正宗 / 地道 / 惊艳 / 极致 stay out unless their words are already that strong. 绝绝子 / 封神 / 天花板 are optional and only for strong praise they already gave.
+正宗 / 地道 / 惊艳 / 极致 stay out unless their words are already that strong.${strongPraise}
 Style references are habits only. Never copy their sentences.`;
 }
 
@@ -41,25 +51,31 @@ A food they named stays even if it is not on the menu. 粉红奶 stays 粉红奶
 Do not upgrade 一口就满足 into 口感层次, or 菜单只有泰语和英语 into 不影响体验. Do not flip 太难吃了 into praise or 不会再来了 into 下次还会再来.`;
 }
 
-export function formatSpokenNaturalnessRules() {
+export function formatSpokenNaturalnessRules(options: VoiceRuleOptions = {}) {
+  const strongPraise = options.lean ? "" : " 绝绝子 / 封神 / 天花板 only on strong praise they already gave.";
+  const locationModes = options.lean
+    ? ""
+    : " Inline: the mall and Baan Ying share one sentence, folded into the customer's own opening when they gave a reason. Do not add 这次在商场的Baan Ying吃了一顿饭, and do not name the place again — not as 这家店就在商场里 / 刚好在商场 / 位置很好找. Standalone names neither the mall nor the restaurant; the system adds Location & Time.";
   return `SPOKEN SHAPE — one point per title, one meal in the caption. Natural Chinese beats covering every field.
 
 TITLES: exactly 3, each one complete point a person would actually type. No comma, ｜, or colon that bolts on a second selling point or a search keyword.
 Do not make them all [dish] + [好吃 / 滑嫩 / 刚刚好 / 必吃 / 停不下来]. Vary the idea: a discovery, a situation, a return, a short remark, someone else's recommendation — only when the note supports it.
 BAD: 咖喱蟹肉好吃，餐厅环境也不错 / 芒果糯米饭真的好好吃 / 滑蛋饭真的很滑嫩 / 青柠蒸鲈鱼美味推荐
 GOOD: 没想到这道会这么喜欢 / 同事推荐的这顿没有踩雷 / 这家泰餐厅空间真的很宽敞
-No 最 / 第一 / 最好吃 / 顶级. 绝绝子 / 封神 / 天花板 only on strong praise they already gave.
+No 最 / 第一 / 最好吃 / 顶级.${strongPraise}
 
-CAPTION is one meal, not a restaurant introduction. Follow THIS ROUND LOCATION PLAN without letting the place become the story. Inline: the mall and Baan Ying share one sentence, folded into the customer's own opening when they gave a reason. Do not add 这次在商场的Baan Ying吃了一顿饭, and do not name the place again — not as 这家店就在商场里 / 刚好在商场 / 位置很好找. Standalone names neither the mall nor the restaurant; the system adds Location & Time. Do not invent a shopping trip they did not mention.
+CAPTION is one meal, not a restaurant introduction. Follow THIS ROUND LOCATION PLAN without letting the place become the story.${locationModes} Do not invent a shopping trip they did not mention.
 A person's reaction sits with that dish. Service sits with how the meal felt. Same kind of information stays together.
 Name a dish and finish its taste, texture, and judgment there. Do not return to it after the next dish. A 最后/收尾 dish stays in the second half. Do not start a new dish after that.
 One hero dish, then a shorter supporting dish. Skipping a point is allowed.`;
 }
 
-export function formatCaptionShapeRules() {
+export function formatCaptionShapeRules(options: VoiceRuleOptions = {}) {
+  const grouping = options.lean
+    ? ""
+    : "\nKeep a dish with its taste and reason, and the owner with the service. The room comes after the food and does not rename the mall or the restaurant.";
   return `CAPTION LENGTH — at least 3 sentences from the same facts. Ordinary notes: 3–6 sentences. Rich notes: at most 8. Do not make every post exactly 3, and do not invent a sentence to get longer. Pick the strongest points; do not write every questionnaire answer.
-Paragraphs are blocks separated by a blank line (\\n\\n in the caption string). Each paragraph is at most 3 sentences, usually 2 or 3. A one-sentence paragraph is only for real emphasis. Do not put a blank line after every sentence.
-Keep a dish with its taste and reason, and the owner with the service. The room comes after the food and does not rename the mall or the restaurant.`;
+Paragraphs are blocks separated by a blank line (\\n\\n in the caption string). Each paragraph is at most 3 sentences, usually 2 or 3. A one-sentence paragraph is only for real emphasis. Do not put a blank line after every sentence.${grouping}`;
 }
 
 export function formatCustomerHookPriorityRules() {

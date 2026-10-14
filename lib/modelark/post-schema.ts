@@ -64,7 +64,7 @@ export const modelArkRewriteSchema = {
   },
 };
 
-export const MODELARK_OUTPUT_APPENDIX = `OUTPUT SHAPE FOR THIS CALL ONLY. This replaces the sample JSON at the end of the instructions. Do not change the story, the titles, or the paragraph breaks.
+export const MODELARK_OUTPUT_APPENDIX = `OUTPUT SHAPE FOR THIS CALL ONLY. Do not change the story, the titles, or the paragraph breaks.
 Return captionParagraphs as an array. Each item is one paragraph and must not contain a line break. The server joins the items with a blank line.
 Do not return evidenceSource, customerEvidenceUsed, selectedTemplateId, suitableTemplateIds, selectedKspId, selectedStorylineId, selectedContentAngleId, or selectedSearchKeyword. Those are chosen locally.
 titles has exactly 3 strings. hashtags has exactly 5 strings. mainTitle and subTitle stay separate strings.`;

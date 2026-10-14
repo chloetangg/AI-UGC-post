@@ -153,14 +153,20 @@ export function formatNarrativeFlowRules(context: CoverTitleContext = {}, map: E
 ${formatNarrativeFlowInstance(context, map)}`;
 }
 
-export function formatNarrativeFlowStaticRules() {
+/** `lean` drops the location-mode line and the dish-order line that THIS ROUND LOCATION PLAN and SPOKEN SHAPE already carry. */
+export function formatNarrativeFlowStaticRules(options: { lean?: boolean } = {}) {
+  const locationModes = options.lean
+    ? ""
+    : "\nInline: the mall and Baan Ying share one sentence inside that story, and do not come back in any wording. Standalone: do not put that place in the story; Location is appended separately. Do not add 这家店就在商场几楼.";
+  const dishOrder = options.lean
+    ? ""
+    : "Finish a dish's taste and judgment beside its first mention. Do not return to a dish after the next one starts. One hero dish, then a shorter supporting dish. ";
   return `NARRATIVE FLOW — one meal, each fact once. Do not follow the questionnaire field order.
-Start from the customer's reason for coming when they gave one. Then the dish they described most, other dishes and a drink, then the room and a closing feeling. Do not open with the mall just because the form has a branch. Do not follow the order of the form.
-Inline: the mall and Baan Ying share one sentence inside that story, and do not come back in any wording. Standalone: do not put that place in the story; Location is appended separately. Do not add 这家店就在商场几楼.
+Start from the customer's reason for coming when they gave one. Then the dish they described most, other dishes and a drink, then the room and a closing feeling. Do not open with the mall just because the form has a branch. Do not follow the order of the form.${locationModes}
 Keep 氛围 and 坐着舒服 in one place, not between dishes. A dish and the room cannot share one sentence. A summary such as 整体感觉很满意 stays at the end. A drink needs a finished clause, with no taste they did not write.
 Then the dish they actually dwelled on, with the taste they wrote, in that same stretch. Other dishes and a named drink continue the meal. Do not give every item 很好吃，很推荐. A short drink note joins the previous dish. It does not appear as a final questionnaire answer.
 Service, the owner, and an overall feeling they actually wrote close the meal. Do not invent 方便, 舒服, 热情, or a taste to make the ending complete.
-Finish a dish's taste and judgment beside its first mention. Do not return to a dish after the next one starts. One hero dish, then a shorter supporting dish. Do not say the place again if the opening already has it.
+${dishOrder}Do not say the place again if the opening already has it.
 ATTRIBUTE OWNERSHIP — a taste belongs to one dish. Never move 蒜香 onto 咖喱蟹肉 or 椰香 onto 蒜炒虾仁.
 ${UNIQUE_ATTRS.map((item) => `${item.dishes[0]} ← ${item.label}`).join("\n")}`;
 }

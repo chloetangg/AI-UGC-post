@@ -476,7 +476,8 @@ export function coverFallbackPairs(context: CoverTitleContext = {}) {
   return pairs;
 }
 
-export function formatCoverTitleStaticRules() {
+/** `dishTable: false` sends only this request's dish shorts through `formatCoverTitleInstance(…, { dishShorts: true })`. */
+export function formatCoverTitleStaticRules(options: { dishTable?: boolean } = {}) {
   return `COVER OVERLAY — mainTitle + subTitle in this same JSON. Independent from titles[]. Do not shorten a post title into the cover. No extra API call.
 
 Natural spoken Chinese from THIS visit beats a keyword. Do not glue 曼谷 onto a broken stub (曼谷超爱次来吃 / 曼谷美食发现).
@@ -485,13 +486,13 @@ mainTitle: 4–10 units MAX, not a target. Han=1, centralwOrld=1, Terminal 21 / 
 
 subTitle: one different supported fact, 6–15 units. It adds a new point or a new reason to care. It must not restate the mainTitle with a synonym. If mainTitle is a practical convenience such as paying, a dish they named can be the subtitle. If mainTitle is a dish, service or another real point can be the subtitle. Those are options, not a fixed pair. If there is no second point, do not invent one and do not pad with 必点 / 封神 / 狠狠爱了 / 这口. BAD: mainTitle 商场里吃泰餐 / subTitle 商场里吃泰餐很方便. BAD: mainTitle 这家店服务不错 / subTitle 店员服务真的很贴心. A review with no punctuation can still hold several evaluations. Split 食物很好吃粉红奶很好喝 into 食物很好吃 and 粉红奶很好喝, then keep one. Never glue them, and never cut characters off either end to make the line fit. 粉红奶真的很好喝 may stay short. No 招牌泰式料理. If first visit is the ONLY evidence: 第一次来尝试Baan Ying. Never 第一次吃泰餐, and do not put 第一次 and a dish in the same subtitle.
 
-${formatCoverDishNameStaticRules()}
+${formatCoverDishNameStaticRules({ table: options.dishTable })}
 
 No 最 / 最爱 / 第一 / No.1 / 全曼谷 / 最好吃 except 第一次 / 第一道 / 最近 / 最后 and the cover keyword 必吃. 最爱 → 超爱. 绝绝子 / 封神 / 天花板 only for strong praise they already gave.
 No raw 贵 / 难吃 / 踩雷 / 不推荐 / 失望 on the cover. No hashtag, address, hours, or emoji. Never invent a dish.`;
 }
 
-export function formatCoverTitleInstance(context: CoverTitleContext = {}) {
+export function formatCoverTitleInstance(context: CoverTitleContext = {}, options: { dishShorts?: boolean } = {}) {
   const location = selectedCoverLocation(context.branch);
   const previousMain = (context.previousCoverTitle ?? "").split("/")[0]?.trim() || "none";
   const note = context.diningNote?.trim() || "none";
@@ -514,7 +515,7 @@ Customer evidence for subtitle (INTERNAL — pick ONE, then rewrite):
 - Selected dishes: ${dishes}
 - Visit: ${context.visitFrequency || "none"} / ${context.customerType || "none"}
 ${locationHint}
-${formatCoverDishNameInstance(context.dishes)}`;
+${formatCoverDishNameInstance(context.dishes, { shorts: options.dishShorts, sourceTexts: [context.diningNote ?? ""] })}`;
 }
 
 export function formatCoverTitleRules(context: CoverTitleContext = {}) {
