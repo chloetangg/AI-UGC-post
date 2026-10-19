@@ -18,6 +18,9 @@ import { BAAN_YING_CONTENT_STRATEGY } from "@/lib/brand/baan-ying-strategy";
 import { keywordsFromTitles } from "@/lib/title-keywords";
 import { buildGenerateRequest } from "@/lib/generate-prompt";
 import { clientAnalyticsSessionId } from "@/lib/analytics/track-client";
+import { sendFunnelEvent } from "@/lib/analytics/funnel-client";
+import type { GenerateActionType } from "@/lib/analytics/types";
+import { currentReviewId } from "@/lib/entry-rating";
 import type { GenerationMemory } from "@/lib/generation-variation";
 import { emptyCustomerInfo, type CustomerInfo } from "@/types/customer";
 import { isMealExpenseRangeComplete } from "@/lib/meal-expense";
@@ -106,6 +109,8 @@ type CampaignFlowContextValue = {
   addPhotos: (files: File[]) => { added: number; rejected: number };
   removePhoto: (id: string) => void;
   generatePost: (onPhase?: (phase: GeneratePhase) => void) => Promise<ResultDraft>;
+  /** Call from the button that really starts a generation, after its own checks pass. */
+  startGenerateAction: (actionType: GenerateActionType) => void;
   updateDraft: (draft: ResultDraft) => void;
   updateGeneratedTitles: (titles: [string, string, string]) => void;
   retryCover: () => Promise<void>;
@@ -295,6 +300,8 @@ export function CampaignFlowProvider({
   const photosRef = useRef<PhotoItem[]>([]);
   const photoPrepRef = useRef(new Map<string, Promise<void>>());
   const generateInFlightRef = useRef<Promise<ResultDraft> | null>(null);
+  /** The click waiting for its request. generatePost takes it once, so a rerender cannot reuse it. */
+  const pendingActionRef = useRef<{ actionId: string; actionType: GenerateActionType } | null>(null);
   const [coverComposing, setCoverComposing] = useState(false);
   const composeInFlightRef = useRef<Promise<void> | null>(null);
 
@@ -417,9 +424,31 @@ export function CampaignFlowProvider({
     [campaignId],
   );
 
+  /** Arms the click. `generate` is written only when generatePost really starts a request for it. */
+  const startGenerateAction = useCallback((actionType: GenerateActionType) => {
+    pendingActionRef.current = { actionId: createId(), actionType };
+  }, []);
+
   const generatePost = useCallback(async (onPhase?: (phase: GeneratePhase) => void) => {
     if (generateInFlightRef.current) {
       return generateInFlightRef.current;
+    }
+    const action = pendingActionRef.current;
+    pendingActionRef.current = null;
+    if (action) {
+      const metadata = {
+        campaignId,
+        reviewId: currentReviewId(campaignId),
+        actionId: action.actionId,
+        actionType: action.actionType,
+        previousGenerationId: getFlowSnapshot(campaignId).generationId,
+      };
+      void (async () => {
+        for (let attempt = 0; attempt < 2; attempt += 1) {
+          if (await sendFunnelEvent({ eventType: "generate", metadata })) return;
+        }
+        console.error(`[analytics] generate ${action.actionType} was not recorded (${action.actionId})`);
+      })();
     }
 
     const run = (async () => {
@@ -537,6 +566,9 @@ export function CampaignFlowProvider({
       submissionId: ensureSubmissionId(campaignId),
     }),
       analyticsSessionId: clientAnalyticsSessionId(),
+      reviewId: currentReviewId(campaignId),
+      generationActionId: action?.actionId ?? "",
+      generationActionType: action?.actionType ?? "",
     };
 
     const form = new FormData();
@@ -956,6 +988,7 @@ export function CampaignFlowProvider({
       addPhotos,
       removePhoto,
       generatePost,
+      startGenerateAction,
       updateDraft,
       updateGeneratedTitles,
       retryCover,
@@ -982,6 +1015,7 @@ export function CampaignFlowProvider({
       addPhotos,
       removePhoto,
       generatePost,
+      startGenerateAction,
       updateDraft,
       updateGeneratedTitles,
       retryCover,

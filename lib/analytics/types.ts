@@ -9,6 +9,7 @@ export const ANALYTICS_EVENT_TYPES = [
   "qr_scan",
   "rating_submitted",
   "form_submit",
+  "generate",
   "generation_complete",
   "xhs_publish_click",
   "xhs_copy_content",
@@ -24,6 +25,12 @@ export type AnalyticsEventType = (typeof ANALYTICS_EVENT_TYPES)[number];
 
 const METADATA_VALUE_MAX_LENGTH = 180;
 export const RATING_FEEDBACK_MAX_LENGTH = 1000;
+
+/** `form_submit` written when 3–5 stars open the experience form. Older events came from /api/generate. */
+export const FORM_SUBMIT_SOURCE = "rating_continue";
+
+export const GENERATE_ACTION_TYPES = ["initial", "regenerate", "retry"] as const;
+export type GenerateActionType = (typeof GENERATE_ACTION_TYPES)[number];
 
 export function parseStarRating(value: unknown): number | null {
   const text = typeof value === "number" ? String(value) : typeof value === "string" ? value.trim() : "";
@@ -92,14 +99,22 @@ export type RecordAnalyticsInput = {
 export type AnalyticsSummary = {
   qrScans: number;
   uniqueVisitors: number;
+  ratingSubmissions: number;
+  lowRatings: number;
   formSubmissions: number;
+  /** `form_submit` from before FORM_SUBMIT_SOURCE: one per /api/generate request, kept apart, never added in. */
+  legacyFormSubmissions: number;
+  generateActions: number;
   generations: number;
   xhsPublishClicks: number;
   dianpingPublishClicks: number;
 };
 
 export type AnalyticsConversion = {
+  qrToRating: number;
   qrToForm: number;
+  formToGenerate: number;
+  generateToComplete: number;
   formToGeneration: number;
   generationToXhs: number;
   qrToXhs: number;
@@ -108,10 +123,19 @@ export type AnalyticsConversion = {
 export type AnalyticsDailyRow = {
   date: string;
   qrScans: number;
+  ratingSubmissions: number;
   formSubmissions: number;
+  generateActions: number;
   generations: number;
   xhsPublishClicks: number;
   dianpingPublishClicks: number;
+};
+
+export type AnalyticsLowRatingRow = {
+  reviewId: string;
+  rating: number;
+  feedback: string;
+  timestamp: string;
 };
 
 export type AnalyticsQrRow = {
@@ -130,4 +154,7 @@ export type AnalyticsReport = {
   conversion: AnalyticsConversion;
   daily: AnalyticsDailyRow[];
   byQrCode: AnalyticsQrRow[];
+  /** 1–2 star reviews with feedback, newest first. `lowRatingStars` is the filter that produced them. */
+  lowRatingStars: 1 | 2 | null;
+  lowRatingFeedback: AnalyticsLowRatingRow[];
 };

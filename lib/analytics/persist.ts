@@ -1,6 +1,6 @@
 import type { Document, UpdateFilter } from "mongodb";
 import { getDb } from "@/lib/mongodb";
-import { ANALYTICS_TIMEZONE } from "@/lib/analytics/types";
+import { ANALYTICS_TIMEZONE, FORM_SUBMIT_SOURCE } from "@/lib/analytics/types";
 import { ymdInTimeZone } from "@/lib/analytics/dates";
 
 const DAILY_COLLECTION = "analytics_daily";
@@ -8,13 +8,19 @@ const MONTHLY_COLLECTION = "monthly_archives";
 
 const EVENT_FIELDS: Record<string, string> = {
   qr_scan: "qrScans",
+  rating_submitted: "ratingSubmissions",
   form_submit: "formSubmissions",
+  generate: "generateActions",
   generation_complete: "generations",
   xhs_publish_click: "xhsPublishClicks",
   publish_dianping_click: "dianpingPublishClicks",
 };
 
 function persistCounterField(eventType: string, document: unknown) {
+  if (eventType === "form_submit") {
+    const source = (document as { metadata?: { source?: string } } | null)?.metadata?.source;
+    return source === FORM_SUBMIT_SOURCE ? EVENT_FIELDS.form_submit : "";
+  }
   return EVENT_FIELDS[eventType] ?? "";
 }
 

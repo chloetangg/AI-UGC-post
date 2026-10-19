@@ -37,16 +37,21 @@ export async function trackServerEvent(
   eventType: AnalyticsEventType,
   metadata: Record<string, string> = {},
   explicitSessionId = "",
+  eventId?: string,
 ) {
   try {
     const session = await resolveAnalyticsSession(explicitSessionId);
-    await recordAnalyticsEvent({
+    const result = await recordAnalyticsEvent({
       eventType,
+      eventId,
       sessionId: session.sessionId,
       qrCodeId: session.qrCodeId,
       campaign: ANALYTICS_CAMPAIGN,
       metadata,
     });
+    if (!result.recorded && !result.duplicate) {
+      console.error(`[analytics] ${eventType} was not written to MongoDB`);
+    }
   } catch (error) {
     console.error("[analytics] track failed");
     const detail = error instanceof Error ? error.message : "";

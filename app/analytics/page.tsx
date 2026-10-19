@@ -27,6 +27,7 @@ export default function AnalyticsDashboardPage() {
   const [branchId, setBranchId] = useState(() => getDeploymentConfig().branchId);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [lowStars, setLowStars] = useState<"" | "1" | "2">("");
   const [report, setReport] = useState<AnalyticsReport | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -40,8 +41,9 @@ export default function AnalyticsDashboardPage() {
     } else {
       params.set("range", range);
     }
+    if (lowStars) params.set("stars", lowStars);
     return params.toString();
-  }, [branchId, endDate, range, startDate]);
+  }, [branchId, endDate, lowStars, range, startDate]);
 
   useEffect(() => {
     let cancelled = false;
@@ -77,8 +79,8 @@ export default function AnalyticsDashboardPage() {
           <p className="text-sm font-medium text-primary">Baan Ying UGC</p>
           <h1 className="font-display text-3xl text-foreground">Analytics</h1>
           <p className="text-sm text-muted-foreground">
-            QR scans, form submissions, generations, Rednote and Dianping publish clicks. Dates use Asia/Bangkok.
-            Each branch is stored in its own database.
+            QR scans, ratings, form submissions, Generate clicks, completed generations, Rednote and Dianping
+            publish clicks. Dates use Asia/Bangkok. Each branch is stored in its own database.
           </p>
         </header>
 
@@ -146,41 +148,77 @@ export default function AnalyticsDashboardPage() {
 
         {summary && conversion ? (
           <>
-            <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+            <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <Metric label="QR Scans" value={formatCount(summary.qrScans)} />
               <Metric label="Unique Visitors" value={formatCount(summary.uniqueVisitors)} />
-              <Metric label="Form Submissions" value={formatCount(summary.formSubmissions)} />
+              <Metric
+                label="Rating Submitted"
+                value={formatCount(summary.ratingSubmissions)}
+                note={`${formatCount(summary.lowRatings)} at 1–2 stars`}
+              />
+              <Metric
+                label="Form Submissions"
+                value={formatCount(summary.formSubmissions)}
+                note="3–5 stars, Continue to review"
+              />
+              <Metric label="Generate" value={formatCount(summary.generateActions)} note="Generate + Regenerate + Retry clicks" />
               <Metric label="Generation Completed" value={formatCount(summary.generations)} />
               <Metric label="XHS Publish Clicks" value={formatCount(summary.xhsPublishClicks)} />
               <Metric label="Dianping Publish Clicks" value={formatCount(summary.dianpingPublishClicks)} />
             </section>
+            {summary.legacyFormSubmissions > 0 ? (
+              <p className="text-xs text-muted-foreground">
+                {formatCount(summary.legacyFormSubmissions)} older form submissions in this range were recorded once per
+                generation request (before 2026-10-19). They are not included in Form Submissions or Generate.
+              </p>
+            ) : null}
 
-            <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <Metric label="QR → Rating" value={formatRate(conversion.qrToRating)} />
               <Metric label="QR → Form" value={formatRate(conversion.qrToForm)} />
-              <Metric label="Form → Generation" value={formatRate(conversion.formToGeneration)} />
+              <Metric label="Form → Generate" value={formatRate(conversion.formToGenerate)} />
+              <Metric label="Generate → Completed" value={formatRate(conversion.generateToComplete)} />
               <Metric label="Generation → XHS Click" value={formatRate(conversion.generationToXhs)} />
               <Metric label="QR → XHS Click" value={formatRate(conversion.qrToXhs)} />
             </section>
 
             <section className="overflow-x-auto rounded-2xl bg-card p-4 ring-1 ring-border/70">
               <h2 className="mb-3 text-base font-semibold">Daily</h2>
-              <table className="w-full min-w-[640px] text-left text-sm">
+              <table className="w-full min-w-[760px] text-left text-sm">
                 <thead>
                   <tr className="text-muted-foreground">
                     <th className="pb-2 font-medium">Date</th>
                     <th className="pb-2 font-medium">QR Scans</th>
+                    <th className="pb-2 font-medium">Ratings</th>
                     <th className="pb-2 font-medium">Forms</th>
-                    <th className="pb-2 font-medium">Generations</th>
+                    <th className="pb-2 font-medium">Generate</th>
+                    <th className="pb-2 font-medium">Completed</th>
                     <th className="pb-2 font-medium">XHS Clicks</th>
                     <th className="pb-2 font-medium">Dianping Clicks</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {(report.daily.length ? report.daily : [{ date: "—", qrScans: 0, formSubmissions: 0, generations: 0, xhsPublishClicks: 0, dianpingPublishClicks: 0 }]).map((row) => (
+                  {(report.daily.length
+                    ? report.daily
+                    : [
+                        {
+                          date: "—",
+                          qrScans: 0,
+                          ratingSubmissions: 0,
+                          formSubmissions: 0,
+                          generateActions: 0,
+                          generations: 0,
+                          xhsPublishClicks: 0,
+                          dianpingPublishClicks: 0,
+                        },
+                      ]
+                  ).map((row) => (
                     <tr key={row.date} className="border-t border-border/60">
                       <td className="py-2">{row.date}</td>
                       <td>{formatCount(row.qrScans)}</td>
+                      <td>{formatCount(row.ratingSubmissions)}</td>
                       <td>{formatCount(row.formSubmissions)}</td>
+                      <td>{formatCount(row.generateActions)}</td>
                       <td>{formatCount(row.generations)}</td>
                       <td>{formatCount(row.xhsPublishClicks)}</td>
                       <td>{formatCount(row.dianpingPublishClicks)}</td>
@@ -209,6 +247,59 @@ export default function AnalyticsDashboardPage() {
                 </tbody>
               </table>
             </section>
+
+            <section className="overflow-x-auto rounded-2xl bg-card p-4 ring-1 ring-border/70">
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                <h2 className="mr-2 text-base font-semibold">Low-rating feedback</h2>
+                {(
+                  [
+                    { id: "", label: "1–2 stars" },
+                    { id: "1", label: "1 star" },
+                    { id: "2", label: "2 stars" },
+                  ] as const
+                ).map((item) => (
+                  <button
+                    key={item.id || "all"}
+                    type="button"
+                    className={`rounded-full px-3 py-1 text-xs ${
+                      lowStars === item.id
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-background text-foreground ring-1 ring-border"
+                    }`}
+                    onClick={() => setLowStars(item.id)}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+              <table className="w-full min-w-[520px] text-left text-sm">
+                <thead>
+                  <tr className="text-muted-foreground">
+                    <th className="pb-2 font-medium">Time (Bangkok)</th>
+                    <th className="pb-2 font-medium">Stars</th>
+                    <th className="pb-2 font-medium">Feedback</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {report.lowRatingFeedback.length ? (
+                    report.lowRatingFeedback.map((row) => (
+                      <tr key={row.reviewId || row.timestamp} className="border-t border-border/60 align-top">
+                        <td className="whitespace-nowrap py-2 pr-4">{formatBangkokTime(row.timestamp)}</td>
+                        <td className="pr-4">{row.rating}</td>
+                        <td className="whitespace-pre-wrap break-words">{row.feedback || "—"}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr className="border-t border-border/60">
+                      <td className="py-2" colSpan={3}>
+                        —
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+              <p className="mt-2 text-xs text-muted-foreground">Newest 100 in the selected range.</p>
+            </section>
           </>
         ) : null}
       </div>
@@ -216,11 +307,22 @@ export default function AnalyticsDashboardPage() {
   );
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
+function formatBangkokTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value || "—";
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Bangkok",
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
+}
+
+function Metric({ label, value, note }: { label: string; value: string; note?: string }) {
   return (
     <div className="rounded-2xl bg-card p-4 ring-1 ring-border/70">
       <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
       <p className="mt-2 text-2xl font-semibold text-foreground">{value}</p>
+      {note ? <p className="mt-1 text-xs text-muted-foreground">{note}</p> : null}
     </div>
   );
 }

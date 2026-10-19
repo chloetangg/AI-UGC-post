@@ -8,11 +8,10 @@ import { useLanguage, useT } from "@/components/providers/language-provider";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { trackAnalyticsEvent } from "@/lib/analytics/track-client";
+import { sendFunnelEvent } from "@/lib/analytics/funnel-client";
 import { RATING_FEEDBACK_MAX_LENGTH } from "@/lib/analytics/types";
-import { markEntryRatingPassed, NEW_RATING_PARAM } from "@/lib/entry-rating";
+import { clearReviewId, ensureReviewId, markEntryRatingPassed, NEW_RATING_PARAM } from "@/lib/entry-rating";
 import { campaignPath } from "@/lib/flow";
-import { createId } from "@/lib/id";
 import { interpolate } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
@@ -27,17 +26,11 @@ const HEADING_SIZE_CLASS = {
 
 /** Survives client navigation, resets on a full page load. */
 let thankYouInThisVisit = false;
-/** Used when sessionStorage is blocked, so one visit still keeps one review id. */
-const memoryReviewIds = new Map<string, string>();
 /** Step-1 stars kept across in-app navigation (Back); a browser refresh starts empty. */
 const stepOneRatings = new Map<string, number>();
 
 function storageKey(campaignId: string) {
   return `ugc-entry-rating:${campaignId}`;
-}
-
-function reviewKey(campaignId: string) {
-  return `ugc-entry-review:${campaignId}`;
 }
 
 function submittedKey(campaignId: string) {
@@ -73,44 +66,43 @@ function readRating(campaignId: string) {
   return value >= 1 && value <= 5 ? value : null;
 }
 
-/** One review per visit: the same id is sent on every retry, so the unique eventId index drops repeats. */
-function reviewId(campaignId: string) {
-  const existing = readStorage(reviewKey(campaignId)) || memoryReviewIds.get(campaignId) || "";
-  if (existing) return existing;
-  const id = createId();
-  memoryReviewIds.set(campaignId, id);
-  writeStorage(reviewKey(campaignId), id);
-  return id;
-}
-
 /** Ends the current round: only this flow's keys, never the rest of sessionStorage. */
 function resetRatingFlow(campaignId: string) {
   removeStorage(storageKey(campaignId));
-  removeStorage(reviewKey(campaignId));
   removeStorage(submittedKey(campaignId));
-  memoryReviewIds.delete(campaignId);
+  clearReviewId(campaignId);
   stepOneRatings.delete(campaignId);
   thankYouInThisVisit = false;
 }
 
-/** Records this round's rating once; retries reuse the same eventId, so the unique index drops repeats. */
+/**
+ * Saves this round's rating and returns false unless MongoDB has it. A retry sends the same reviewId, so the
+ * unique index drops repeats. Saved stars changed afterwards (Back, then another star) start a new round,
+ * otherwise a later 1–2 star review and its feedback would be skipped as "already sent".
+ */
 async function submitRating(campaignId: string, rating: number, note: string) {
-  const low = isLowRating(rating);
-  const eventId = `rating_submitted:${reviewId(campaignId)}`;
-  if (readStorage(submittedKey(campaignId)) !== eventId) {
-    await trackAnalyticsEvent({
+  const submitted = readStorage(submittedKey(campaignId));
+  let reviewId = ensureReviewId(campaignId);
+  if (submitted && submitted !== `${reviewId}:${rating}`) {
+    clearReviewId(campaignId);
+    reviewId = ensureReviewId(campaignId);
+  }
+  const marker = `${reviewId}:${rating}`;
+  if (submitted !== marker) {
+    const saved = await sendFunnelEvent({
       eventType: "rating_submitted",
-      eventId,
-      metadata: {
-        rating: String(rating),
-        band: low ? "rating_low" : "rating_positive",
-        campaignId,
-        ...(note ? { feedback: note } : {}),
-      },
+      metadata: { rating: String(rating), campaignId, reviewId, ...(note ? { feedback: note } : {}) },
     });
-    writeStorage(submittedKey(campaignId), eventId);
+    if (!saved) return null;
+    writeStorage(submittedKey(campaignId), marker);
   }
   writeStorage(storageKey(campaignId), String(rating));
+  return reviewId;
+}
+
+/** 3–5 stars only, once per round: the server keys it by reviewId and refuses it without a positive rating. */
+function submitFormStart(campaignId: string, reviewId: string) {
+  return sendFunnelEvent({ eventType: "form_submit", metadata: { campaignId, reviewId } });
 }
 
 /** Drops round-specific params so a later refresh resumes this round instead of starting another. */
@@ -169,6 +161,7 @@ export function RatingPageClient({
   const [draw, setDraw] = useState(initialDraw);
   const [rating, setRating] = useState<number | null>(() => stepOneRatings.get(campaignId) ?? null);
   const [submitting, setSubmitting] = useState(false);
+  const [saveFailed, setSaveFailed] = useState(false);
   const inFlight = useRef(false);
 
   useLayoutEffect(() => {
@@ -212,6 +205,7 @@ export function RatingPageClient({
 
   function selectRating(next: number) {
     setRating(next);
+    setSaveFailed(false);
     stepOneRatings.set(campaignId, next);
     const params = new URLSearchParams(window.location.search);
     params.set("stars", String(next));
@@ -222,13 +216,20 @@ export function RatingPageClient({
     if (rating == null || inFlight.current) return;
     if (isLowRating(rating)) {
       writeStorage(storageKey(campaignId), String(rating));
-      reviewId(campaignId);
+      ensureReviewId(campaignId);
       router.push(`/c/${campaignId}/rating/review?stars=${rating}`);
       return;
     }
     inFlight.current = true;
     setSubmitting(true);
-    await submitRating(campaignId, rating, "");
+    setSaveFailed(false);
+    const reviewId = await submitRating(campaignId, rating, "");
+    if (!reviewId || !(await submitFormStart(campaignId, reviewId))) {
+      inFlight.current = false;
+      setSubmitting(false);
+      setSaveFailed(true);
+      return;
+    }
     markEntryRatingPassed(campaignId);
     router.push(campaignPath(campaignId, "experience"));
   }
@@ -257,8 +258,11 @@ export function RatingPageClient({
           >
             {t.rating.continueToReview}
           </Button>
-          <p className="mt-2.5 h-4 text-center text-xs text-muted-foreground" aria-live="polite">
-            {rating == null ? t.rating.selectFirst : null}
+          <p
+            className={cn("mt-2.5 min-h-4 text-center text-xs", saveFailed ? "text-destructive" : "text-muted-foreground")}
+            aria-live="polite"
+          >
+            {saveFailed ? t.rating.saveFailed : rating == null ? t.rating.selectFirst : null}
           </p>
         </>
       }
@@ -323,6 +327,7 @@ export function RatingReviewClient({
   const t = useT();
   const [feedback, setFeedback] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [saveFailed, setSaveFailed] = useState(false);
   const inFlight = useRef(false);
   const low = isLowRating(rating);
 
@@ -336,7 +341,13 @@ export function RatingReviewClient({
     if (inFlight.current || (low && !note)) return;
     inFlight.current = true;
     setSubmitting(true);
-    await submitRating(campaignId, rating, note);
+    setSaveFailed(false);
+    if (!(await submitRating(campaignId, rating, note))) {
+      inFlight.current = false;
+      setSubmitting(false);
+      setSaveFailed(true);
+      return;
+    }
     if (low) {
       thankYouInThisVisit = true;
       router.push(`/c/${campaignId}/rating?draw=1`);
@@ -358,6 +369,11 @@ export function RatingReviewClient({
           >
             {submitting ? t.rating.submitting : t.rating.submitReview}
           </Button>
+          {saveFailed ? (
+            <p className="text-center text-xs text-destructive" aria-live="polite">
+              {t.rating.saveFailed}
+            </p>
+          ) : null}
           <Button type="button" variant="ghost" className={BUTTON_CLASS} disabled={submitting} onClick={goBack}>
             {t.rating.back}
           </Button>

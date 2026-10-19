@@ -59,6 +59,10 @@ export type GenerateRequestBody = GeneratePostInput & {
   brandContext?: BrandContext;
   contentStrategy?: ContentStrategyLibrary;
   analyticsSessionId?: string;
+  /** This rating round, and the Generate / Regenerate / Retry click that started this request. */
+  reviewId?: string;
+  generationActionId?: string;
+  generationActionType?: string;
   brandId?: string;
   branchId?: string;
 };

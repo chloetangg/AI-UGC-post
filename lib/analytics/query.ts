@@ -1,3 +1,4 @@
+import type { Document } from "mongodb";
 import { getDeploymentConfig } from "@/lib/deployment/config";
 import { dashboardBranchById } from "@/lib/deployment/databases";
 import { getNamedDb } from "@/lib/mongodb";
@@ -6,11 +7,43 @@ import { ensureAnalyticsIndexes } from "@/lib/analytics/events";
 import {
   ANALYTICS_COLLECTION,
   ANALYTICS_TIMEZONE,
+  FORM_SUBMIT_SOURCE,
   type AnalyticsDailyRow,
-  type AnalyticsEventType,
+  type AnalyticsLowRatingRow,
   type AnalyticsQrRow,
   type AnalyticsReport,
+  type AnalyticsSummary,
 } from "@/lib/analytics/types";
+
+const LOW_RATING_ROWS = 100;
+
+/**
+ * Each dashboard number is one plain filter, so a figure means exactly one event definition.
+ * Form Submission is only the 3–5 star Continue; older `form_submit` rows (one per /api/generate request)
+ * are counted apart and never added in. Generate counts every click; Generation Complete every success.
+ */
+export const METRIC_FILTERS = {
+  qrScans: { eventType: "qr_scan" },
+  ratingSubmissions: { eventType: "rating_submitted" },
+  lowRatings: { eventType: "rating_submitted", "metadata.band": "rating_low" },
+  formSubmissions: { eventType: "form_submit", "metadata.source": FORM_SUBMIT_SOURCE },
+  legacyFormSubmissions: { eventType: "form_submit", "metadata.source": { $ne: FORM_SUBMIT_SOURCE } },
+  generateActions: { eventType: "generate" },
+  generations: { eventType: "generation_complete" },
+  xhsPublishClicks: { eventType: "xhs_publish_click" },
+  dianpingPublishClicks: { eventType: "publish_dianping_click" },
+} as const satisfies Record<Exclude<keyof AnalyticsSummary, "uniqueVisitors">, Document>;
+
+type CountedMetric = keyof typeof METRIC_FILTERS;
+const DAILY_METRICS = [
+  "qrScans",
+  "ratingSubmissions",
+  "formSubmissions",
+  "generateActions",
+  "generations",
+  "xhsPublishClicks",
+  "dianpingPublishClicks",
+] as const satisfies readonly CountedMetric[];
 
 function percent(numerator: number, denominator: number) {
   if (!denominator) return 0;
@@ -21,17 +54,24 @@ function asCount(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
 
+export function parseLowRatingStars(value: string | null | undefined): 1 | 2 | null {
+  const text = value?.trim();
+  return text === "1" ? 1 : text === "2" ? 2 : null;
+}
+
 export async function queryAnalyticsReport(input: {
   range?: string;
   startDate?: string;
   endDate?: string;
   qrCodeId?: string;
   branchId?: string;
+  lowRatingStars?: string;
 }): Promise<AnalyticsReport> {
   const branch = dashboardBranchById(input.branchId?.trim() || getDeploymentConfig().branchId);
   if (!branch) throw new Error("Unknown branch");
   const window = resolveAnalyticsWindow(input);
   const qrCodeId = input.qrCodeId?.trim() || "";
+  const lowRatingStars = parseLowRatingStars(input.lowRatingStars);
   const match: Record<string, unknown> = {};
   if (window.from || window.to) {
     match.timestamp = {
@@ -41,102 +81,76 @@ export async function queryAnalyticsReport(input: {
   }
   if (qrCodeId) match.qrCodeId = qrCodeId;
 
-  const db = await getNamedDb(branch.dbName);
-  await ensureAnalyticsIndexes(db);
-  const [facet] = await db
-    .collection(ANALYTICS_COLLECTION)
-    .aggregate<{
-      counts?: Array<{ _id: AnalyticsEventType; count: number }>;
-      uniqueVisitors?: Array<{ count: number }>;
-      rednoteClicks?: Array<{ count: number }>;
-      dianpingClicks?: Array<{ count: number }>;
-      daily?: Array<{
-        _id: string;
-        qrScans: number;
-        formSubmissions: number;
-        generations: number;
-        xhsPublishClicks: number;
-        dianpingPublishClicks: number;
-      }>;
-      byQrCode?: Array<{ _id: string; scans: number }>;
-    }>([
-      { $match: match },
+  const day = { $dateToString: { format: "%Y-%m-%d", date: "$timestamp", timezone: ANALYTICS_TIMEZONE } };
+  const facets: Record<string, Document[]> = {
+    uniqueVisitors: [{ $group: { _id: "$sessionId" } }, { $count: "count" }],
+    byQrCode: [
+      { $match: METRIC_FILTERS.qrScans },
+      { $group: { _id: "$qrCodeId", scans: { $sum: 1 } } },
+      { $sort: { scans: -1 } },
+    ],
+    lowRatingFeedback: [
       {
-        $facet: {
-          counts: [{ $group: { _id: "$eventType", count: { $sum: 1 } } }],
-          uniqueVisitors: [
-            { $group: { _id: "$sessionId" } },
-            { $count: "count" },
-          ],
-          rednoteClicks: [
-            { $match: { eventType: "xhs_publish_click" } },
-            { $count: "count" },
-          ],
-          dianpingClicks: [
-            { $match: { eventType: "publish_dianping_click" } },
-            { $count: "count" },
-          ],
-          daily: [
-            {
-              $group: {
-                _id: {
-                  $dateToString: {
-                    format: "%Y-%m-%d",
-                    date: "$timestamp",
-                    timezone: ANALYTICS_TIMEZONE,
-                  },
-                },
-                qrScans: {
-                  $sum: { $cond: [{ $eq: ["$eventType", "qr_scan"] }, 1, 0] },
-                },
-                formSubmissions: {
-                  $sum: { $cond: [{ $eq: ["$eventType", "form_submit"] }, 1, 0] },
-                },
-                generations: {
-                  $sum: { $cond: [{ $eq: ["$eventType", "generation_complete"] }, 1, 0] },
-                },
-                xhsPublishClicks: {
-                  $sum: { $cond: [{ $eq: ["$eventType", "xhs_publish_click"] }, 1, 0] },
-                },
-                dianpingPublishClicks: {
-                  $sum: { $cond: [{ $eq: ["$eventType", "publish_dianping_click"] }, 1, 0] },
-                },
-              },
-            },
-            { $sort: { _id: 1 } },
-          ],
-          byQrCode: [
-            { $match: { eventType: "qr_scan" } },
-            { $group: { _id: "$qrCodeId", scans: { $sum: 1 } } },
-            { $sort: { scans: -1 } },
-          ],
+        $match: {
+          ...METRIC_FILTERS.lowRatings,
+          ...(lowRatingStars ? { "metadata.rating": String(lowRatingStars) } : {}),
         },
       },
-    ])
+      { $sort: { timestamp: -1 } },
+      { $limit: LOW_RATING_ROWS },
+    ],
+  };
+  for (const [key, filter] of Object.entries(METRIC_FILTERS)) {
+    facets[key] = [{ $match: filter }, { $count: "count" }];
+  }
+  for (const key of DAILY_METRICS) {
+    facets[`daily_${key}`] = [
+      { $match: METRIC_FILTERS[key] },
+      { $group: { _id: day, count: { $sum: 1 } } },
+    ];
+  }
+
+  const db = await getNamedDb(branch.dbName);
+  await ensureAnalyticsIndexes(db);
+  const [facet = {}] = await db
+    .collection(ANALYTICS_COLLECTION)
+    .aggregate<Record<string, Document[]>>([{ $match: match }, { $facet: facets }])
     .toArray();
 
-  const counts = new Map((facet?.counts ?? []).map((row) => [row._id, asCount(row.count)]));
+  const counted = (key: string) => asCount(facet[key]?.[0]?.count);
   const summary = {
-    qrScans: counts.get("qr_scan") ?? 0,
-    uniqueVisitors: asCount(facet?.uniqueVisitors?.[0]?.count),
-    formSubmissions: counts.get("form_submit") ?? 0,
-    generations: counts.get("generation_complete") ?? 0,
-    xhsPublishClicks: asCount(facet?.rednoteClicks?.[0]?.count),
-    dianpingPublishClicks: asCount(facet?.dianpingClicks?.[0]?.count),
-  };
+    uniqueVisitors: counted("uniqueVisitors"),
+    ...Object.fromEntries(Object.keys(METRIC_FILTERS).map((key) => [key, counted(key)])),
+  } as AnalyticsSummary;
 
-  const daily: AnalyticsDailyRow[] = (facet?.daily ?? []).map((row) => ({
-    date: row._id,
-    qrScans: asCount(row.qrScans),
-    formSubmissions: asCount(row.formSubmissions),
-    generations: asCount(row.generations),
-    xhsPublishClicks: asCount(row.xhsPublishClicks),
-    dianpingPublishClicks: asCount(row.dianpingPublishClicks),
-  }));
+  const days = new Map<string, AnalyticsDailyRow>();
+  for (const key of DAILY_METRICS) {
+    for (const row of facet[`daily_${key}`] ?? []) {
+      const date = String(row._id ?? "");
+      if (!date) continue;
+      const entry =
+        days.get(date) ??
+        ({ date, ...Object.fromEntries(DAILY_METRICS.map((metric) => [metric, 0])) } as AnalyticsDailyRow);
+      entry[key] = asCount(row.count);
+      days.set(date, entry);
+    }
+  }
+  const daily = [...days.values()].sort((left, right) => left.date.localeCompare(right.date));
 
-  const byQrCode: AnalyticsQrRow[] = (facet?.byQrCode ?? [])
+  const byQrCode: AnalyticsQrRow[] = (facet.byQrCode ?? [])
     .filter((row) => row._id)
-    .map((row) => ({ qrCodeId: row._id, scans: asCount(row.scans) }));
+    .map((row) => ({ qrCodeId: String(row._id), scans: asCount(row.scans) }));
+
+  const lowRatingFeedback: AnalyticsLowRatingRow[] = (facet.lowRatingFeedback ?? []).map((row) => {
+    const metadata = (row.metadata ?? {}) as Record<string, unknown>;
+    const timestamp = row.timestamp instanceof Date ? row.timestamp.toISOString() : String(row.timestamp ?? "");
+    return {
+      reviewId: typeof metadata.reviewId === "string" ? metadata.reviewId : "",
+      rating: Number(metadata.rating) || 0,
+      feedback: typeof metadata.feedback === "string" ? metadata.feedback : "",
+      timestamp,
+    };
+  });
 
   return {
     range: window.range,
@@ -147,12 +161,17 @@ export async function queryAnalyticsReport(input: {
     branchName: branch.name,
     summary,
     conversion: {
+      qrToRating: percent(summary.ratingSubmissions, summary.qrScans),
       qrToForm: percent(summary.formSubmissions, summary.qrScans),
+      formToGenerate: percent(summary.generateActions, summary.formSubmissions),
+      generateToComplete: percent(summary.generations, summary.generateActions),
       formToGeneration: percent(summary.generations, summary.formSubmissions),
       generationToXhs: percent(summary.xhsPublishClicks, summary.generations),
       qrToXhs: percent(summary.xhsPublishClicks, summary.qrScans),
     },
     daily,
     byQrCode,
+    lowRatingStars,
+    lowRatingFeedback,
   };
 }

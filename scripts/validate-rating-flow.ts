@@ -4,6 +4,8 @@
  */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import * as nodeModule from "node:module";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { analyticsEventId } from "../lib/analytics/events";
 import { NextRequest } from "next/server";
 import { parseStarRating, ratingEventMetadata, sanitizeEventMetadata } from "../lib/analytics/types";
@@ -39,6 +41,19 @@ assert.equal(
   "rating_submitted:review-1",
   "client eventId is kept, so the unique index drops a repeated submit",
 );
+
+type ResolveHook = (
+  specifier: string,
+  context: unknown,
+  nextResolve: (specifier: string, context: unknown) => unknown,
+) => unknown;
+const headersStub = pathToFileURL(fileURLToPath(new URL("./stubs/next-headers.cjs", import.meta.url))).href;
+(nodeModule as unknown as { registerHooks: (hooks: { resolve: ResolveHook }) => void }).registerHooks({
+  resolve(specifier, context, nextResolve) {
+    if (specifier === "next/headers") return { url: headersStub, shortCircuit: true, format: "commonjs" };
+    return nextResolve(specifier, context);
+  },
+});
 
 async function postEvent(body: unknown) {
   const { POST } = await import("../app/api/analytics/events/route");
@@ -83,14 +98,14 @@ async function checkNewRound(client: string, step1: string) {
   assert.match(page, /newRound=\{newRound\}/);
 
   const reset = fnBody(client, "resetRatingFlow");
-  for (const key of ["storageKey", "reviewKey", "submittedKey"]) {
+  for (const key of ["storageKey", "submittedKey"]) {
     assert.match(reset, new RegExp(`removeStorage\\(${key}\\(campaignId\\)\\)`), `reset clears ${key}`);
   }
-  assert.match(reset, /memoryReviewIds\.delete\(campaignId\)/);
+  assert.match(reset, /clearReviewId\(campaignId\)/, "reset drops the review id, so the next round gets a new one");
   assert.match(reset, /thankYouInThisVisit = false/);
   assert.doesNotMatch(client, /sessionStorage\.clear\(/, "never wipes unrelated sessionStorage");
   assert.equal(client.match(/resetRatingFlow\(campaignId\)/g)?.length, 2, "only the new-round entry and Rate again reset");
-  assert.equal(client.match(/removeStorage\(/g)?.length, 4, "keys are removed only inside resetRatingFlow");
+  assert.equal(client.match(/removeStorage\(/g)?.length, 3, "keys are removed only inside resetRatingFlow");
 
   assert.match(step1, /if \(!newRound\) return;\s*resetRatingFlow\(campaignId\);/, "reset only runs on an explicit new round");
   assert.match(fnBody(step1.replace(/^  /gm, ""), "rateAgain"), /resetRatingFlow\(campaignId\);\s*setDraw\(false\);\s*setRating\(null\);/);
@@ -109,18 +124,21 @@ async function checkNewRound(client: string, step1: string) {
 }
 
 async function main() {
+  const round = { campaignId: "baan-ying-centralworld", reviewId: "11111111-2222-4333-8444-555555555555" };
   for (const rating of ["0", "6", "9", "2.5", "x"]) {
-    const result = await postEvent({ eventType: "rating_submitted", metadata: { rating, campaignId: "c" } });
+    const result = await postEvent({ eventType: "rating_submitted", metadata: { ...round, rating } });
     assert.equal(result.status, 400, `backend rejects rating ${rating}`);
     assert.equal(result.json.ok, false);
   }
-  const missing = await postEvent({ eventType: "rating_submitted", metadata: { campaignId: "c" } });
+  const missing = await postEvent({ eventType: "rating_submitted", metadata: round });
   assert.equal(missing.status, 400, "backend rejects a rating event without stars");
+  const noReview = await postEvent({ eventType: "rating_submitted", metadata: { campaignId: round.campaignId, rating: "4" } });
+  assert.equal(noReview.status, 400, "backend rejects a rating without a review id");
 
   const client = readFileSync(new URL("../app/c/[campaignId]/rating/rating-page-client.tsx", import.meta.url), "utf8");
   const step1 = client.slice(client.indexOf("export function RatingPageClient"), client.indexOf("export function RatingReviewClient"));
   const step2 = client.slice(client.indexOf("export function RatingReviewClient"));
-  assert.doesNotMatch(step1, /trackAnalyticsEvent|Textarea/, "step 1 shows no feedback box and only submits through submitRating");
+  assert.doesNotMatch(step1, /trackAnalyticsEvent|sendFunnelEvent|Textarea/, "step 1 shows no feedback box and only submits through submitRating");
   assert.match(step1, /disabled=\{rating == null \|\| submitting\}/, "continue is disabled until a star is chosen and while sending");
   const continueFn = fnBody(step1.replace(/^  /gm, ""), "continueToReview");
   assert.match(
@@ -130,13 +148,20 @@ async function main() {
   );
   assert.match(
     continueFn,
-    /inFlight\.current = true;[\s\S]*await submitRating\(campaignId, rating, ""\);\s*markEntryRatingPassed\(campaignId\);\s*router\.push\(campaignPath\(campaignId, "experience"\)\);/,
-    "3–5 stars record the rating once, then open the experience page",
+    /inFlight\.current = true;[\s\S]*const reviewId = await submitRating\(campaignId, rating, ""\);\s*if \(!reviewId \|\| !\(await submitFormStart\(campaignId, reviewId\)\)\) \{[\s\S]*?setSaveFailed\(true\);\s*return;\s*\}\s*markEntryRatingPassed\(campaignId\);\s*router\.push\(campaignPath\(campaignId, "experience"\)\);/,
+    "3–5 stars open the experience page only after the rating and form_submit are both saved",
   );
   const submit = fnBody(client, "submitRating");
-  assert.match(submit, /eventId,/, "the rating carries a stable eventId");
-  assert.match(submit, /readStorage\(submittedKey\(campaignId\)\) !== eventId/, "a round already recorded is not sent again");
-  assert.match(step2, /await submitRating\(campaignId, rating, note\)/);
+  assert.match(submit, /reviewId,/, "the rating carries this round's review id; the server builds the eventId from it");
+  assert.match(submit, /if \(submitted !== marker\) \{/, "a round already recorded with these stars is not sent again");
+  assert.match(submit, /if \(!saved\) return null;\s*writeStorage\(submittedKey\(campaignId\), marker\);/, "the round is marked sent only after MongoDB saved it");
+  assert.match(submit, /submitted && submitted !== `\$\{reviewId\}:\$\{rating\}`[\s\S]*?clearReviewId\(campaignId\);/, "changed stars after a saved round start a new round");
+  assert.match(fnBody(client, "submitFormStart"), /eventType: "form_submit"/);
+  assert.match(step2, /if \(!\(await submitRating\(campaignId, rating, note\)\)\) \{[\s\S]*?setSaveFailed\(true\);\s*return;\s*\}/, "a failed review stays on the page");
+  assert.match(step2, /\{saveFailed \? \([\s\S]*?t\.rating\.saveFailed/, "a failed review shows the save error");
+  for (const language of ["en", "zh", "th"] as const) {
+    assert.ok(translations[language].rating.saveFailed.trim(), `${language} has a save error`);
+  }
   assert.match(step2, /const note = low \? feedback\.trim\(\) : ""/, "feedback is only sent for 1–2 stars");
   assert.match(step2, /if \(inFlight\.current \|\| \(low && !note\)\) return;/, "1–2 stars cannot submit without feedback");
   assert.match(step2, /disabled=\{submitting \|\| \(low && !feedback\.trim\(\)\)\}/, "submit stays disabled until feedback is typed");

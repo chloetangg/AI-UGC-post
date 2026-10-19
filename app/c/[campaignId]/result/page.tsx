@@ -31,9 +31,11 @@ export default function ResultPage() {
     updateGeneratedTitles,
     retryCover,
     selectCoverTemplate,
+    startGenerateAction,
   } = useCampaignFlow();
   const t = useT();
   const [saved, setSaved] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -58,6 +60,13 @@ export default function ResultPage() {
     });
     setSaved(true);
     window.setTimeout(() => setSaved(false), 1600);
+  }
+
+  function regenerate() {
+    if (regenerating) return;
+    setRegenerating(true);
+    startGenerateAction("regenerate");
+    router.push(campaignPath(campaignId, "generating"));
   }
 
   function goToPublish() {
@@ -129,10 +138,7 @@ export default function ResultPage() {
       </div>
       <div className="sticky bottom-0 -mx-5 space-y-2 bg-gradient-to-t from-background via-background/95 to-transparent px-5 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
         <div className="grid grid-cols-2 gap-2">
-          <Button
-            variant="outline"
-            onClick={() => router.push(campaignPath(campaignId, "generating"))}
-          >
+          <Button variant="outline" disabled={regenerating} onClick={regenerate}>
             {t.result.regenerate}
           </Button>
           <Button variant="secondary" onClick={saveChanges}>

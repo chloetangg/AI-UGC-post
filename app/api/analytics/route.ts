@@ -13,6 +13,7 @@ export async function GET(request: Request) {
       endDate: url.searchParams.get("endDate") ?? "",
       qrCodeId: url.searchParams.get("qrCodeId") ?? "",
       branchId: url.searchParams.get("branch") ?? "",
+      lowRatingStars: url.searchParams.get("stars") ?? "",
     });
     return NextResponse.json(report);
   } catch (error) {

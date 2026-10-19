@@ -57,6 +57,7 @@ export function ExperiencePageClient() {
     photos,
     addPhotos,
     removePhoto,
+    startGenerateAction,
   } = useCampaignFlow();
   const t = useT();
   const [touched, setTouched] = useState(false);
@@ -88,10 +89,11 @@ export function ExperiencePageClient() {
 
   function continueNext() {
     setTouched(true);
-    if (!ready) return;
+    if (!ready || leaving) return;
     setLeaving(true);
     setProductFeedback(withDefaultBranch(feedback, campaignId));
     void saveFeelExpense();
+    startGenerateAction("initial");
     startTransition(() => {
       router.push(campaignPath(campaignId, "generating"));
     });

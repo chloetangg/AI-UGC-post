@@ -1,7 +1,7 @@
 # AI 小红书 / Rednote UGC 生成器
 
-**版本：** Consumer Demo v0.25  
-**日期：** 2026-10-12  
+**版本：** Consumer Demo v0.27  
+**日期：** 2026-10-19  
 **状态：** 同一套生成代码、两个互相隔离的分店部署（centralwOrld 与 Siam Center）。消费者端前端 + 两步星级入口 + ModelArk（默认）或 OpenAI 真实生成（标题 / 正文 / 话题标签 / 封面 mainTitle + subTitle / 封面选图）+ 内部 Content Strategy Layer + Human Style（正文和标题同一套写法）+ Cover Composer + 各分店自己的 MongoDB + GitHub / Vercel 部署
 
 本文记录当前代码里的行为。标题和正文的表情写法另见 `title-rules.md`、`emoji-rules.md`。不是完整产品 spec。线上两个地址跑的不一定是这份代码。
@@ -21,14 +21,14 @@
 | centralwOrld | [https://seedai-baanying.vercel.app](https://seedai-baanying.vercel.app) | `/c/baan-ying-centralworld/rating` |
 | Siam Center | [https://baan-ying-siam-center.vercel.app](https://baan-ying-siam-center.vercel.app) | `/c/baan-ying-siam-center/rating` |
 
-[https://aiugcpost.vercel.app](https://aiugcpost.vercel.app) 会跳到 centralwOrld 那个地址。部署：Vercel（Hobby，团队 `chloe-20b3`），两个项目各一份环境变量：centralwOrld 是 `ai_ugc_post`，Siam Center 是 `baan-ying-siam-center`。Git 分支：centralwOrld 从 `main` 发布；Siam Center 的代码在 `siam-center` 分支。
+[https://aiugcpost.vercel.app](https://aiugcpost.vercel.app) 会跳到 centralwOrld 那个地址。部署：Vercel（Hobby，团队 `chloe-20b3`），两个项目各一份环境变量：centralwOrld 是 `ai_ugc_post`，Siam Center 是 `baan-ying-siam-center`。Git 分支：centralwOrld 从 `main` 发布；Siam Center 的代码在 `siam-center` 分支。推到其他分支时，两个项目各自自动构建一个 Preview，连的是测试库，见 2.1。
 
 消费者进入后：
 
 1. 星级第一步：标题「为这次用餐体验评分」，下方「Baan Ying · 分店名」。选 1–5 星后点「继续评价」
-2. 1–2 星：进入反馈页「欢迎告知我们有待优化的地方」，意见必填，提交后到感谢页「感谢你的反馈！/ 感谢你的评价，请向店员出示此页面」，只有一个「重新评分」按钮。不进入后面的填写，也不生成帖子
-3. 3–5 星：点「继续评价」时记下评分，直接进入体验页「这次 Baan Ying 用餐体验怎么样？」：是否第一次、游客/本地、喜欢的点、推荐菜、推荐理由、用餐补充说明、本餐开销、来自哪里、上传 1–5 张照片
-4. Generating：一次文本请求写出标题 + 正文 + 5 个标签 + 封面 mainTitle / subTitle + 封面照片选择；地点按本轮模式写入或由系统追加，再调用 Cover Composer 自动生成封面
+2. 1–2 星：进入反馈页「欢迎告知我们有待优化的地方」，意见必填。点「提交评价」后，星级和完整意见写进 MongoDB，写入成功才到感谢页「感谢你的反馈！/ 感谢你的评价，请向店员出示此页面」，只有一个「重新评分」按钮。写入失败时留在反馈页，显示「评分没有保存成功，请检查网络后重试。」，可以再点一次。不进入后面的填写，也不生成帖子
+3. 3–5 星：点「继续评价」时写入评分（`rating_submitted`）和 `form_submit`，两条都写入成功才进入体验页「这次 Baan Ying 用餐体验怎么样？」：是否第一次、游客/本地、喜欢的点、推荐菜、推荐理由、用餐补充说明、本餐开销、来自哪里、上传 1–5 张照片。写入失败时留在第一步并显示同一句提示
+4. Generating：体验页必填项都通过后点「生成我的帖子」，记一次 `generate`。结果页每点一次「重新生成」、生成失败页每点一次「重新生成」（英文 Try again），也各记一次。一次文本请求写出标题 + 正文 + 5 个标签 + 封面 mainTitle / subTitle + 封面照片选择；地点按本轮模式写入或由系统追加，再调用 Cover Composer 自动生成封面
 5. POST：看封面、换封面风格（Style 1–6）、选正文标题、改正文、改标签
 6. SHARE：点「去发布」后选择小红书（系统分享发图）或大众点评（复制文案后手动发布）
 
@@ -70,21 +70,54 @@ NEXT_PUBLIC_DEPLOYMENT_ID=baan-ying-centralworld
 
 本地默认就是 centralwOrld，数据库名是 `baan-ying-centralworld`。要在本机看 Siam Center，两个部署变量都设成 `baan-ying-siam-center`，并且 `MONGODB_DB_NAME` 必须是 `baan-ying-siam-center`，不能用 `baan-ying-centralworld`。
 
-Vercel 上是两个项目，环境变量都要配 Production / Preview / Development，改完后各自 Redeploy：
+Vercel 上是两个项目。数据库变量按环境分开配：Production 和 Development 用正式库，Preview 用测试库（见 2.1）。改完后要重新部署才生效：
 
-| 变量 | centralwOrld | Siam Center |
-| --- | --- | --- |
-| `DEPLOYMENT_ID` | `baan-ying-centralworld` | `baan-ying-siam-center` |
-| `NEXT_PUBLIC_DEPLOYMENT_ID` | 与上面相同 | 与上面相同 |
-| `MONGODB_DB_NAME` | `baan-ying-centralworld` | `baan-ying-siam-center` |
-| `MONGODB_URI` | 各自的连接串 | 各自的连接串 |
-| `AI_PROVIDER` | 不设或 `modelark`。要改用 OpenAI 时才写 `openai` | 同左 |
-| `MODELARK_API_KEY` / `MODELARK_MODEL` | 默认必配。模型默认 `dola-seed-2-1-turbo-260628` | 同左 |
-| `OPENAI_API_KEY` / `OPENAI_MODEL` | 只在 `AI_PROVIDER=openai` 时需要 | 同左 |
+| 变量 | 勾选范围 | centralwOrld | Siam Center |
+| --- | --- | --- | --- |
+| `DEPLOYMENT_ID` | 全部环境 | 不配，默认就是 `baan-ying-centralworld` | `baan-ying-siam-center` |
+| `NEXT_PUBLIC_DEPLOYMENT_ID` | 全部环境 | 不配 | `baan-ying-siam-center` |
+| `MONGODB_URI` | Production + Development | 正式库的连接串 | 正式库的连接串 |
+| `MONGODB_DB_NAME` | Production + Development | `baan-ying-centralworld` | `baan-ying-siam-center` |
+| `AI_PROVIDER` | Production + Preview | 不设或 `modelark`。要改用 OpenAI 时才写 `openai` | 同左 |
+| `MODELARK_API_KEY` / `MODELARK_MODEL` | Production + Preview | 默认必配。模型默认 `dola-seed-2-1-turbo-260628` | 同左 |
+| `OPENAI_API_KEY` / `OPENAI_MODEL` | 全部环境 | 只在 `AI_PROVIDER=openai` 时需要 | 同左 |
 
-`NEXT_PUBLIC_DEPLOYMENT_ID` 给浏览器里的分店锁定用，只写服务端的 `DEPLOYMENT_ID` 不够。一个进程只加载一个部署。生成默认走 ModelArk；设了 `AI_PROVIDER=openai` 才走 OpenAI。成功后把文案写入**当前部署**的 Mongo `generations`，失败不挡住出帖。封面中文字体依赖 `public/fonts` 被打进 serverless bundle。
+两个部署变量都不配时，代码默认是 centralwOrld，所以 centralwOrld 可以不配。Siam Center 两个都要配：`NEXT_PUBLIC_DEPLOYMENT_ID` 给浏览器里的分店锁定用，只写服务端的 `DEPLOYMENT_ID` 不够。Siam Center 的正式 `MONGODB_DB_NAME` 现在勾的是全部环境，测试分支靠下面那条分支专用的值覆盖。一个进程只加载一个部署。生成默认走 ModelArk；设了 `AI_PROVIDER=openai` 才走 OpenAI。成功后把文案写入**当前部署**的 Mongo `generations`，失败不挡住出帖。封面中文字体依赖 `public/fonts` 被打进 serverless bundle。
 
 如果浏览器报 `ERR_CONNECTION_REFUSED`，说明 `npm run dev` 没在跑。
+
+### 2.1 Preview 测试环境
+
+推到 `main` / `siam-center` 以外的分支（例如 `sync/siam-center-rules-to-main`）时，两个项目都会自动构建 Preview。Preview 只能写测试库：
+
+| 变量 | 勾选范围 | centralwOrld | Siam Center |
+| --- | --- | --- | --- |
+| `MONGODB_URI` | 只勾 Preview | 测试账号的连接串 | 测试账号的连接串 |
+| `MONGODB_DB_NAME` | 只勾 Preview（Siam Center 另限定测试分支） | `baan-ying-centralworld-preview` | `baan-ying-siam-center-preview` |
+
+测试账号在 MongoDB Atlas 里只有这两个 `-preview` 库的 readWrite 权限。库名配错时写入会被拒绝，不会落进正式库。
+
+这两条必须配，因为代码不会自己选测试库：
+- centralwOrld 没有 `MONGODB_DB_NAME` 时，退回正式库 `baan-ying-centralworld`。
+- Siam Center 没有 `MONGODB_DB_NAME` 时直接报错。它也不能用 centralwOrld 的库名，但能用自己的正式库名。
+
+**重新部署：** 环境变量只在构建时读入，改完要重新部署。打开那个 Preview 部署，点「⋯」→「Redeploy」。确认环境是 Preview，不勾「Use existing Build Cache」。同一个菜单里有「Promote to Production」，不要点。
+
+**确认数据库能写入，再生成：**
+- 打开星级页会写一条 `qr_scan`。写入失败时，日志依次打印 `[analytics] record failed`、失败原因，以及 `qr_scan was not written to MongoDB`。成功不打印任何内容。
+- Vercel 日志会晚几分钟到十几分钟才出现。没有日志不等于没有报错。centralwOrld 的项目日志曾经二十多分钟都是空的。
+- 更快的判断：浏览器里 `/api/submissions` 返回 500，就是数据库写入失败。这个接口只在数据库出错时返回 500。
+- 生成成功时，日志里有 `[modelark] label=generate ... http=200` 和 `Generation Cost: Model: dola-seed-2-1-turbo-260628`。保存失败时有 `[generations] save failed`。
+- 登录失败的报错是 `bad auth : Authentication failed.`，多半是连接串里的账号或密码不对。例如 `<db_password>` 没替换、密码里有 `@` `#` `/` 等符号没转义，或账号建在了别的 Atlas 项目里。
+- Preview 上不要打开 `/analytics`。看板只认正式库名，不认 `-preview` 库（见 12.10）。
+
+**2026-10-15 测试结果（commit `97699b0`）：** 两个 Preview 都是 Ready，生成都成功：
+- Siam Center 的日志确认走 ModelArk：一次请求成功，输入 19,873 token，输出 190 token，费用 $0.0104。
+- centralwOrld 的日志看不到，所以是否走 ModelArk 只是按代码推断。
+
+但两个 Preview 连测试库都报 `bad auth`，任何库都没写进数据。要先在 Atlas 重设测试账号密码，更新两个项目的 Preview `MONGODB_URI`，重新部署，确认写入成功后再测生成。
+
+两个项目正式那条 `MONGODB_URI` 的勾选范围在 10-15 改成了 Production + Development。正在运行的正式站不受影响，下次正式部署前要确认值没变。
 
 ---
 
@@ -115,21 +148,21 @@ Vercel 上是两个项目，环境变量都要配 Production / Preview / Develop
         ↓
 星级第一步（为这次用餐体验评分 / Baan Ying · 分店 / 1–5 星 / 继续评价）
         ↓
-1–2 星 → 反馈页（意见必填 / 提交评价 / 返回）→ 感谢页（请向店员出示此页面 / 重新评分），不生成
-3–5 星 → 点「继续评价」时记评分
+1–2 星 → 反馈页（意见必填 / 提交评价 / 返回）→ 写入 rating_submitted（含意见）成功 → 感谢页（请向店员出示此页面 / 重新评分），不生成
+3–5 星 → 点「继续评价」→ 写入 rating_submitted + form_submit 都成功
         ↓
 体验页（这次 Baan Ying 用餐体验怎么样？/ 是否第一次 / 游客或本地 / 喜欢的点 / 菜 / 理由 / 补充说明 / 本餐开销 / 来自哪里 / 上传 1–5 张）
-        ↓
-Generating（1 次模型请求 → 地点按本轮模式处理 → 1 次 Cover Composer）
-        ↓
-POST（看封面 / 换 Style 1–6 / 选正文标题 / 改正文 / 改标签）
+        ↓ 必填都通过后点「生成我的帖子」→ generate（initial）
+Generating（1 次模型请求 → 地点按本轮模式处理 → 1 次 Cover Composer）→ 成功时 generation_complete
+        ↓                                   失败页点「重新生成」→ generate（retry）
+POST（看封面 / 换 Style 1–6 / 选正文标题 / 改正文 / 改标签；「重新生成」→ generate（regenerate））
         ↓
 SHARE（点「去发布」打开系统分享；可复制文案、保存图片）
 ```
 
 星级页不进进度条。进入填写之后，进度条是：**REVIEW → POST → SHARE**。
 
-1–2 星不会进入体验页，也不会打 `/api/generate`。3–5 星点「继续评价」后才放开后面的步骤。没填完体验页（含餐费、补充说明至少 10 个计数单位、至少 1 张照片），不能进生成。
+1–2 星不会进入体验页，也不会打 `/api/generate`，所以没有 `form_submit`、`generate`、`generation_complete`。3–5 星点「继续评价」并写入成功后才放开后面的步骤。没填完体验页（含餐费、补充说明至少 10 个计数单位、至少 1 张照片），不能进生成。
 
 ### 4.1 星级两步的细节
 
@@ -139,12 +172,14 @@ SHARE（点「去发布」打开系统分享；可复制文案、保存图片）
 | 第二步（反馈页）点「返回」 | 回到第一步，刚选的星级保留；先刷新第二步再点「返回」也保留 |
 | 第二步刷新 | 星级（地址里的 `?stars=N`）和门店名保留 |
 | 1–2 星反馈 | 必填：去掉首尾空格后为空时「提交评价」不可点。只发给 1–2 星；3–5 星不显示反馈框 |
+| 写入 MongoDB | 1–2 星点「提交评价」、3–5 星点「继续评价」时都要等服务器确认写入。失败（数据库连不上、10 秒超时）就留在原页，按钮恢复，显示「评分没有保存成功，请检查网络后重试。」。重试用同一个评价 ID，不会多出一条 |
+| 已提交后又改星级 | 例如 4 星继续后返回改成 2 星：算新一轮，换一个评价 ID 写入，2 星的意见不会被当成「已提交」丢掉 |
 | 直接打开 `rating/review?stars=3/4/5` | 送回第一步 |
 | 感谢页刷新 | 本轮已提交低分时仍是感谢页；没有提交记录就回第一步 |
 | 感谢页「重新评分」 | 开始新一轮：清掉上一轮的星级、评价 ID 和已提交标记，显示未选星的第一步 |
 | 扫码进入（`/qr/...`、`/`、`/c/[campaignId]`、别家 Campaign 路径） | 带 `?new=1` 开始新一轮，同样只清这三项，然后把 `new` 从地址里去掉 |
 
-第一步选的星级只存在页面内存里：站内返回还在，浏览器刷新就没了。本轮的评价 ID 和已提交标记存在 `sessionStorage`（`ugc-entry-review:{campaignId}`、`ugc-entry-review-submitted:{campaignId}`），星级另存 `ugc-entry-rating:{campaignId}`。新一轮只删这三个键，不清空整个 `sessionStorage`。
+第一步选的星级只存在页面内存里：站内返回还在，浏览器刷新就没了。本轮的评价 ID 和已提交标记存在 `sessionStorage`（`ugc-entry-review:{campaignId}`、`ugc-entry-review-submitted:{campaignId}`，后者的值是「评价 ID:星级」，只在写入成功后才写），星级另存 `ugc-entry-rating:{campaignId}`。新一轮只删这三个键，不清空整个 `sessionStorage`。评价 ID 由 `lib/entry-rating.ts` 管，体验页和结果页记 `generate` 时也带上它。
 
 刷新体验页会清空表单，并回到星级。同一次访问里按返回，已填内容还在。感谢页不再有抽奖按钮。
 
@@ -750,7 +785,7 @@ Cover Composer 失败时：「Cover generation failed」+ Retry Cover（只重�
 
 ### 12.9 生成结果入库（`generations`）
 
-每一次 **成功的** `/api/generate` 写入当前部署自己的 Mongo `generations` **一条新文档**（重新生成也是新文档，不覆盖旧的）。centralwOrld 的库名是 `baan-ying-centralworld`。Mongo 失败只打日志，不挡住出帖。
+每一次 **成功的** `/api/generate` 写入当前部署自己的 Mongo `generations` **一条新文档**（重新生成也是新文档，不覆盖旧的）。centralwOrld 的库名是 `baan-ying-centralworld`，Preview 用 `-preview` 测试库（见 2.1）。Mongo 失败只打日志 `[generations] save failed`，不挡住出帖，页面上看不出来。
 
 | 字段 | 内容 |
 | --- | --- |
@@ -770,21 +805,64 @@ Cover Composer 失败时：「Cover generation failed」+ Retry Cover（只重�
 
 ### 12.10 转化分析（`analytics_events`）
 
-漏斗埋点写进**当前部署自己的** Mongo（`MONGODB_URI` / `MONGODB_DB_NAME`），不加 OpenAI 请求。分析失败只打日志，不挡住扫码、生成、发帖。centralwOrld 的事件在数据库 `baan-ying-centralworld`，Siam Center 的事件在数据库 `baan-ying-siam-center`。
+漏斗埋点写进**当前部署自己的** Mongo（`MONGODB_URI` / `MONGODB_DB_NAME`），不加 OpenAI 请求。centralwOrld 的事件在数据库 `baan-ying-centralworld`，Siam Center 的事件在数据库 `baan-ying-siam-center`。
+
+`rating_submitted`、`form_submit`、`generate` 由浏览器发到 `POST /api/analytics/events`，由 `lib/analytics/funnel.ts` 校验后写入。这三种事件的 `eventId` 由服务器根据评价 ID 或操作 ID 生成，不用浏览器传来的值，所以重试同一轮、同一次点击只会碰到 `eventId` 唯一索引，不会多出一行。写入失败时接口返回 503 和 `ok:false`，不会报成功，服务器日志打 `[analytics] {事件} was not written to MongoDB ({eventId})`。
+
+接口拒绝（400）的情况：
+- `campaignId` 不是当前部署的；
+- 缺评价 ID 或操作 ID；
+- 星级不是 1–5 的整数；
+- 1–2 星的意见不是文字、为空，或去掉首尾空格后超过 1000 字。超长不会被截断后保存。
+
+其他事件（扫码、发布）照旧：失败只打日志，不挡住页面。
 
 | 事件 | 何时写入 | 去重 |
 | --- | --- | --- |
 | `qr_scan` | 服务端渲染星级页时 | 每次进入一条；`?draw=1`、带 `?stars=N` 的返回不再记。跳过 Link prefetch。`/qr/:qrCodeId` 只跳到星级页，不单独记 |
-| `rating_submitted` | 1–2 星：反馈页点「提交评价」时。3–5 星：第一步点「继续评价」时，等写入请求结束再跳体验页 | 每一轮评分一条：`eventId` 为 `rating_submitted:{本轮评价 ID}`，同一轮重试会被唯一索引丢掉；本轮已提交过就不再发送。`rating` 为 1–5，`band` 为 `rating_low`（1–2）或 `rating_positive`（3–5）。1–2 星带 `feedback`（最多 1000 字），3–5 星不带。后端拒绝不是 1–5 整数的星级（400） |
-| `form_submit` | 现有 `POST /api/generate` 真正发出时 | 每 session 一次 |
-| `generation_complete` | 现有 `/api/generate` 成功返回前 | 每 session 一次 |
+| `rating_submitted` | 1–2 星：反馈页点「提交评价」时，写入成功才到感谢页。3–5 星：第一步点「继续评价」时，写入成功才进体验页 | 每一轮评分一条：`eventId` 为 `rating_submitted:{评价 ID}`。本轮已用同样星级写入成功就不再发送；重试是重复，按成功处理。`rating` 为 1–5，`band` 为 `rating_low`（1–2）或 `rating_positive`（3–5）。1–2 星必带 `feedback`：去掉首尾空格后的完整原文，最多 1000 字。3–5 星即使传了意见也不存 |
+| `form_submit` | 3–5 星点「继续评价」，`rating_submitted` 写入成功后、进入体验页前 | 每一轮 3–5 星一条：`eventId` 为 `form_submit:{评价 ID}`，`metadata.source = rating_continue`。服务器先查这一轮有没有已写入的 3–5 星评分，没有就拒绝（409），所以 1–2 星不会有。进入生成、调用 `/api/generate`、点「重新生成」都不再记 |
+| `generate` | 一次真正发出的生成请求。由用户点击触发：体验页必填都通过后点「生成我的帖子」（`actionType=initial`）、结果页「重新生成」（`regenerate`）、生成失败页「重新生成」（`retry`）。点击只登记一个新的操作 ID；`generatePost` 真正发出请求时才写这条事件，点了却没发出请求的不记 | 每次生成操作一条：`eventId` 为 `generate:{操作 ID}`。操作 ID（`metadata.actionId`）就是本次生成操作的唯一 ID（generationAttemptId），同一个 ID 也随请求发给 `/api/generate`。带本轮评价 ID、`sessionId`，以及上一次的 `previousGenerationId`。必填没通过的点击不记；按钮在第一次点击后锁住，失败页每次失败只允许一次重试。Generating 页面重新渲染、React Strict Mode 第二次执行、刷新都不会再记：请求还在进行时直接复用，操作 ID 只被取用一次。只表示发起了生成，不代表模型成功 |
+| `generation_complete` | `/api/generate` 通过最终输出检查、返回成功结果之前 | 每次成功的生成操作一条：`eventId` 为 `generation_complete:{操作 ID}`（没有操作 ID 的请求用这次的 `generationId`）。同一次点击即使成功两次也只算一次；每次「重新生成」成功都另算一次。模型失败、输出检查失败、封面单独重试都不记。带 `generationId`、`reviewId`、`actionId`、`actionType` |
 | `publish_click` | 小红书系统分享成功，或确认打开 `xhsdiscover://post` | 每 session + platform 一次。系统分享：`platform=unknown`，`method=web_share`。Deep Link：`platform=xiaohongshu`，`method=deep_link`。取消不记 |
 | `publish_platform_selected` | SHARE 选择小红书或大众点评 | 每 session + platform 一次。大众点评只记选择，不记「已发布」 |
-| `xhs_publish_click` | 旧版 SHARE 点 Publish to Rednote | 历史数据保留读取。新的系统分享成功**不**再记此事件。看板 XHS 数 = 旧事件 + `publish_click` 且 platform 为 rednote/xiaohongshu |
+| `xhs_publish_click` | 旧版 SHARE 点 Publish to Rednote | 历史数据保留读取。新的系统分享成功**不**再记此事件。看板「XHS Publish Clicks」目前只数这个旧事件，`publish_click` 没有算进去 |
 
-进入星级页记一次 `qr_scan`，来源是 `rating-page`。`/qr/:qrCodeId` 只跳到星级页（`?new=1`），避免扫码被记两次。首页 `/` 和 `/c/baan-ying` 会先到星级页再记。`?draw=1` 是 1–2 星的感谢页，刷新时不重复记扫码。新一轮评分会换一个新的评价 ID，所以同一个标签页再扫码或点「重新评分」可以正常再记一条 `rating_submitted`，不会被上一轮挡住。访客 cookie：`ugc_sid`（httpOnly session）、`ugc_qr`（来源码）。不存 IP、姓名、电话、邮箱。1–2 星只记 `rating_submitted`，不记 `form_submit` / `generation_complete`。
+进入星级页记一次 `qr_scan`，来源是 `rating-page`。`/qr/:qrCodeId` 只跳到星级页（`?new=1`），避免扫码被记两次。首页 `/` 和 `/c/baan-ying` 会先到星级页再记。`?draw=1` 是 1–2 星的感谢页，刷新时不重复记扫码。新一轮评分会换一个新的评价 ID，所以同一个标签页再扫码或点「重新评分」可以正常再记一条 `rating_submitted`，不会被上一轮挡住。访客 cookie：`ugc_sid`（httpOnly session）、`ugc_qr`（来源码）。不存 IP、姓名、电话、邮箱，也不存照片、图片 Base64 或 API Key。1–2 星只记 `rating_submitted`，不记 `form_submit` / `generate` / `generation_complete`。
 
-看板：`GET /api/analytics?range=today|yesterday|last_7_days|last_30_days|this_month|all`，可加 `startDate` / `endDate` / `qrCodeId` / `branch`。`branch` 只能是 `baan-ying-centralworld` 或 `baan-ying-siam-center`，对应上面两个数据库，不是在一个库里按字段过滤。页面 [https://seedai-baanying.vercel.app/analytics](https://seedai-baanying.vercel.app/analytics) 有 centralwOrld / Siam Center 两个按钮。日期按 Asia/Bangkok。
+每条事件的公共字段：`eventId`、`eventType`、`sessionId`、`qrCodeId`、`campaign`（固定 `baan-ying-ugc`）、`brandId`、`timestamp`、`metadata`。下面是写入 `metadata` 的内容，`campaignId` 和 `branchId` 都由服务器按当前部署填：
+
+```text
+rating_submitted  { campaignId, branchId, reviewId, rating: "2", band: "rating_low", feedback: "上菜有点慢，冬阴功偏咸。" }
+rating_submitted  { campaignId, branchId, reviewId, rating: "4", band: "rating_positive" }
+form_submit       { campaignId, branchId, reviewId, source: "rating_continue" }
+generate          { campaignId, branchId, reviewId, actionId, actionType: "initial" | "regenerate" | "retry", previousGenerationId? }
+generation_complete { source: "generate_api", campaignId, branchId, generationId, reviewId, actionId, actionType }
+```
+
+去重只针对同一次操作的重复执行（网络重试、重复提交、Strict Mode），靠操作 ID 或评价 ID 加 `eventId` 唯一索引。用户主动发起的新操作（同一 session 里再点「重新生成」、开始新一轮评分）都会拿到新 ID，照常记录。这四种事件都不按 `sessionId` 去重。
+
+例子：同一个 session 里评分一次（3–5 星）、进入体验页一次、首次生成一次，再点「重新生成」三次，四次都成功，结果是 `rating_submitted = 1`、`form_submit = 1`、`generate = 4`、`generation_complete = 4`。如果四次里有一次失败，就是 `generate = 4`、`generation_complete = 3`。
+
+**旧数据：** 2026-10-19 之前的 `form_submit`（`source: generate_api`）是每次请求 `/api/generate` 记一条，等于把首次生成和重新生成都算了进去。这些旧行保留，但不算进新的 Form Submission，也不当成 Generate。旧数据里没有操作 ID，不补造历史 Generate 次数。`analytics_daily.formSubmissions` 从这次部署起也只累加新口径；那一天之前的日累计仍是旧口径。
+
+看板（`/analytics`）的口径：
+
+| 指标 | 怎么数 |
+| --- | --- |
+| QR Scans | `qr_scan` 条数 |
+| Rating Submitted | `rating_submitted` 条数。每轮一条，所以就是提交过评分的轮次数，包括 1–2 星和 3–5 星。卡片下面另显示其中 1–2 星的条数 |
+| Form Submissions | `form_submit` 且 `metadata.source = rating_continue` 的条数，即 3–5 星点「继续评价」进入体验页的轮次数。旧口径的行在卡片下方单独说明，不加进来 |
+| Generate | `generate` 条数：首次生成、重新生成、失败重试，每次点击各算一次 |
+| Generation Completed | `generation_complete` 条数：成功完成的生成操作数 |
+| 转化率 | QR → Rating、QR → Form、Form → Generate（可以超过 100%，因为一轮可以多次重新生成）、Generate → Completed、Generation → XHS Click、QR → XHS Click |
+| Low-rating feedback | 最近 100 条 1–2 星评价和完整意见，可以按 1 星 / 2 星筛选（`?stars=1|2`）。只取 `band = rating_low` 的行，3–5 星不会出现 |
+
+不用 `generations` 文档数代替 Generate：用户可能点了生成却失败，也可能对同一次用餐重新生成多次。
+
+**注意：** `/analytics` 和 `/api/analytics` 没有登录保护，知道网址的人都能看到低分意见原文。
+
+看板：`GET /api/analytics?range=today|yesterday|last_7_days|last_30_days|this_month|all`，可加 `startDate` / `endDate` / `qrCodeId` / `branch` / `stars`。`branch` 只能是 `baan-ying-centralworld` 或 `baan-ying-siam-center`，对应上面两个数据库，不是在一个库里按字段过滤。看板按这份固定名单读库，不看当前部署的 `MONGODB_DB_NAME`，所以在 Preview 上打开会去读正式库名，还会尝试在那个库上建索引，不会读 `-preview` 测试库。页面 [https://seedai-baanying.vercel.app/analytics](https://seedai-baanying.vercel.app/analytics) 有 centralwOrld / Siam Center 两个按钮。日期按 Asia/Bangkok。
 
 ---
 
@@ -976,7 +1054,7 @@ Baan Ying
 
 生成时 5 个标签**打乱顺序**，品牌标签不一定排第一。centralwOrld 池子里带商场名的标签，大小写跟本轮商场名走。Siam Center 的商场标签固定是 `#SiamCenter` 这一组，标签里商场名不带空格。用户在 POST 页手动改标签时**保留当前顺序**。
 
-没有指定分店时，解析、合规改写、结果页和标签编辑器都用**当前部署**的池子。浏览器里靠 `NEXT_PUBLIC_DEPLOYMENT_ID` 判断，所以这个变量必须配。
+没有指定分店时，解析、合规改写、结果页和标签编辑器都用**当前部署**的池子。浏览器里靠 `NEXT_PUBLIC_DEPLOYMENT_ID` 判断，所以 Siam Center 必须配这个变量。centralwOrld 不配时默认就是自己的池子。
 
 两家店共用这 13 个：
 
@@ -1074,6 +1152,9 @@ Siam Center 再加这 5 个，不能抽到 centralwOrld 的标签：
 | `scripts/validate-title-keyword-postprocess.ts` | 本地整理不为了凑搜索词改写合格的标题。直接测 `enforceCustomerEvidence`，再在进程内调用 `/api/generate` 的路由代码；两家店各跑一遍。ModelArk 回复是脚本写好的模拟数据，不发真实模型请求，MongoDB 用内存替身 |
 | `scripts/validate-negative-feedback-prompt.ts` | ModelArk prompt 每次都带一次负面反馈中性化规则，不管顾客写了什么；OpenAI 和备用 `/api/generate-content` 的 prompt 用哈希固定。两家店各跑一遍；纯函数组装，不调用路由和模型，不连数据库。有意改 prompt 后用 `PRINT_PROMPT_HASHES=1` 打印新哈希 |
 | `lib/analytics/` | 转化事件写入、日期窗口、看板查询 |
+| `lib/analytics/funnel.ts` | `rating_submitted` / `form_submit` / `generate` 的校验和写入；由服务器生成 `eventId`，写入失败如实返回 |
+| `lib/analytics/funnel-client.ts` | 浏览器发送上面三种事件，返回是否真的写入；不用 beacon |
+| `lib/analytics/query.ts` | 看板查询：每个指标一个过滤条件（`METRIC_FILTERS`），汇总和每日表共用；含低分意见列表 |
 | `middleware.ts` | 匿名 `ugc_sid` session cookie |
 | `app/qr/[qrCodeId]/route.ts` | 扫码后跳到星级页 `?new=1`（开始新一轮）；`qr_scan` 在星级页服务端记 |
 | `app/api/analytics/route.ts` | 看板汇总 / 转化率 / 按日 / 按 QR |
@@ -1121,10 +1202,11 @@ Siam Center 再加这 5 个，不能抽到 centralwOrld 的标签：
 | `lib/brand-spelling.ts` | 餐厅名 `Baan Ying` / `baan ying`。centralwOrld 商场名在 `Centralworld` / `centralworld` 里抽；Siam Center 固定 `Siam Center`。话题标签里的商场名和餐厅名都去掉空格 |
 | `lib/title-insight.ts` | 标题照搬顾客原句时，本地提炼成 hook |
 | `lib/first-visit-wording.ts` | 第一次来 Baan Ying；没有写明就去掉「第一次吃泰餐」 |
-| `lib/entry-rating.ts` | 3–5 星通过后才允许进入体验页；`newRatingPath()` 生成开始新一轮的 `rating?new=1` |
+| `lib/entry-rating.ts` | 3–5 星通过后才允许进入体验页；`newRatingPath()` 生成开始新一轮的 `rating?new=1`；管本轮评价 ID（`ensureReviewId` / `currentReviewId` / `clearReviewId`） |
 | `lib/lucky-draw.ts` | 抽奖链接；当前为空。感谢页已不显示抽奖按钮，留作以后恢复 |
 | `app/c/[campaignId]/rating/` | 星级两步：`page.tsx` 第一步 / 感谢页，`review/page.tsx` 1–2 星反馈页，`rating-page-client.tsx` 选星、提交、返回、重新评分 |
-| `scripts/validate-rating-flow.ts` | 检查星级范围、反馈规则、提交去重、新一轮入口、感谢页文案；不写数据库 |
+| `scripts/validate-rating-flow.ts` | 检查星级范围、反馈规则、提交去重、写入失败留在原页、新一轮入口、感谢页文案；不写数据库 |
+| `scripts/validate-funnel-events.ts` | 两家店各跑一遍真实的 `/api/analytics/events` 和 `/api/generate` 路由，MongoDB 用内存替身、ModelArk 用模拟回复。覆盖：3–5 星一条评分加一条 `form_submit`、重试不重复、1–2 星完整意见、写入失败返回 503 且重试只留一条、1–2 星没有后续事件、每次生成点击一条 `generate`、AI 失败不记 `generation_complete`、成功按操作计、两家店不串库、看板数字按新口径。另用源码检查必填校验、按钮锁和 Strict Mode 下不重复记。不连真实数据库，不打真实模型。还跑完整场景：同一 session 一轮评分 + 首次生成 + 三次重新生成全部成功应为 1 / 1 / 4 / 4；其中一次失败应为 4 次 `generate`、3 次 `generation_complete`；同一 session 的第二轮评分另记一条 `form_submit`。2026-10-19 运行：客户端接线 11/11，两家店各 61/61 通过；把 `form_submit` / `generate` 临时改成按 session 去重时有 17 项失败，说明测试能抓到这种回退。线上 MongoDB 写入尚未验证 |
 | `scripts/validate-ai-provider.ts` | 检查默认 ModelArk、缺 key 和 OpenAI 拒绝时的错误提示；不打真实接口 |
 | `types/content.ts` | 体验问卷类型；10 道菜 + 其他；默认分店、到访 Yes/No、补充说明计数 |
 | `lib/generate-prompt.ts` | 同一次请求的 system / user prompt。顾客经历在品牌前面；JSON 形状不变 |

@@ -12,6 +12,8 @@ import {
 import { insertGeneration } from "@/lib/generations";
 import { upsertSubmission } from "@/lib/submissions";
 import { resolveAnalyticsSession, trackServerEvent } from "@/lib/analytics/server";
+import { funnelId, generationCompleteEventId } from "@/lib/analytics/funnel";
+import { GENERATE_ACTION_TYPES } from "@/lib/analytics/types";
 import { normalizeHashtags } from "@/lib/hashtags";
 import { resolveGenerationContext } from "@/lib/generation/context";
 import { DeploymentMismatchError } from "@/lib/deployment/config";
@@ -153,11 +155,6 @@ export async function POST(request: Request) {
     payload.requiredInlineLocationStyle = locationPlan.inlineStyle;
     payload.requiredInlineLocationSlot = locationPlan.inlineSlot;
     const analyticsSessionId = payload.analyticsSessionId?.trim() || "";
-    await trackServerEvent(
-      "form_submit",
-      { source: "generate_api", formType: "baan-ying-ugc" },
-      analyticsSessionId,
-    );
 
     const photos = form
       .getAll("photos")
@@ -742,11 +739,6 @@ export async function POST(request: Request) {
       const detail = error instanceof Error ? error.message : "";
       if (detail) console.error("[generations]", detail);
     }
-    await trackServerEvent(
-      "generation_complete",
-      { source: "generate_api" },
-      analyticsSessionId,
-    );
     if (payload.submissionId && payload.campaignId) {
       try {
         await upsertSubmission({
@@ -773,6 +765,25 @@ export async function POST(request: Request) {
       modelCalls: generationUsage.length,
       complianceCalls: compliant.usage.length,
     });
+    const actionId = funnelId(payload.generationActionId);
+    const actionType = (GENERATE_ACTION_TYPES as readonly string[]).includes(payload.generationActionType ?? "")
+      ? payload.generationActionType ?? ""
+      : "";
+    const reviewId = funnelId(payload.reviewId);
+    await trackServerEvent(
+      "generation_complete",
+      {
+        source: "generate_api",
+        campaignId: payload.campaignId,
+        branchId: payload.branchId,
+        generationId,
+        ...(reviewId ? { reviewId } : {}),
+        ...(actionId ? { actionId } : {}),
+        ...(actionType ? { actionType } : {}),
+      },
+      analyticsSessionId,
+      generationCompleteEventId(actionId, generationId),
+    );
 
     return Response.json({
       titles: spelledTitles,
